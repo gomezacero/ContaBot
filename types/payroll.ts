@@ -126,7 +126,7 @@ export interface TaxEvent {
     id: string;
     title: string;
     date: string; // YYYY-MM-DD
-    type: 'RENTA' | 'IVA' | 'RETEFUENTE' | 'EXOGENA' | 'SIMPLE' | 'PATRIMONIO' | 'EXTERIOR';
+    type: 'RENTA' | 'IVA' | 'RETEFUENTE' | 'RETENCION' | 'GMF' | 'EXOGENA' | 'SIMPLE' | 'PATRIMONIO' | 'EXTERIOR';
     status: 'PENDING' | 'DUE_SOON' | 'OVERDUE' | 'COMPLETED';
     description: string;
     alertDates?: { daysBefore: number, date: string, triggered: boolean }[];

@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { CalendarClientConfig, TaxEvent } from '@/types/payroll';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { TaxEvent } from '@/types/payroll';
+import { getTaxDeadlines, TaxClientConfig } from '@/lib/tax-deadlines';
+import { createClient } from '@/lib/supabase/client';
 import {
     CalendarDays,
     Bell,
@@ -10,68 +12,37 @@ import {
     Building2,
     Plus,
     X,
-    Save
+    Save,
+    Loader2,
+    Trash2,
+    Filter
 } from 'lucide-react';
 
-// Simplified tax deadline calculator
-const getTaxDeadlines = (nit: string, classification: string): TaxEvent[] => {
-    const cleanNit = nit.replace(/\D/g, '');
-    const lastDigit = parseInt(cleanNit.slice(-1)) || 0;
-    const year = 2025;
+interface DBClient {
+    id: string;
+    name: string;
+    nit: string | null;
+    classification: string | null;
+    iva_periodicity: string | null;
+    is_retention_agent: boolean | null;
+    has_gmf: boolean | null;
+    requires_exogena: boolean | null;
+    has_patrimony_tax: boolean | null;
+    alert_days: number[] | null;
+}
 
-    const events: TaxEvent[] = [];
-
-    // Sample deadlines based on classification
-    if (classification === 'JURIDICA') {
-        const days = ['23', '12', '13', '14', '15', '16', '19', '20', '21', '22'];
-        events.push({
-            id: 'renta-pj-1',
-            title: 'Renta PJ - Cuota 1',
-            date: `${year}-05-${days[lastDigit]}`,
-            type: 'RENTA',
-            status: 'PENDING',
-            description: 'Declaración y pago primera cuota'
-        });
-        events.push({
-            id: 'renta-pj-2',
-            title: 'Renta PJ - Cuota 2',
-            date: `${year}-07-${days[lastDigit]}`,
-            type: 'RENTA',
-            status: 'PENDING',
-            description: 'Pago segunda cuota'
-        });
-    }
-
-    if (classification === 'NATURAL') {
-        events.push({
-            id: 'renta-pn',
-            title: 'Renta Persona Natural',
-            date: `${year}-08-12`,
-            type: 'RENTA',
-            status: 'PENDING',
-            description: 'Declaración anual de renta'
-        });
-    }
-
-    // IVA Bimestral sample
-    const ivaDays = ['25', '11', '12', '13', '14', '17', '18', '19', '20', '21'];
-    events.push({
-        id: 'iva-1',
-        title: 'IVA Bimestral P1',
-        date: `${year}-03-${ivaDays[lastDigit]}`,
-        type: 'IVA',
-        status: 'PENDING',
-        description: 'IVA enero-febrero'
-    });
-
-    return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-};
+type TaxType = 'ALL' | 'RENTA' | 'IVA' | 'RETENCION' | 'GMF' | 'EXOGENA' | 'PATRIMONIO';
 
 export default function CalendarioPage() {
-    const [clients, setClients] = useState<CalendarClientConfig[]>([]);
+    const supabase = createClient();
+    const [clients, setClients] = useState<DBClient[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
-    const [selectedClient, setSelectedClient] = useState<CalendarClientConfig | null>(null);
+    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterType, setFilterType] = useState<TaxType>('ALL');
+    const [error, setError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         clientName: '',
@@ -79,37 +50,92 @@ export default function CalendarioPage() {
         classification: 'JURIDICA' as 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE',
         ivaPeriodicity: 'BIMESTRAL' as 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE',
         isRetentionAgent: true,
+        hasGmf: false,
+        requiresExogena: false,
+        hasPatrimonyTax: false,
         alertDays: [7, 3, 1],
     });
 
-    const handleAddClient = () => {
-        const newClient: CalendarClientConfig = {
-            id: crypto.randomUUID(),
-            clientName: formData.clientName,
-            nit: formData.nit,
-            classification: formData.classification,
-            ivaPeriodicity: formData.ivaPeriodicity,
-            isSimpleRegime: false,
-            taxRegime: 'ORDINARIO',
-            isRetentionAgent: formData.isRetentionAgent,
-            wealthSituation: 'DECLARANTE_RENTA',
-            sectoralTaxes: [],
-            alertDays: formData.alertDays,
-            lastUpdated: new Date().toISOString(),
-            notifications: {
-                emailEnabled: true,
-                whatsappEnabled: false,
-            }
-        };
+    // Load clients from Supabase
+    const loadClients = useCallback(async () => {
+        try {
+            const { data, error } = await supabase
+                .from('clients')
+                .select('id, name, nit, classification, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days')
+                .order('name');
 
-        setClients([...clients, newClient]);
-        setShowForm(false);
+            if (error) throw error;
+            setClients(data || []);
+        } catch {
+            console.error('Error loading clients');
+            setError('Error cargando clientes');
+        } finally {
+            setLoading(false);
+        }
+    }, [supabase]);
+
+    useEffect(() => {
+        loadClients();
+    }, [loadClients]);
+
+    const handleAddClient = async () => {
+        setSaving(true);
+        setError(null);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No user');
+
+            const { data, error } = await supabase
+                .from('clients')
+                .insert({
+                    user_id: user.id,
+                    name: formData.clientName,
+                    nit: formData.nit,
+                    classification: formData.classification,
+                    iva_periodicity: formData.ivaPeriodicity,
+                    is_retention_agent: formData.isRetentionAgent,
+                    has_gmf: formData.hasGmf,
+                    requires_exogena: formData.requiresExogena,
+                    has_patrimony_tax: formData.hasPatrimonyTax,
+                    alert_days: formData.alertDays,
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            setClients([...clients, data]);
+            setShowForm(false);
+            resetForm();
+        } catch (err) {
+            console.error('Error adding client:', err);
+            setError('Error agregando cliente');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteClient = async (id: string) => {
+        if (!confirm('¿Eliminar este cliente?')) return;
+        try {
+            const { error } = await supabase.from('clients').delete().eq('id', id);
+            if (error) throw error;
+            setClients(clients.filter(c => c.id !== id));
+            if (selectedClientId === id) setSelectedClientId(null);
+        } catch {
+            setError('Error eliminando cliente');
+        }
+    };
+
+    const resetForm = () => {
         setFormData({
             clientName: '',
             nit: '',
             classification: 'JURIDICA',
             ivaPeriodicity: 'BIMESTRAL',
             isRetentionAgent: true,
+            hasGmf: false,
+            requiresExogena: false,
+            hasPatrimonyTax: false,
             alertDays: [7, 3, 1],
         });
     };
@@ -125,15 +151,63 @@ export default function CalendarioPage() {
         return 'bg-green-50 text-green-700 border-green-200';
     };
 
+    const getTypeColor = (type: string) => {
+        const colors: Record<string, string> = {
+            'RENTA': 'bg-blue-100 text-blue-700',
+            'IVA': 'bg-purple-100 text-purple-700',
+            'RETENCION': 'bg-orange-100 text-orange-700',
+            'GMF': 'bg-pink-100 text-pink-700',
+            'EXOGENA': 'bg-teal-100 text-teal-700',
+            'PATRIMONIO': 'bg-indigo-100 text-indigo-700',
+        };
+        return colors[type] || 'bg-gray-100 text-gray-700';
+    };
+
+    // Convert DB client to TaxClientConfig
+    const toTaxConfig = (client: DBClient): TaxClientConfig => ({
+        nit: client.nit || '',
+        classification: (client.classification as TaxClientConfig['classification']) || 'JURIDICA',
+        ivaPeriodicity: (client.iva_periodicity as TaxClientConfig['ivaPeriodicity']) || 'BIMESTRAL',
+        isRetentionAgent: client.is_retention_agent || false,
+        hasGmf: client.has_gmf || false,
+        requiresExogena: client.requires_exogena || false,
+        hasPatrimonyTax: client.has_patrimony_tax || false,
+    });
+
+    // Calculate all events
     const allEvents = useMemo(() => {
-        return clients.flatMap(client =>
-            getTaxDeadlines(client.nit, client.classification).map(event => ({
+        const clientsToUse = selectedClientId
+            ? clients.filter(c => c.id === selectedClientId)
+            : clients;
+
+        const events = clientsToUse.flatMap(client =>
+            getTaxDeadlines(toTaxConfig(client)).map(event => ({
                 ...event,
-                clientName: client.clientName,
-                clientNit: client.nit
+                clientName: client.name,
+                clientNit: client.nit,
+                clientId: client.id,
             }))
         );
-    }, [clients]);
+
+        // Apply type filter
+        if (filterType !== 'ALL') {
+            return events.filter(e => e.type === filterType);
+        }
+        return events;
+    }, [clients, selectedClientId, filterType]);
+
+    const filteredClients = clients.filter(c =>
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c.nit && c.nit.includes(searchTerm))
+    );
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="w-8 h-8 animate-spin text-[#1AB1B1]" />
+            </div>
+        );
+    }
 
     return (
         <div className="animate-fade-in">
@@ -151,6 +225,14 @@ export default function CalendarioPage() {
                     Agregar Cliente
                 </button>
             </div>
+
+            {/* Error */}
+            {error && (
+                <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
+                    <span className="text-red-700">{error}</span>
+                    <button onClick={() => setError(null)}><X className="w-4 h-4 text-red-500" /></button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Panel - Client List */}
@@ -178,33 +260,51 @@ export default function CalendarioPage() {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {clients.filter(c =>
-                                c.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                c.nit.includes(searchTerm)
-                            ).map((client) => (
+                            {/* All clients button */}
+                            <button
+                                onClick={() => setSelectedClientId(null)}
+                                className={`w-full text-left p-4 rounded-xl border transition-all ${selectedClientId === null
+                                        ? 'border-[#1AB1B1] bg-teal-50'
+                                        : 'border-gray-100 bg-white hover:shadow-md'
+                                    }`}
+                            >
+                                <p className="font-bold text-[#002D44]">📊 Todos los clientes</p>
+                                <p className="text-sm text-gray-500">{clients.length} clientes registrados</p>
+                            </button>
+
+                            {filteredClients.map((client) => (
                                 <div
                                     key={client.id}
-                                    onClick={() => setSelectedClient(client)}
-                                    className={`bg-white rounded-2xl border p-4 cursor-pointer transition-all ${selectedClient?.id === client.id
+                                    onClick={() => setSelectedClientId(client.id)}
+                                    className={`bg-white rounded-2xl border p-4 cursor-pointer transition-all ${selectedClientId === client.id
                                         ? 'border-[#1AB1B1] shadow-lg'
                                         : 'border-gray-100 hover:shadow-md'
                                         }`}
                                 >
                                     <div className="flex items-start justify-between mb-2">
                                         <div>
-                                            <p className="font-bold text-[#002D44]">{client.clientName}</p>
+                                            <p className="font-bold text-[#002D44]">{client.name}</p>
                                             <p className="text-sm text-gray-400 font-mono">{client.nit}</p>
                                         </div>
-                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${client.classification === 'GRAN_CONTRIBUYENTE' ? 'bg-purple-100 text-purple-700' :
-                                            client.classification === 'JURIDICA' ? 'bg-blue-100 text-blue-700' :
-                                                'bg-green-100 text-green-700'
-                                            }`}>
-                                            {client.classification}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${client.classification === 'GRAN_CONTRIBUYENTE' ? 'bg-purple-100 text-purple-700' :
+                                                    client.classification === 'JURIDICA' ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-green-100 text-green-700'
+                                                }`}>
+                                                {client.classification}
+                                            </span>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteClient(client.id); }}
+                                                className="p-1 hover:bg-red-50 rounded"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-xs text-gray-500">
                                         <Bell className="w-3 h-3" />
-                                        Alertas: {client.alertDays.join(', ')} días antes
+                                        {client.is_retention_agent && <span className="bg-orange-50 px-2 py-0.5 rounded">Retenedor</span>}
+                                        {client.has_gmf && <span className="bg-pink-50 px-2 py-0.5 rounded">GMF</span>}
                                     </div>
                                 </div>
                             ))}
@@ -214,24 +314,50 @@ export default function CalendarioPage() {
 
                 {/* Right Panel - Timeline */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* Filter */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Filter className="w-4 h-4 text-gray-400" />
+                        {(['ALL', 'RENTA', 'IVA', 'RETENCION', 'GMF', 'EXOGENA', 'PATRIMONIO'] as TaxType[]).map(type => (
+                            <button
+                                key={type}
+                                onClick={() => setFilterType(type)}
+                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${filterType === type
+                                        ? 'bg-[#1AB1B1] text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                            >
+                                {type === 'ALL' ? 'Todos' : type}
+                            </button>
+                        ))}
+                    </div>
+
                     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                         <div className="p-6 border-b border-gray-100 bg-gray-50">
                             <h3 className="font-bold text-[#002D44] flex items-center gap-2">
                                 <CalendarDays className="w-5 h-5" />
                                 Próximos Vencimientos
+                                {selectedClientId && (
+                                    <span className="text-sm font-normal text-gray-500">
+                                        - {clients.find(c => c.id === selectedClientId)?.name}
+                                    </span>
+                                )}
                             </h3>
                         </div>
 
                         {allEvents.length === 0 ? (
                             <div className="p-12 text-center">
                                 <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                                <p className="text-gray-400">Agrega clientes para ver sus vencimientos</p>
+                                <p className="text-gray-400">
+                                    {clients.length === 0
+                                        ? 'Agrega clientes para ver sus vencimientos'
+                                        : 'No hay vencimientos para el filtro seleccionado'}
+                                </p>
                             </div>
                         ) : (
-                            <div className="p-6 space-y-4">
-                                {allEvents.slice(0, 10).map((event) => (
+                            <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto">
+                                {allEvents.slice(0, 50).map((event, idx) => (
                                     <div
-                                        key={`${event.id}-${event.clientNit}`}
+                                        key={`${event.id}-${(event as TaxEvent & { clientId: string }).clientId}-${idx}`}
                                         className={`flex items-center gap-4 p-4 rounded-xl border ${getStatusColor(event.date)}`}
                                     >
                                         <div className="w-12 h-12 bg-white rounded-xl flex flex-col items-center justify-center shadow-sm">
@@ -242,14 +368,13 @@ export default function CalendarioPage() {
                                                 {new Date(event.date).getDate()}
                                             </span>
                                         </div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-[#002D44]">{event.title}</p>
-                                            <p className="text-sm text-gray-500">{event.clientName} • {event.clientNit}</p>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-bold text-[#002D44] truncate">{event.title}</p>
+                                            <p className="text-sm text-gray-500 truncate">
+                                                {(event as TaxEvent & { clientName: string }).clientName} • {(event as TaxEvent & { clientNit: string }).clientNit}
+                                            </p>
                                         </div>
-                                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${event.type === 'RENTA' ? 'bg-blue-100 text-blue-700' :
-                                            event.type === 'IVA' ? 'bg-purple-100 text-purple-700' :
-                                                'bg-gray-100 text-gray-700'
-                                            }`}>
+                                        <span className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ${getTypeColor(event.type)}`}>
                                             {event.type}
                                         </span>
                                     </div>
@@ -263,7 +388,7 @@ export default function CalendarioPage() {
             {/* Add Client Modal */}
             {showForm && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl max-w-lg w-full p-8 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-xl font-black text-[#002D44]">Agregar Cliente</h2>
                             <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
@@ -298,7 +423,7 @@ export default function CalendarioPage() {
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Clasificación</label>
                                 <select
                                     value={formData.classification}
-                                    onChange={(e) => setFormData({ ...formData, classification: e.target.value as any })}
+                                    onChange={(e) => setFormData({ ...formData, classification: e.target.value as typeof formData.classification })}
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] bg-white"
                                 >
                                     <option value="NATURAL">Persona Natural</option>
@@ -311,7 +436,7 @@ export default function CalendarioPage() {
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Periodicidad IVA</label>
                                 <select
                                     value={formData.ivaPeriodicity}
-                                    onChange={(e) => setFormData({ ...formData, ivaPeriodicity: e.target.value as any })}
+                                    onChange={(e) => setFormData({ ...formData, ivaPeriodicity: e.target.value as typeof formData.ivaPeriodicity })}
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] bg-white"
                                 >
                                     <option value="BIMESTRAL">Bimestral</option>
@@ -320,15 +445,47 @@ export default function CalendarioPage() {
                                 </select>
                             </div>
 
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.isRetentionAgent}
-                                    onChange={(e) => setFormData({ ...formData, isRetentionAgent: e.target.checked })}
-                                    className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                />
-                                <span className="text-sm text-gray-700">Es agente retenedor</span>
-                            </label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.isRetentionAgent}
+                                        onChange={(e) => setFormData({ ...formData, isRetentionAgent: e.target.checked })}
+                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
+                                    />
+                                    <span className="text-sm text-gray-700">Agente retenedor</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.hasGmf}
+                                        onChange={(e) => setFormData({ ...formData, hasGmf: e.target.checked })}
+                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
+                                    />
+                                    <span className="text-sm text-gray-700">GMF (4x1000)</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.requiresExogena}
+                                        onChange={(e) => setFormData({ ...formData, requiresExogena: e.target.checked })}
+                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
+                                    />
+                                    <span className="text-sm text-gray-700">Info Exógena</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.hasPatrimonyTax}
+                                        onChange={(e) => setFormData({ ...formData, hasPatrimonyTax: e.target.checked })}
+                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
+                                    />
+                                    <span className="text-sm text-gray-700">Imp. Patrimonio</span>
+                                </label>
+                            </div>
                         </div>
 
                         <div className="flex gap-4 mt-8">
@@ -340,10 +497,10 @@ export default function CalendarioPage() {
                             </button>
                             <button
                                 onClick={handleAddClient}
-                                disabled={!formData.clientName || !formData.nit}
+                                disabled={!formData.clientName || !formData.nit || saving}
                                 className="flex-1 py-3 bg-[#1AB1B1] text-white rounded-xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                             >
-                                <Save className="w-5 h-5" />
+                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                                 Guardar
                             </button>
                         </div>
