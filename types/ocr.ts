@@ -6,6 +6,7 @@ export interface OCRItem {
     unitPrice: number;
     total: number;
     category: string;
+    confidence?: number;
 }
 
 export interface OCRResult {
