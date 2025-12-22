@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PayrollInput, RiskLevel } from '@/types/payroll';
 import { calculatePayroll, formatCurrency, createDefaultEmployee } from '@/lib/calculations';
+import { generatePayrollPDF, generateLiquidationPDF } from '@/lib/pdf-generator';
 import { SMMLV_2025, RISK_LEVEL_LABELS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -722,7 +723,21 @@ export default function NominaPage() {
 
                         {/* Actions */}
                         <div className="flex gap-4">
-                            <button className="flex items-center gap-2 bg-[#002D44] text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-colors">
+                            <button
+                                onClick={() => {
+                                    if (activeEmployee && result) {
+                                        const selectedClient = clients.find(c => c.id === selectedClientId);
+                                        generatePayrollPDF({
+                                            employee: activeEmployee,
+                                            result,
+                                            companyName: selectedClient?.name,
+                                            companyNit: selectedClient?.nit || undefined,
+                                            periodDescription: `Período: ${activeEmployee.startDate} - ${activeEmployee.endDate}`
+                                        });
+                                    }
+                                }}
+                                className="flex items-center gap-2 bg-[#002D44] text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-colors"
+                            >
                                 <Download className="w-5 h-5" />
                                 Descargar PDF
                             </button>
@@ -736,7 +751,20 @@ export default function NominaPage() {
                                     Guardar Cálculo
                                 </button>
                             )}
-                            <button className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-colors">
+                            <button
+                                onClick={() => {
+                                    if (activeEmployee && result) {
+                                        const selectedClient = clients.find(c => c.id === selectedClientId);
+                                        generateLiquidationPDF({
+                                            employee: activeEmployee,
+                                            result,
+                                            companyName: selectedClient?.name,
+                                            companyNit: selectedClient?.nit || undefined,
+                                        });
+                                    }
+                                }}
+                                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+                            >
                                 <Calendar className="w-5 h-5" />
                                 Ver Liquidación
                             </button>
