@@ -213,88 +213,314 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
     doc.save(fileName);
 }
 
-// Generate PDF for liquidation
+// Generate PDF for liquidation (Colombian format)
 export function generateLiquidationPDF(data: PayrollPDFData): void {
     const { employee, result } = data;
     const doc = new jsPDF();
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    let yPos = 20;
+    const margin = 15;
+    let yPos = 15;
 
-    const primaryColor: [number, number, number] = [0, 45, 68];
-    const accentColor: [number, number, number] = [26, 177, 177];
+    // Colors
+    const headerBg: [number, number, number] = [240, 240, 240];
+    const primaryText: [number, number, number] = [0, 0, 0];
+    const greenHighlight: [number, number, number] = [220, 252, 231];
+    const redText: [number, number, number] = [185, 28, 28];
 
-    // Calculate liquidation values based on monthly provisions
+    // Calculate values (same as DocumentPreview)
     const daysWorked = result.monthly.salaryData.daysWorked || 30;
-    const cesantiasAmount = result.monthly.employerCosts.cesantias;
-    const interesesCesantias = result.monthly.employerCosts.interesesCesantias;
-    const primaAmount = result.monthly.employerCosts.prima;
-    const vacationsAmount = result.monthly.employerCosts.vacations;
-    const totalLiquidation = cesantiasAmount + interesesCesantias + primaAmount + vacationsAmount;
+    const baseSalary = employee.baseSalary;
+    const transportAid = result.monthly.salaryData.transportAid || 0;
+    const variableSalary = (result.monthly.salaryData.overtime || 0) + (result.monthly.salaryData.variables || 0);
+    const baseForBenefits = baseSalary + transportAid + variableSalary;
 
-    // Header
-    doc.setFillColor(...primaryColor);
-    doc.rect(0, 0, pageWidth, 35, 'F');
+    // Colombian formulas
+    const cesantias = (baseForBenefits * daysWorked) / 360;
+    const interesesCesantias = (cesantias * daysWorked * 0.12) / 360;
+    const prima = (baseForBenefits * daysWorked) / 360;
+    const vacaciones = (baseSalary * daysWorked) / 720;
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
+    const totalPrestaciones = cesantias + interesesCesantias + prima + vacaciones;
+    const descuentos = employee.loans || 0;
+    const netoAPagar = totalPrestaciones - descuentos;
+
+    // ===== HEADER =====
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('LIQUIDACIÓN DE CONTRATO', pageWidth / 2, 18, { align: 'center' });
-
+    doc.text('LIQUIDACIÓN DE PRESTACIONES SOCIALES', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 6;
     doc.setFontSize(9);
-    doc.text(`Período trabajado: ${employee.startDate} - ${employee.endDate}`, pageWidth / 2, 28, { align: 'center' });
+    doc.setFont('helvetica', 'italic');
+    doc.text('(Colombia – Código Sustantivo del Trabajo)', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
 
-    yPos = 45;
+    // Helper: Section Header
+    const sectionHeader = (num: string, title: string) => {
+        doc.setFillColor(...headerBg);
+        doc.rect(margin, yPos, pageWidth - margin * 2, 7, 'F');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primaryText);
+        doc.text(`${num}. ${title}`, margin + 2, yPos + 5);
+        yPos += 10;
+    };
 
-    // Employee info
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Empleado: ${employee.name}`, margin, yPos);
-    doc.text(`Documento: ${employee.documentNumber || 'N/A'}`, pageWidth - margin, yPos, { align: 'right' });
+    // ===== 1. DATOS GENERALES DEL TRABAJADOR =====
+    sectionHeader('1', 'DATOS GENERALES DEL TRABAJADOR');
 
-    yPos += 15;
-
-    // Liquidation table
     autoTable(doc, {
         startY: yPos,
-        head: [['Concepto', 'Base', 'Días', 'Valor']],
         body: [
-            ['Cesantías', formatCurrency(result.monthly.salaryData.totalAccrued), String(daysWorked), formatCurrency(cesantiasAmount)],
-            ['Intereses Cesantías', '-', '-', formatCurrency(interesesCesantias)],
-            ['Prima de Servicios', formatCurrency(result.monthly.salaryData.totalAccrued), String(daysWorked), formatCurrency(primaAmount)],
-            ['Vacaciones', formatCurrency(result.monthly.salaryData.baseSalary), String(daysWorked), formatCurrency(vacationsAmount)],
+            ['Nombre del trabajador', employee.name],
+            ['Documento de identidad', employee.documentNumber || ''],
+            ['Cargo', employee.jobTitle || ''],
+            ['Tipo de contrato', employee.contractType === 'INDEFINIDO' ? '[ X ] Indefinido' : employee.contractType === 'FIJO' ? '[ X ] Término fijo' : '[ X ] Obra o labor'],
+            ['Fecha de ingreso', employee.startDate || ''],
+            ['Fecha de retiro / corte', employee.endDate || ''],
+            ['Días laborados en el período', String(daysWorked)],
+            ['Salario mensual base', formatCurrency(baseSalary)],
+            ['Salario variable (promedio)', formatCurrency(variableSalary)],
+            ['Auxilio de transporte', employee.includeTransportAid ? '[ X ] Sí' : '[ X ] No'],
+            ['Total salario base de liquidación', formatCurrency(baseForBenefits)],
         ],
-        foot: [['', '', 'TOTAL LIQUIDACIÓN', formatCurrency(totalLiquidation)]],
-        theme: 'striped',
-        headStyles: { fillColor: accentColor, textColor: [255, 255, 255], fontStyle: 'bold' },
-        footStyles: { fillColor: [230, 255, 255], textColor: primaryColor, fontStyle: 'bold', fontSize: 11 },
-        styles: { fontSize: 9, cellPadding: 5 },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'center' }, 3: { halign: 'right' } },
+        theme: 'plain',
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'left' } },
         margin: { left: margin, right: margin },
     });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
 
-    yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 30;
+    // ===== 2. BASE DE LIQUIDACIÓN =====
+    sectionHeader('2', 'BASE DE LIQUIDACIÓN');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.text('* Base salarial = Salario + factores salariales habituales', margin, yPos);
+    yPos += 4;
 
-    // Signatures
-    const signWidth = (pageWidth - margin * 2 - 20) / 2;
-    doc.setDrawColor(150, 150, 150);
-    doc.line(margin, yPos, margin + signWidth, yPos);
-    doc.line(pageWidth - margin - signWidth, yPos, pageWidth - margin, yPos);
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Concepto', 'Valor']],
+        body: [
+            ['Salario mensual', formatCurrency(baseSalary)],
+            ['Recargos y Variables', formatCurrency(variableSalary)],
+            ['Auxilio de transporte (si aplica)', formatCurrency(transportAid)],
+        ],
+        foot: [['Base para prestaciones', formatCurrency(baseForBenefits)]],
+        theme: 'striped',
+        headStyles: { fillColor: [230, 230, 230], textColor: primaryText, fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [245, 245, 245], textColor: primaryText, fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
 
+    // ===== 3. LIQUIDACIÓN DE PRESTACIONES SOCIALES =====
+    sectionHeader('3', 'LIQUIDACIÓN DE PRESTACIONES SOCIALES');
+
+    // A. Cesantías
     doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Firma Empleador', margin + signWidth / 2, yPos + 7, { align: 'center' });
-    doc.text('Firma Empleado', pageWidth - margin - signWidth / 2, yPos + 7, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.text('A. CESANTÍAS (Art. 249 CST)', margin, yPos);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text('Fórmula: (Salario base x Días trabajados) / 360', margin, yPos + 4);
+    yPos += 7;
 
-    // Footer
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Concepto', 'Valor']],
+        body: [
+            ['Salario base', formatCurrency(baseForBenefits)],
+            ['Días trabajados', String(daysWorked)],
+        ],
+        foot: [['Cesantías causadas', formatCurrency(cesantias)]],
+        theme: 'striped',
+        headStyles: { fillColor: [230, 230, 230], textColor: primaryText, fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
+
+    // B. Intereses Cesantías
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('B. INTERESES A LAS CESANTÍAS (Ley 52 de 1975)', margin, yPos);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text('Fórmula: (Cesantías x Días Trabajados x 12%) / 360', margin, yPos + 4);
+    yPos += 7;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Concepto', 'Valor']],
+        body: [
+            ['Valor cesantías', formatCurrency(cesantias)],
+            ['Días causados', String(daysWorked)],
+            ['Tasa', '12%'],
+        ],
+        foot: [['Intereses de cesantías', formatCurrency(interesesCesantias)]],
+        theme: 'striped',
+        headStyles: { fillColor: [230, 230, 230], textColor: primaryText, fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
+
+    // C. Prima de Servicios
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('C. PRIMA DE SERVICIOS (Art. 306 CST)', margin, yPos);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text('Fórmula: (Salario base x Días trabajados) / 360', margin, yPos + 4);
+    yPos += 7;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Concepto', 'Valor']],
+        body: [
+            ['Salario base', formatCurrency(baseForBenefits)],
+            ['Días trabajados', String(daysWorked)],
+        ],
+        foot: [['Prima causada', formatCurrency(prima)]],
+        theme: 'striped',
+        headStyles: { fillColor: [230, 230, 230], textColor: primaryText, fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
+
+    // D. Vacaciones
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('D. VACACIONES (Art. 186 CST)', margin, yPos);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text('Fórmula: (Salario base x Días trabajados) / 720 - No incluye auxilio de transporte', margin, yPos + 4);
+    yPos += 7;
+
+    autoTable(doc, {
+        startY: yPos,
+        head: [['Concepto', 'Valor']],
+        body: [
+            ['Salario base', formatCurrency(baseSalary)],
+            ['Días trabajados', String(daysWorked)],
+        ],
+        foot: [['Vacaciones causadas', formatCurrency(vacaciones)]],
+        theme: 'striped',
+        headStyles: { fillColor: [230, 230, 230], textColor: primaryText, fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
+
+    // Check for page break
+    if (yPos > 240) {
+        doc.addPage();
+        yPos = 15;
+    }
+
+    // ===== 4. RESUMEN GENERAL =====
+    sectionHeader('4', 'RESUMEN GENERAL DE LA LIQUIDACION');
+
+    autoTable(doc, {
+        startY: yPos,
+        body: [
+            ['Cesantías', formatCurrency(cesantias)],
+            ['Intereses de cesantías', formatCurrency(interesesCesantias)],
+            ['Prima de servicios', formatCurrency(prima)],
+            ['Vacaciones', formatCurrency(vacaciones)],
+        ],
+        foot: [['TOTAL PRESTACIONES SOCIALES', formatCurrency(totalPrestaciones)]],
+        theme: 'plain',
+        footStyles: { fillColor: [254, 242, 242], textColor: redText, fontStyle: 'bold', fontSize: 9 },
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
+
+    // ===== 5. DESCUENTOS =====
+    sectionHeader('5', 'DESCUENTOS DE NÓMINA Y RETENCIONES DEL PERIODO FINAL');
+
+    autoTable(doc, {
+        startY: yPos,
+        body: [
+            ['Préstamos y Libranzas', formatCurrency(descuentos)],
+        ],
+        foot: [['Total descuentos del periodo', formatCurrency(descuentos)]],
+        theme: 'plain',
+        footStyles: { textColor: redText, fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 5;
+
+    // ===== 6. NETO A PAGAR =====
+    sectionHeader('6', 'NETO A PAGAR');
+
+    autoTable(doc, {
+        startY: yPos,
+        body: [
+            ['Total prestaciones acumuladas', formatCurrency(totalPrestaciones)],
+            ['(-) Descuentos periodo final', formatCurrency(descuentos)],
+        ],
+        foot: [['NETO A PAGAR AL TRABAJADOR', formatCurrency(netoAPagar)]],
+        theme: 'plain',
+        footStyles: { fillColor: greenHighlight, textColor: [22, 101, 52], fontStyle: 'bold', fontSize: 10 },
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: { 1: { halign: 'right' } },
+        margin: { left: margin, right: margin },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // ===== 7. FIRMAS =====
+    sectionHeader('7', 'FIRMAS');
+    yPos += 5;
+
+    const signWidth = (pageWidth - margin * 2 - 20) / 2;
+
+    // Employer box
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(margin, yPos, signWidth, 30);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EMPLEADOR', margin + 5, yPos + 8);
+    doc.line(margin + 5, yPos + 22, margin + signWidth - 5, yPos + 22);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Firma', margin + 5, yPos + 27);
+
+    // Employee box
+    const empBoxX = pageWidth - margin - signWidth;
+    doc.rect(empBoxX, yPos, signWidth, 30);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TRABAJADOR', empBoxX + 5, yPos + 8);
+    doc.line(empBoxX + 5, yPos + 22, empBoxX + signWidth - 5, yPos + 22);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('Firma', empBoxX + 5, yPos + 27);
+
+    // ===== FOOTER =====
     doc.setFillColor(245, 245, 245);
-    doc.rect(0, doc.internal.pageSize.getHeight() - 12, pageWidth, 12, 'F');
+    doc.rect(0, doc.internal.pageSize.getHeight() - 10, pageWidth, 10, 'F');
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
     doc.text('Generado con ContaBot - www.contabot.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 4, { align: 'center' });
 
+    // Save the PDF
     const fileName = `liquidacion_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
 }

@@ -11,9 +11,11 @@ import {
     CalendarDays,
     User,
     LogOut,
+    LogIn,
     Menu,
     X,
-    ChevronDown
+    ChevronDown,
+    Sparkles
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -31,10 +33,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     const navItems = [
-        { id: 'nomina', label: 'Nómina', icon: LayoutDashboard, href: '/dashboard/nomina' },
-        { id: 'gastos', label: 'Digitador', icon: ScanLine, href: '/dashboard/gastos' },
-        { id: 'calendario', label: 'Calendario', icon: CalendarDays, href: '/dashboard/calendario' },
+        { id: 'nomina', label: 'Nómina', icon: LayoutDashboard, href: '/dashboard/nomina', premium: false },
+        { id: 'gastos', label: 'Digitador', icon: ScanLine, href: '/dashboard/gastos', premium: true },
+        { id: 'calendario', label: 'Calendario', icon: CalendarDays, href: '/dashboard/calendario', premium: false },
     ];
+
+    const isGuest = !user;
 
     useEffect(() => {
         const getUser = async () => {
@@ -135,11 +139,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                 }}
                                 className="flex items-center gap-2 hover:bg-gray-100 rounded-xl px-3 py-2 transition-colors"
                             >
-                                <div className="w-10 h-10 bg-[#1AB1B1] text-white rounded-full flex items-center justify-center font-bold">
-                                    {user?.profile?.name?.[0]?.toUpperCase() || 'U'}
+                                <div className={`w-10 h-10 ${isGuest ? 'bg-gray-400' : 'bg-[#1AB1B1]'} text-white rounded-full flex items-center justify-center font-bold`}>
+                                    {isGuest ? 'I' : (user?.profile?.name?.[0]?.toUpperCase() || 'U')}
                                 </div>
                                 <span className="hidden md:block text-sm font-semibold text-gray-700">
-                                    {user?.profile?.name || 'Usuario'}
+                                    {isGuest ? 'Invitado' : (user?.profile?.name || 'Usuario')}
                                 </span>
                                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -149,24 +153,51 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-fade-in"
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div className="px-4 py-2 border-b border-gray-100">
-                                        <p className="font-bold text-[#002D44]">{user?.profile?.name}</p>
-                                        <p className="text-xs text-gray-400">{user?.email}</p>
-                                    </div>
-                                    <Link
-                                        href="/dashboard/perfil"
-                                        className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <User className="w-4 h-4" />
-                                        Mi Perfil
-                                    </Link>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
-                                    >
-                                        <LogOut className="w-4 h-4" />
-                                        Cerrar Sesión
-                                    </button>
+                                    {isGuest ? (
+                                        // Guest Menu
+                                        <>
+                                            <div className="px-4 py-3 border-b border-gray-100">
+                                                <p className="font-bold text-gray-600">Modo Invitado</p>
+                                                <p className="text-xs text-gray-400">Tus datos se guardan localmente</p>
+                                            </div>
+                                            <Link
+                                                href="/login"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-[#1AB1B1] hover:bg-teal-50 transition-colors font-semibold"
+                                            >
+                                                <LogIn className="w-4 h-4" />
+                                                Iniciar Sesión
+                                            </Link>
+                                            <Link
+                                                href="/register"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <User className="w-4 h-4" />
+                                                Crear Cuenta Gratis
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        // Authenticated User Menu
+                                        <>
+                                            <div className="px-4 py-2 border-b border-gray-100">
+                                                <p className="font-bold text-[#002D44]">{user?.profile?.name}</p>
+                                                <p className="text-xs text-gray-400">{user?.email}</p>
+                                            </div>
+                                            <Link
+                                                href="/dashboard/perfil"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <User className="w-4 h-4" />
+                                                Mi Perfil
+                                            </Link>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
+                                            >
+                                                <LogOut className="w-4 h-4" />
+                                                Cerrar Sesión
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>

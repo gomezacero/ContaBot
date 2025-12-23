@@ -1,4 +1,4 @@
-// Colombian Tax Deadlines Calculator
+// Colombian Tax Deadlines Calculator (Updated for 2025)
 // Based on DIAN resolution for 2025 tax calendar
 
 import { TaxEvent } from '@/types/payroll';
@@ -6,6 +6,7 @@ import { TaxEvent } from '@/types/payroll';
 export interface TaxClientConfig {
     nit: string;
     classification: 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE';
+    taxRegime: 'ORDINARIO' | 'SIMPLE' | 'ESPECIAL';
     ivaPeriodicity: 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE';
     isRetentionAgent: boolean;
     hasGmf: boolean;
@@ -70,84 +71,128 @@ const PATRIMONIO_2025 = {
     cuota2: { month: '09', days: ['18', '09', '10', '11', '12', '15', '16', '17', '18', '19'] },
 };
 
+const SIMPLE_2025 = {
+    anticipos: [
+        { month: '05', days: ['23', '12', '13', '14', '15', '16', '19', '20', '21', '22'] }, // Bimestre 1 (Ene-Feb)
+        { month: '07', days: ['18', '11', '12', '15', '16', '17', '18', '21', '22', '23'] }, // Bimestre 2 (Mar-Abr)
+        { month: '09', days: ['22', '08', '09', '10', '11', '12', '15', '16', '17', '18'] }, // Bimestre 3 (May-Jun)
+        { month: '11', days: ['18', '10', '11', '12', '13', '14', '18', '19', '20', '21'] }, // Bimestre 4 (Jul-Ago)
+        { month: '01', days: ['23', '14', '15', '16', '17', '20', '21', '22', '23', '24'], year: 2026 }, // Bimestre 5 (Sep-Oct)
+        { month: '03', days: ['20', '10', '11', '12', '13', '14', '17', '18', '19', '20'], year: 2026 }, // Bimestre 6 (Nov-Dic) - Example, adjust as per DIAN
+    ],
+    annual: { month: '04', days: ['15', '16', '21', '22', '23', '24', '25', '28', '29', '30'] } // Annual declaration for previous year
+};
+
 export function getTaxDeadlines(client: TaxClientConfig): TaxEvent[] {
     const events: TaxEvent[] = [];
     const lastDigit = getLastDigit(client.nit);
     const year = 2025;
 
-    // ========== RENTA ==========
-    if (client.classification === 'JURIDICA' || client.classification === 'GRAN_CONTRIBUYENTE') {
+    // ========== SIMPLE REGIME ==========
+    if (client.taxRegime === 'SIMPLE') {
+        // Annual Declaration (for 2025, declared in 2026)
         events.push({
-            id: 'renta-pj-1',
-            title: 'Renta PJ - Cuota 1',
-            date: `${year}-05-${RENTA_PJ_2025.cuota1[lastDigit]}`,
-            type: 'RENTA',
+            id: 'simple-anual',
+            title: 'Declaración Anual SIMPLE',
+            date: `${year + 1}-04-${SIMPLE_2025.annual.days[lastDigit]}`, // Annual declaration for 2025 is in April 2026
+            type: 'RENTA', // Consolidated category
             status: 'PENDING',
-            description: 'Declaración y pago primera cuota impuesto de renta personas jurídicas',
+            description: 'Declaración anual consolidada Régimen Simple de Tributación (Año Gravable 2025)',
         });
-        events.push({
-            id: 'renta-pj-2',
-            title: 'Renta PJ - Cuota 2',
-            date: `${year}-07-${RENTA_PJ_2025.cuota2[lastDigit]}`,
-            type: 'RENTA',
-            status: 'PENDING',
-            description: 'Pago segunda cuota impuesto de renta personas jurídicas',
-        });
-    }
 
-    if (client.classification === 'NATURAL') {
-        const digit = lastDigit;
-        const isAug = digit >= 0 && digit <= 4;
-        events.push({
-            id: 'renta-pn',
-            title: 'Renta Persona Natural',
-            date: isAug
-                ? `${year}-08-${RENTA_PN_2025.aug[digit]}`
-                : `${year}-09-${RENTA_PN_2025.sep[digit]}`,
-            type: 'RENTA',
-            status: 'PENDING',
-            description: 'Declaración anual de renta personas naturales',
+        // Bimonthly advances
+        SIMPLE_2025.anticipos.forEach((anticipo, idx) => {
+            events.push({
+                id: `simple-adv-${idx + 1}`,
+                title: `Anticipo SIMPLE Bimestre ${idx + 1}`,
+                date: `${anticipo.year || year}-${anticipo.month}-${anticipo.days[lastDigit]}`,
+                type: 'RENTA', // Anticipos are part of RENTA for SIMPLE
+                status: 'PENDING',
+                description: `Pago anticipo bimestral SIMPLE (Bimestre ${idx + 1})`,
+            });
         });
+
+        // SIMPLE also pays IVA annual consolidated within the annual declaration,
+        // but typically GMF is still separate if applicable, although SIMPLE integrates most.
+        // We will skip RENTA ORDINARIA logic for SIMPLE clients.
+    } else {
+        // ========== RENTA (ORDINARIO / ESPECIAL) ==========
+        if (client.classification === 'JURIDICA' || client.classification === 'GRAN_CONTRIBUYENTE') {
+            events.push({
+                id: 'renta-pj-1',
+                title: 'Renta PJ - Cuota 1',
+                date: `${year}-05-${RENTA_PJ_2025.cuota1[lastDigit]}`,
+                type: 'RENTA',
+                status: 'PENDING',
+                description: 'Declaración y pago primera cuota impuesto de renta personas jurídicas',
+            });
+            events.push({
+                id: 'renta-pj-2',
+                title: 'Renta PJ - Cuota 2',
+                date: `${year}-07-${RENTA_PJ_2025.cuota2[lastDigit]}`,
+                type: 'RENTA',
+                status: 'PENDING',
+                description: 'Pago segunda cuota impuesto de renta personas jurídicas',
+            });
+        }
+
+        if (client.classification === 'NATURAL') {
+            const digit = lastDigit;
+            const isAug = digit >= 0 && digit <= 4;
+            events.push({
+                id: 'renta-pn',
+                title: 'Renta Persona Natural',
+                date: isAug
+                    ? `${year}-08-${RENTA_PN_2025.aug[digit]}`
+                    : `${year}-09-${RENTA_PN_2025.sep[digit]}`,
+                type: 'RENTA',
+                status: 'PENDING',
+                description: 'Declaración anual de renta personas naturales',
+            });
+        }
     }
 
     // ========== IVA ==========
-    if (client.ivaPeriodicity === 'BIMESTRAL') {
-        const periods = [
-            { key: 'p1', name: 'Ene-Feb', ...IVA_BIMESTRAL_2025.p1 },
-            { key: 'p2', name: 'Mar-Abr', ...IVA_BIMESTRAL_2025.p2 },
-            { key: 'p3', name: 'May-Jun', ...IVA_BIMESTRAL_2025.p3 },
-            { key: 'p4', name: 'Jul-Ago', ...IVA_BIMESTRAL_2025.p4 },
-            { key: 'p5', name: 'Sep-Oct', ...IVA_BIMESTRAL_2025.p5 },
-            { key: 'p6', name: 'Nov-Dic', ...IVA_BIMESTRAL_2025.p6 },
-        ];
-        periods.forEach((p, idx) => {
-            events.push({
-                id: `iva-bim-${idx + 1}`,
-                title: `IVA Bimestral ${p.name}`,
-                date: `${p.year || year}-${p.month}-${p.days[lastDigit]}`,
-                type: 'IVA',
-                status: 'PENDING',
-                description: `Declaración y pago IVA período ${p.name}`,
+    // Only if not SIMPLE (usually SIMPLE has consolidated IVA, but depends on logic. Keeping regular IVA if assigned)
+    if (client.taxRegime !== 'SIMPLE') {
+        if (client.ivaPeriodicity === 'BIMESTRAL') {
+            const periods = [
+                { key: 'p1', name: 'Ene-Feb', ...IVA_BIMESTRAL_2025.p1 },
+                { key: 'p2', name: 'Mar-Abr', ...IVA_BIMESTRAL_2025.p2 },
+                { key: 'p3', name: 'May-Jun', ...IVA_BIMESTRAL_2025.p3 },
+                { key: 'p4', name: 'Jul-Ago', ...IVA_BIMESTRAL_2025.p4 },
+                { key: 'p5', name: 'Sep-Oct', ...IVA_BIMESTRAL_2025.p5 },
+                { key: 'p6', name: 'Nov-Dic', ...IVA_BIMESTRAL_2025.p6 },
+            ];
+            periods.forEach((p, idx) => {
+                events.push({
+                    id: `iva-bim-${idx + 1}`,
+                    title: `IVA Bimestral ${p.name}`,
+                    date: `${p.year || year}-${p.month}-${p.days[lastDigit]}`,
+                    type: 'IVA',
+                    status: 'PENDING',
+                    description: `Declaración y pago IVA período ${p.name}`,
+                });
             });
-        });
-    }
+        }
 
-    if (client.ivaPeriodicity === 'CUATRIMESTRAL') {
-        const periods = [
-            { key: 'p1', name: 'Ene-Abr', ...IVA_CUATRIMESTRAL_2025.p1 },
-            { key: 'p2', name: 'May-Ago', ...IVA_CUATRIMESTRAL_2025.p2 },
-            { key: 'p3', name: 'Sep-Dic', ...IVA_CUATRIMESTRAL_2025.p3 },
-        ];
-        periods.forEach((p, idx) => {
-            events.push({
-                id: `iva-cuat-${idx + 1}`,
-                title: `IVA Cuatrimestral ${p.name}`,
-                date: `${p.year || year}-${p.month}-${p.days[lastDigit]}`,
-                type: 'IVA',
-                status: 'PENDING',
-                description: `Declaración y pago IVA período ${p.name}`,
+        if (client.ivaPeriodicity === 'CUATRIMESTRAL') {
+            const periods = [
+                { key: 'p1', name: 'Ene-Abr', ...IVA_CUATRIMESTRAL_2025.p1 },
+                { key: 'p2', name: 'May-Ago', ...IVA_CUATRIMESTRAL_2025.p2 },
+                { key: 'p3', name: 'Sep-Dic', ...IVA_CUATRIMESTRAL_2025.p3 },
+            ];
+            periods.forEach((p, idx) => {
+                events.push({
+                    id: `iva-cuat-${idx + 1}`,
+                    title: `IVA Cuatrimestral ${p.name}`,
+                    date: `${p.year || year}-${p.month}-${p.days[lastDigit]}`,
+                    type: 'IVA',
+                    status: 'PENDING',
+                    description: `Declaración y pago IVA período ${p.name}`,
+                });
             });
-        });
+        }
     }
 
     // ========== RETENCIÓN EN LA FUENTE ==========

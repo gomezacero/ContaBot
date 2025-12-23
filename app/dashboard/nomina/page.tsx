@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { PayrollInput, RiskLevel } from '@/types/payroll';
 import { calculatePayroll, formatCurrency, createDefaultEmployee } from '@/lib/calculations';
 import { generatePayrollPDF, generateLiquidationPDF } from '@/lib/pdf-generator';
-import { SMMLV_2025, RISK_LEVEL_LABELS } from '@/lib/constants';
+import { SMMLV_2025 } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import {
     Plus,
@@ -12,17 +12,20 @@ import {
     UserCircle2,
     Info,
     Download,
-    FileText,
-    Building2,
-    User,
-    Wallet,
     Calendar,
     Save,
     CheckCircle2,
     Loader2,
     FolderOpen,
-    AlertCircle
+    AlertCircle,
+    Eye,
+    LayoutDashboard
 } from 'lucide-react';
+
+// New Components
+import { PayrollInputForm } from '@/components/payroll/PayrollInputForm';
+import { PayrollSummary } from '@/components/payroll/PayrollSummary';
+import { DocumentPreview } from '@/components/payroll/DocumentPreview';
 
 interface DBEmployee {
     id: string;
@@ -43,6 +46,8 @@ interface DBEmployee {
         name: string;
         nit: string | null;
     };
+    // Additional fields for new inputs would be mapped here if stored in JSONb or columns
+    // For now assuming we map them from JSONb or ignore persistence of overtime for MVP
 }
 
 interface DBClient {
@@ -53,6 +58,8 @@ interface DBClient {
 
 // Convert DB employee to PayrollInput
 function dbToPayrollInput(emp: DBEmployee): PayrollInput {
+    // Note: If we added overtime columns to DB, we would map them here.
+    // Assuming they might be in a flexible jsonb column or just default to 0 for now.
     return {
         id: emp.id,
         employerType: 'JURIDICA',
@@ -61,7 +68,7 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         name: emp.name,
         documentNumber: emp.document_number || '',
         jobTitle: emp.job_title || '',
-        contractType: (emp.contract_type as 'INDEFINIDO' | 'FIJO' | 'OBRA_LABOR') || 'INDEFINIDO',
+        contractType: (emp.contract_type as any) || 'INDEFINIDO',
         baseSalary: emp.base_salary,
         riskLevel: (emp.risk_level as RiskLevel) || RiskLevel.I,
         isExempt: emp.is_exempt,
@@ -69,14 +76,7 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         startDate: emp.start_date || '2025-01-01',
         endDate: emp.end_date || '2025-01-30',
         enableDeductions: false,
-        deductionsParameters: (emp.deductions_config as {
-            housingInterest: number;
-            prepaidMedicine: number;
-            voluntaryPension: number;
-            voluntaryPensionExempt: number;
-            afc: number;
-            hasDependents: boolean;
-        }) || {
+        deductionsParameters: (emp.deductions_config as any) || {
             housingInterest: 0,
             prepaidMedicine: 0,
             voluntaryPension: 0,
@@ -84,6 +84,9 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
             afc: 0,
             hasDependents: false
         },
+        // Defaults for non-persisted fields (yet)
+        hedHours: 0, henHours: 0, rnHours: 0, domFestHours: 0, heddfHours: 0, hendfHours: 0,
+        commissions: 0, salaryBonuses: 0, nonSalaryBonuses: 0, loans: 0, otherDeductions: 0
     };
 }
 
@@ -104,23 +107,24 @@ export default function NominaPage() {
     const [newClientNit, setNewClientNit] = useState('');
     const [error, setError] = useState<string | null>(null);
 
+    // View Mode for Right Panel
+    const [viewMode, setViewMode] = useState<'SUMMARY' | 'DOCUMENT'>('SUMMARY');
+
     // Determine which employees to show (DB if client selected, local otherwise)
     const employees = selectedClientId
         ? dbEmployees.map(dbToPayrollInput)
         : localEmployees;
 
     const activeEmployee = employees.find(e => e.id === activeEmployeeId) || employees[0];
+
+    // Memoized Result Calculation
     const result = activeEmployee ? calculatePayroll(activeEmployee) : null;
 
     // Load clients on mount
     useEffect(() => {
         const loadClients = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('clients')
-                    .select('id, name, nit')
-                    .order('name');
-
+                const { data, error } = await supabase.from('clients').select('id, name, nit').order('name');
                 if (error) throw error;
                 setClients(data || []);
             } catch {
@@ -129,7 +133,6 @@ export default function NominaPage() {
                 setLoading(false);
             }
         };
-
         loadClients();
     }, [supabase]);
 
@@ -137,9 +140,7 @@ export default function NominaPage() {
     useEffect(() => {
         if (!selectedClientId) {
             setDbEmployees([]);
-            if (localEmployees.length > 0) {
-                setActiveEmployeeId(localEmployees[0].id);
-            }
+            if (localEmployees.length > 0) setActiveEmployeeId(localEmployees[0].id);
             return;
         }
 
@@ -148,18 +149,13 @@ export default function NominaPage() {
             try {
                 const { data, error } = await supabase
                     .from('employees')
-                    .select(`
-            *,
-            clients (id, name, nit)
-          `)
+                    .select(`*, clients (id, name, nit)`)
                     .eq('client_id', selectedClientId)
                     .order('name');
 
                 if (error) throw error;
                 setDbEmployees(data || []);
-                if (data && data.length > 0) {
-                    setActiveEmployeeId(data[0].id);
-                }
+                if (data && data.length > 0) setActiveEmployeeId(data[0].id);
             } catch {
                 console.error('Error loading employees');
                 setError('Error cargando empleados');
@@ -181,7 +177,6 @@ export default function NominaPage() {
     // Handle adding employee
     const handleAddEmployee = async () => {
         if (selectedClientId) {
-            // Add to database
             setSaving(true);
             try {
                 const { data, error } = await supabase
@@ -205,13 +200,11 @@ export default function NominaPage() {
                 setSaved(true);
                 setTimeout(() => setSaved(false), 2000);
             } catch {
-                console.error('Error adding employee');
                 setError('Error agregando empleado');
             } finally {
                 setSaving(false);
             }
         } else {
-            // Add locally
             if (localEmployees.length >= 10) return;
             const newEmp = createDefaultEmployee(localEmployees.length + 1);
             setLocalEmployees([...localEmployees, newEmp]);
@@ -219,24 +212,34 @@ export default function NominaPage() {
         }
     };
 
-    // Handle updating employee
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleUpdateEmployee = useCallback((field: keyof PayrollInput, value: unknown) => {
+    // Handle Full Object Update from Form
+    const handleEmployeeChange = (updated: PayrollInput) => {
         if (selectedClientId) {
-            // Update in database (debounced)
+            // Optimistic update for UI smoothness
+            // We need to map PayrollInput back to DBEmployee partial structure for state
             setDbEmployees(prev => prev.map(emp =>
                 emp.id === activeEmployeeId
-                    ? { ...emp, [field === 'documentNumber' ? 'document_number' : field === 'baseSalary' ? 'base_salary' : field === 'riskLevel' ? 'risk_level' : field === 'includeTransportAid' ? 'include_transport_aid' : field === 'isExempt' ? 'is_exempt' : field === 'startDate' ? 'start_date' : field === 'endDate' ? 'end_date' : field]: value }
+                    ? {
+                        ...emp,
+                        name: updated.name,
+                        document_number: updated.documentNumber || null,
+                        base_salary: updated.baseSalary,
+                        risk_level: updated.riskLevel,
+                        include_transport_aid: updated.includeTransportAid,
+                        is_exempt: updated.isExempt,
+                        start_date: updated.startDate || null,
+                        end_date: updated.endDate || null,
+                        deductions_config: updated.deductionsParameters as unknown as Record<string, unknown>
+                        // Note: Overtime fields are not persisted in this MVP DB schema yet, strictly UI state for DB employees unless we add columns
+                    }
                     : emp
             ));
         } else {
-            setLocalEmployees(prev => prev.map(emp =>
-                emp.id === activeEmployeeId ? { ...emp, [field]: value } : emp
-            ));
+            setLocalEmployees(prev => prev.map(emp => emp.id === activeEmployeeId ? updated : emp));
         }
-    }, [activeEmployeeId, selectedClientId]);
+    };
 
-    // Save changes to database
+    // Save changes to database (Explicit Save)
     const handleSaveToDb = async () => {
         if (!selectedClientId || !activeEmployee) return;
 
@@ -253,6 +256,7 @@ export default function NominaPage() {
                     is_exempt: activeEmployee.isExempt,
                     start_date: activeEmployee.startDate,
                     end_date: activeEmployee.endDate,
+                    deductions_config: activeEmployee.deductionsParameters as unknown as Record<string, unknown>
                 })
                 .eq('id', activeEmployeeId);
 
@@ -260,17 +264,15 @@ export default function NominaPage() {
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } catch {
-            console.error('Error saving');
             setError('Error guardando cambios');
         } finally {
             setSaving(false);
         }
     };
 
-    // Save payroll record
+    // Save payroll record history
     const handleSavePayroll = async () => {
         if (!selectedClientId || !activeEmployee || !result) return;
-
         setSaving(true);
         try {
             const { error } = await supabase
@@ -279,16 +281,15 @@ export default function NominaPage() {
                     employee_id: activeEmployeeId,
                     period_start: activeEmployee.startDate,
                     period_end: activeEmployee.endDate,
-                    calculation_data: result,
+                    calculation_data: result, // This stores the full JSON result including overtime breakdown
                     net_pay: result.monthly.netPay,
-                    total_employer_cost: result.monthly.employerCosts.totalEmployerCost,
+                    total_employer_cost: result.monthly.totals.grandTotalCost,
                 });
 
             if (error) throw error;
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } catch {
-            console.error('Error saving payroll');
             setError('Error guardando nómina');
         } finally {
             setSaving(false);
@@ -298,24 +299,15 @@ export default function NominaPage() {
     // Handle deleting employee
     const handleDeleteEmployee = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-
         if (selectedClientId) {
-            // Delete from database
             setSaving(true);
             try {
-                const { error } = await supabase
-                    .from('employees')
-                    .delete()
-                    .eq('id', id);
-
+                const { error } = await supabase.from('employees').delete().eq('id', id);
                 if (error) throw error;
                 const newList = dbEmployees.filter(emp => emp.id !== id);
                 setDbEmployees(newList);
-                if (activeEmployeeId === id && newList.length > 0) {
-                    setActiveEmployeeId(newList[0].id);
-                }
+                if (activeEmployeeId === id && newList.length > 0) setActiveEmployeeId(newList[0].id);
             } catch {
-                console.error('Error deleting');
                 setError('Error eliminando empleado');
             } finally {
                 setSaving(false);
@@ -324,16 +316,13 @@ export default function NominaPage() {
             if (localEmployees.length === 1) return;
             const newEmployees = localEmployees.filter(emp => emp.id !== id);
             setLocalEmployees(newEmployees);
-            if (activeEmployeeId === id) {
-                setActiveEmployeeId(newEmployees[0].id);
-            }
+            if (activeEmployeeId === id) setActiveEmployeeId(newEmployees[0].id);
         }
     };
 
     // Handle creating client
     const handleCreateClient = async () => {
         if (!newClientName.trim()) return;
-
         setSaving(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -341,12 +330,7 @@ export default function NominaPage() {
 
             const { data, error } = await supabase
                 .from('clients')
-                .insert({
-                    user_id: user.id,
-                    name: newClientName,
-                    nit: newClientNit || null,
-                    classification: 'JURIDICA',
-                })
+                .insert({ user_id: user.id, name: newClientName, nit: newClientNit || null, classification: 'JURIDICA' })
                 .select()
                 .single();
 
@@ -357,7 +341,6 @@ export default function NominaPage() {
             setNewClientName('');
             setNewClientNit('');
         } catch {
-            console.error('Error creating client');
             setError('Error creando cliente');
         } finally {
             setSaving(false);
@@ -373,18 +356,17 @@ export default function NominaPage() {
     }
 
     return (
-        <div className="animate-fade-in">
+        <div className="animate-fade-in p-6 max-w-[1600px] mx-auto">
             {/* Header */}
-            <div className="flex items-start justify-between mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-3xl font-black text-[#002D44] mb-2">Calculadora de Nómina</h1>
-                    <p className="text-gray-500">Cálculos automáticos bajo legislación colombiana 2025</p>
+                    <h1 className="text-3xl font-black text-[#002D44] mb-1">Calculadora de Nómina 2025</h1>
+                    <p className="text-sm text-gray-500 font-medium">Motor de cálculo en tiempo real • Art. 383 E.T. • UGPP</p>
                 </div>
 
-                {/* Client Selector */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
                     {saved && (
-                        <div className="flex items-center gap-2 text-green-600 text-sm font-bold animate-fade-in">
+                        <div className="flex items-center gap-1 text-green-600 text-xs font-bold animate-fade-in px-2">
                             <CheckCircle2 className="w-4 h-4" />
                             Guardado
                         </div>
@@ -392,18 +374,18 @@ export default function NominaPage() {
                     <select
                         value={selectedClientId || ''}
                         onChange={(e) => setSelectedClientId(e.target.value || null)}
-                        className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-[#1AB1B1]"
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-gray-50 focus:ring-2 focus:ring-[#1AB1B1] outline-none min-w-[200px]"
                     >
-                        <option value="">📝 Modo Demo (sin guardar)</option>
+                        <option value="">📝 Modo Demo (Local)</option>
                         {clients.map(client => (
                             <option key={client.id} value={client.id}>
-                                🏢 {client.name} {client.nit ? `(${client.nit})` : ''}
+                                🏢 {client.name}
                             </option>
                         ))}
                     </select>
                     <button
                         onClick={() => setShowClientModal(true)}
-                        className="p-2 bg-[#1AB1B1] text-white rounded-xl hover:scale-105 transition-transform"
+                        className="p-2 bg-[#1AB1B1] text-white rounded-lg hover:bg-[#159C9C] transition-colors"
                         title="Agregar Cliente"
                     >
                         <Plus className="w-5 h-5" />
@@ -412,57 +394,36 @@ export default function NominaPage() {
             </div>
 
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 animate-in slide-in-from-top-2">
                     <AlertCircle className="w-5 h-5" />
                     <span className="font-medium">{error}</span>
-                    <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">
-                        ✕
-                    </button>
+                    <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">✕</button>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Panel - Employee Form */}
-                <div className="lg:col-span-5 space-y-6">
-                    {/* Info Box */}
-                    <div className={`p-4 rounded-2xl flex gap-3 items-start ${selectedClientId ? 'bg-green-50 border border-green-100' : 'bg-indigo-50/50 border border-indigo-100'}`}>
-                        <div className={`p-2 rounded-lg shadow-sm ${selectedClientId ? 'bg-white text-green-600' : 'bg-white text-indigo-600'}`}>
-                            {selectedClientId ? <FolderOpen className="w-4 h-4" /> : <Info className="w-4 h-4" />}
-                        </div>
-                        <p className={`text-sm font-medium ${selectedClientId ? 'text-green-900/80' : 'text-indigo-900/80'}`}>
-                            {selectedClientId
-                                ? '✅ Conectado a Supabase. Los cambios se guardan automáticamente.'
-                                : 'Modo demo. Selecciona un cliente para guardar en la base de datos.'}
-                        </p>
-                    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                    {/* Employee Tabs */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+                {/* LEFT PANEL: INPUTS (5 cols) */}
+                <div className="lg:col-span-5 space-y-6 sticky top-6">
+                    {/* Employee Horizontal List */}
+                    <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-100 flex items-center overflow-x-auto no-scrollbar">
                         {employees.map((emp) => {
                             const isActive = emp.id === activeEmployeeId;
                             return (
                                 <div
                                     key={emp.id}
                                     onClick={() => setActiveEmployeeId(emp.id)}
-                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-3 rounded-t-xl border-b-2 cursor-pointer transition-all group relative ${isActive
-                                        ? 'bg-white border-blue-600 text-blue-900 shadow-sm'
-                                        : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200'
+                                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all group relative border ${isActive
+                                            ? 'bg-blue-50 border-blue-200 text-blue-800 font-medium'
+                                            : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50'
                                         }`}
-                                    style={{ minWidth: '140px' }}
                                 >
-                                    <UserCircle2 className={`w-4 h-4 ${isActive ? 'text-blue-500' : 'text-gray-400'}`} />
-                                    <div className="flex flex-col">
-                                        <span className="text-xs font-bold truncate max-w-[90px]">{emp.name}</span>
-                                        <span className="text-[10px] font-mono opacity-70 truncate max-w-[80px]">
-                                            {emp.documentNumber || 'CC. ???'}
-                                        </span>
-                                    </div>
-
-                                    {employees.length > 1 && isActive && (
+                                    <UserCircle2 className="w-4 h-4" />
+                                    <span className="text-xs truncate max-w-[80px]">{emp.name}</span>
+                                    {isActive && employees.length > 1 && (
                                         <button
                                             onClick={(e) => handleDeleteEmployee(emp.id, e)}
-                                            className="absolute -top-1.5 -right-1.5 p-1 bg-red-100 text-red-500 rounded-full hover:bg-red-200 shadow-sm transition-opacity opacity-0 group-hover:opacity-100"
-                                            title="Eliminar Empleado"
+                                            className="ml-1 p-0.5 text-red-400 hover:text-red-600 rounded bg-white"
                                         >
                                             <Trash2 className="w-3 h-3" />
                                         </button>
@@ -470,315 +431,128 @@ export default function NominaPage() {
                                 </div>
                             );
                         })}
-
                         <button
                             onClick={handleAddEmployee}
-                            disabled={!selectedClientId && localEmployees.length >= 10}
-                            className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl transition-all ${(!selectedClientId && localEmployees.length >= 10)
-                                ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                                : 'bg-gray-200 text-gray-500 hover:bg-blue-600 hover:text-white'
-                                }`}
-                            title="Agregar Empleado"
+                            className="ml-2 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
-                            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                            <Plus className="w-5 h-5" />
                         </button>
                     </div>
 
-                    {/* Employee Form */}
+                    {/* Main Input Form */}
                     {activeEmployee && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6">
-                            <h3 className="font-bold text-[#002D44] flex items-center gap-2">
-                                <User className="w-5 h-5" />
-                                Datos del Empleado
-                            </h3>
+                        <div className="animate-in fade-in zoom-in-95 duration-200">
+                            <PayrollInputForm
+                                input={activeEmployee}
+                                onChange={handleEmployeeChange}
+                            />
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Nombre</label>
-                                    <input
-                                        type="text"
-                                        value={activeEmployee.name}
-                                        onChange={(e) => handleUpdateEmployee('name', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Documento</label>
-                                    <input
-                                        type="text"
-                                        value={activeEmployee.documentNumber || ''}
-                                        onChange={(e) => handleUpdateEmployee('documentNumber', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent"
-                                        placeholder="1234567890"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Salario Base Mensual</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                                    <input
-                                        type="number"
-                                        value={activeEmployee.baseSalary}
-                                        onChange={(e) => handleUpdateEmployee('baseSalary', Number(e.target.value))}
-                                        className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent"
-                                    />
-                                </div>
-                                <p className="text-xs text-gray-400 mt-1">SMMLV 2025: {formatCurrency(SMMLV_2025)}</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Nivel de Riesgo ARL</label>
-                                <select
-                                    value={activeEmployee.riskLevel}
-                                    onChange={(e) => handleUpdateEmployee('riskLevel', e.target.value as RiskLevel)}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent bg-white"
-                                >
-                                    {Object.entries(RISK_LEVEL_LABELS).map(([key, label]) => (
-                                        <option key={key} value={key}>{label}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={activeEmployee.includeTransportAid}
-                                        onChange={(e) => handleUpdateEmployee('includeTransportAid', e.target.checked)}
-                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                    />
-                                    <span className="text-sm text-gray-700">Auxilio de Transporte</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={activeEmployee.isExempt}
-                                        onChange={(e) => handleUpdateEmployee('isExempt', e.target.checked)}
-                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                    />
-                                    <span className="text-sm text-gray-700">Exento Parafiscales</span>
-                                </label>
-                            </div>
-
-                            {/* Period Dates */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Fecha Inicio</label>
-                                    <input
-                                        type="date"
-                                        value={activeEmployee.startDate || ''}
-                                        onChange={(e) => handleUpdateEmployee('startDate', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Fecha Fin</label>
-                                    <input
-                                        type="date"
-                                        value={activeEmployee.endDate || ''}
-                                        onChange={(e) => handleUpdateEmployee('endDate', e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Save Button (only when connected to DB) */}
+                            {/* Save Actions */}
                             {selectedClientId && (
-                                <button
-                                    onClick={handleSaveToDb}
-                                    disabled={saving}
-                                    className="w-full flex items-center justify-center gap-2 bg-[#1AB1B1] text-white py-3 rounded-xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50"
-                                >
-                                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                    Guardar Cambios
-                                </button>
+                                <div className="mt-4 flex gap-3">
+                                    <button
+                                        onClick={handleSaveToDb}
+                                        disabled={saving}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-slate-800 text-white py-3 rounded-lg font-bold text-sm hover:bg-slate-900 transition-all disabled:opacity-50"
+                                    >
+                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                        Guardar Empleado
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}
                 </div>
 
-                {/* Right Panel - Results */}
-                {result && (
-                    <div className="lg:col-span-7 space-y-6">
-                        {/* Summary Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-gradient-to-br from-[#1AB1B1] to-teal-600 rounded-2xl p-6 text-white">
-                                <p className="text-sm font-bold opacity-80 mb-1">Neto a Pagar</p>
-                                <p className="text-2xl font-black">{formatCurrency(result.monthly.netPay)}</p>
-                            </div>
-                            <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                                <p className="text-sm font-bold text-gray-500 mb-1">Total Devengado</p>
-                                <p className="text-2xl font-black text-[#002D44]">{formatCurrency(result.monthly.salaryData.totalAccrued)}</p>
-                            </div>
-                            <div className="bg-white rounded-2xl p-6 border border-gray-100">
-                                <p className="text-sm font-bold text-gray-500 mb-1">Costo Total Empleador</p>
-                                <p className="text-2xl font-black text-[#002D44]">{formatCurrency(result.monthly.employerCosts.totalEmployerCost)}</p>
-                            </div>
-                        </div>
-
-                        {/* Detailed Results */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            {/* Devengado */}
-                            <div className="p-6 border-b border-gray-100">
-                                <h3 className="font-bold text-[#002D44] mb-4 flex items-center gap-2">
-                                    <Wallet className="w-5 h-5 text-green-500" />
-                                    Devengado
-                                </h3>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Salario Base</span>
-                                        <span className="font-bold">{formatCurrency(result.monthly.salaryData.baseSalary)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Auxilio de Transporte</span>
-                                        <span className="font-bold">{formatCurrency(result.monthly.salaryData.transportAid)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                        <span className="font-bold text-[#002D44]">Total Devengado</span>
-                                        <span className="font-black text-green-600">{formatCurrency(result.monthly.salaryData.totalAccrued)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Deducciones */}
-                            <div className="p-6 border-b border-gray-100">
-                                <h3 className="font-bold text-[#002D44] mb-4 flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-red-500" />
-                                    Deducciones del Empleado
-                                </h3>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Salud (4%)</span>
-                                        <span className="font-bold text-red-500">-{formatCurrency(result.monthly.employeeDeductions.health)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Pensión (4%)</span>
-                                        <span className="font-bold text-red-500">-{formatCurrency(result.monthly.employeeDeductions.pension)}</span>
-                                    </div>
-                                    {result.monthly.employeeDeductions.solidarityFund > 0 && (
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Fondo Solidaridad</span>
-                                            <span className="font-bold text-red-500">-{formatCurrency(result.monthly.employeeDeductions.solidarityFund)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                        <span className="font-bold text-[#002D44]">Total Deducciones</span>
-                                        <span className="font-black text-red-600">-{formatCurrency(result.monthly.employeeDeductions.totalDeductions)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Costos Empleador */}
-                            <div className="p-6">
-                                <h3 className="font-bold text-[#002D44] mb-4 flex items-center gap-2">
-                                    <Building2 className="w-5 h-5 text-blue-500" />
-                                    Costos del Empleador
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Salud (8.5%)</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.health)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Pensión (12%)</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.pension)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">ARL</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.arl)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Caja Compensación</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.compensationBox)}</span>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Cesantías</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.cesantias)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Int. Cesantías</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.interesesCesantias)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Prima</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.prima)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Vacaciones</span>
-                                            <span className="font-bold">{formatCurrency(result.monthly.employerCosts.vacations)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between text-sm pt-4 mt-4 border-t border-gray-100">
-                                    <span className="font-bold text-[#002D44]">Total Costo Empleador</span>
-                                    <span className="font-black text-blue-600">{formatCurrency(result.monthly.employerCosts.totalEmployerCost)}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-4">
-                            <button
-                                onClick={() => {
-                                    if (activeEmployee && result) {
-                                        const selectedClient = clients.find(c => c.id === selectedClientId);
-                                        generatePayrollPDF({
-                                            employee: activeEmployee,
-                                            result,
-                                            companyName: selectedClient?.name,
-                                            companyNit: selectedClient?.nit || undefined,
-                                            periodDescription: `Período: ${activeEmployee.startDate} - ${activeEmployee.endDate}`
-                                        });
-                                    }
-                                }}
-                                className="flex items-center gap-2 bg-[#002D44] text-white px-6 py-3 rounded-xl font-bold hover:bg-black transition-colors"
-                            >
-                                <Download className="w-5 h-5" />
-                                Descargar PDF
-                            </button>
-                            {selectedClientId && (
-                                <button
-                                    onClick={handleSavePayroll}
-                                    disabled={saving}
-                                    className="flex items-center gap-2 bg-[#1AB1B1] text-white px-6 py-3 rounded-xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50"
-                                >
-                                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                    Guardar Cálculo
-                                </button>
-                            )}
-                            <button
-                                onClick={() => {
-                                    if (activeEmployee && result) {
-                                        const selectedClient = clients.find(c => c.id === selectedClientId);
-                                        generateLiquidationPDF({
-                                            employee: activeEmployee,
-                                            result,
-                                            companyName: selectedClient?.name,
-                                            companyNit: selectedClient?.nit || undefined,
-                                        });
-                                    }
-                                }}
-                                className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-colors"
-                            >
-                                <Calendar className="w-5 h-5" />
-                                Ver Liquidación
-                            </button>
-                        </div>
+                {/* RIGHT PANEL: OUTPUTS (7 cols) */}
+                <div className="lg:col-span-7 space-y-6">
+                    {/* View Toggle */}
+                    <div className="flex bg-gray-100 p-1 rounded-lg w-fit">
+                        <button
+                            onClick={() => setViewMode('SUMMARY')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'SUMMARY' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            <LayoutDashboard size={16} />
+                            Impacto Financiero
+                        </button>
+                        <button
+                            onClick={() => setViewMode('DOCUMENT')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'DOCUMENT' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            <Eye size={16} />
+                            Previsualizar Desprendible
+                        </button>
                     </div>
-                )}
+
+                    {/* Content */}
+                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                        {viewMode === 'SUMMARY' ? (
+                            <PayrollSummary result={result} />
+                        ) : (
+                            <DocumentPreview input={activeEmployee} result={result} />
+                        )}
+                    </div>
+
+                    {/* Export Actions Bar */}
+                    <div className="flex flex-wrap gap-4 pt-4 border-t border-gray-200">
+                        <button
+                            onClick={() => {
+                                if (activeEmployee && result) {
+                                    const selectedClient = clients.find(c => c.id === selectedClientId);
+                                    generatePayrollPDF({
+                                        employee: activeEmployee,
+                                        result,
+                                        companyName: selectedClient?.name,
+                                        companyNit: selectedClient?.nit || undefined,
+                                        periodDescription: `Período: ${activeEmployee.startDate || '2025-01-01'} - ${activeEmployee.endDate || '2025-01-30'}`
+                                    });
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-[#002D44] text-white px-5 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
+                        >
+                            <Download className="w-4 h-4" />
+                            Descargar Nómina (PDF)
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                if (activeEmployee && result) {
+                                    const selectedClient = clients.find(c => c.id === selectedClientId);
+                                    generateLiquidationPDF({
+                                        employee: activeEmployee,
+                                        result,
+                                        companyName: selectedClient?.name,
+                                        companyNit: selectedClient?.nit || undefined,
+                                    });
+                                }
+                            }}
+                            className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-gray-50 transition-colors"
+                        >
+                            <Calendar className="w-4 h-4" />
+                            Descargar Liquidación
+                        </button>
+
+                        {selectedClientId && (
+                            <button
+                                onClick={handleSavePayroll}
+                                disabled={saving}
+                                className="flex items-center gap-2 bg-[#1AB1B1] text-white px-5 py-2.5 rounded-lg font-bold text-sm hover:brightness-110 transition-all ml-auto"
+                            >
+                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Guardar Histórico
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Create Client Modal */}
             {showClientModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl max-w-md w-full p-8 animate-fade-in">
-                        <h2 className="text-xl font-black text-[#002D44] mb-6">Crear Nuevo Cliente</h2>
-
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 animate-in zoom-in-95">
+                        <h2 className="text-xl font-black text-[#002D44] mb-4">Crear Nuevo Cliente</h2>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Cliente *</label>
@@ -786,7 +560,7 @@ export default function NominaPage() {
                                     type="text"
                                     value={newClientName}
                                     onChange={(e) => setNewClientName(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1]"
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1AB1B1]"
                                     placeholder="Empresa S.A.S"
                                 />
                             </div>
@@ -796,27 +570,25 @@ export default function NominaPage() {
                                     type="text"
                                     value={newClientNit}
                                     onChange={(e) => setNewClientNit(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1]"
+                                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#1AB1B1]"
                                     placeholder="900123456-1"
                                 />
                             </div>
-                        </div>
-
-                        <div className="flex gap-4 mt-8">
-                            <button
-                                onClick={() => setShowClientModal(false)}
-                                className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleCreateClient}
-                                disabled={!newClientName.trim() || saving}
-                                className="flex-1 py-3 bg-[#1AB1B1] text-white rounded-xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Crear Cliente
-                            </button>
+                            <div className="flex justify-end gap-3 pt-4">
+                                <button
+                                    onClick={() => setShowClientModal(false)}
+                                    className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateClient}
+                                    disabled={!newClientName.trim() || saving}
+                                    className="px-4 py-2 bg-[#1AB1B1] text-white rounded-lg font-bold hover:brightness-110 disabled:opacity-50"
+                                >
+                                    {saving ? 'Creando...' : 'Crear Cliente'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

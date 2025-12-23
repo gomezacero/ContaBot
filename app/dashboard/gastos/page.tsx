@@ -15,10 +15,15 @@ import {
     Type,
     Loader2,
     AlertTriangle,
-    Trash2
+    Trash2,
+    Lock,
+    Sparkles,
+    LogIn
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { OCRResult, OCRItem } from '@/types/ocr';
+import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
+import Link from 'next/link';
 
 interface DBClient {
     id: string;
@@ -30,6 +35,8 @@ type InputMode = 'FILE' | 'TEXT';
 
 export default function GastosPage() {
     const supabase = createClient();
+    const { isAuthenticated, isLoading: authLoading } = useAuthStatus();
+    const isGuest = !isAuthenticated;
 
     // Client state
     const [clients, setClients] = useState<DBClient[]>([]);
@@ -243,6 +250,75 @@ export default function GastosPage() {
     const totalAmount = results.reduce((sum, r) => sum + r.total, 0);
     const totalItems = results.reduce((sum, r) => sum + r.items.length, 0);
 
+    // Premium gate for AI features
+    if (isGuest && !authLoading) {
+        return (
+            <div className="animate-fade-in">
+                <div className="flex items-start justify-between mb-6">
+                    <div>
+                        <h1 className="text-3xl font-black text-[#002D44] mb-1 flex items-center gap-3">
+                            <ScanLine className="w-8 h-8" />
+                            Digitador Inteligente
+                            <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1">
+                                <Sparkles className="w-3 h-3" /> PRO
+                            </span>
+                        </h1>
+                        <p className="text-gray-500">Extracción automática con IA de facturas y soportes</p>
+                    </div>
+                </div>
+
+                {/* Premium Gate Card */}
+                <div className="bg-gradient-to-br from-[#002D44] to-[#004D6E] rounded-[2rem] p-12 text-center text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+                    <div className="relative z-10">
+                        <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Lock className="w-10 h-10 text-amber-400" />
+                        </div>
+
+                        <h2 className="text-4xl font-black mb-4">Función Premium</h2>
+                        <p className="text-gray-300 text-lg mb-8 max-w-md mx-auto">
+                            El Digitador Inteligente usa IA avanzada para extraer automáticamente datos de facturas y soportes.
+                            Inicia sesión para acceder a esta función.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <Link
+                                href="/login"
+                                className="bg-[#1AB1B1] text-white px-8 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl flex items-center gap-2"
+                            >
+                                <LogIn className="w-5 h-5" />
+                                Iniciar Sesión
+                            </Link>
+                            <Link
+                                href="/register"
+                                className="bg-white/10 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-white/20 transition-all flex items-center gap-2"
+                            >
+                                Crear Cuenta Gratis
+                            </Link>
+                        </div>
+
+                        <div className="mt-10 flex flex-wrap justify-center gap-6 text-sm text-gray-400">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                OCR con IA Gemini
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                Extracción automática
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                Exportar a Excel
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="animate-fade-in">
             {/* Header */}
@@ -301,8 +377,8 @@ export default function GastosPage() {
                                         key={client.id}
                                         onClick={() => setSelectedClientId(client.id)}
                                         className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-2 ${selectedClientId === client.id
-                                                ? 'bg-[#002D44] text-white'
-                                                : 'hover:bg-gray-50 text-gray-700'
+                                            ? 'bg-[#002D44] text-white'
+                                            : 'hover:bg-gray-50 text-gray-700'
                                             }`}
                                     >
                                         <span className={selectedClientId === client.id ? 'text-white' : 'text-gray-400'}>📁</span>
@@ -336,8 +412,8 @@ export default function GastosPage() {
                             <button
                                 onClick={() => setInputMode('FILE')}
                                 className={`flex-1 py-2 px-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${inputMode === 'FILE'
-                                        ? 'bg-[#002D44] text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-[#002D44] text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 <Upload className="w-4 h-4" />
@@ -346,8 +422,8 @@ export default function GastosPage() {
                             <button
                                 onClick={() => setInputMode('TEXT')}
                                 className={`flex-1 py-2 px-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${inputMode === 'TEXT'
-                                        ? 'bg-[#002D44] text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-[#002D44] text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 <Type className="w-4 h-4" />

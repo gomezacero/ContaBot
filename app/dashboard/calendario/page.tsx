@@ -15,129 +15,214 @@ import {
     Save,
     Loader2,
     Trash2,
-    Filter
+    Filter,
+    ArrowRight,
+    Cloud,
+    HardDrive
 } from 'lucide-react';
+import { TaxCalendarEmptyState } from '@/components/tax-calendar/EmptyState';
+import { TaxCalendarForm } from '@/components/tax-calendar/TaxCalendarForm';
+import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
+import { GuestBanner } from '@/components/ui/GuestBanner';
+import {
+    getLocalClients,
+    addLocalClient,
+    deleteLocalClient,
+    LocalClient
+} from '@/lib/local-storage';
 
 interface DBClient {
     id: string;
     name: string;
     nit: string | null;
     classification: string | null;
+    tax_regime: string | null;
     iva_periodicity: string | null;
     is_retention_agent: boolean | null;
     has_gmf: boolean | null;
     requires_exogena: boolean | null;
     has_patrimony_tax: boolean | null;
     alert_days: number[] | null;
+    email_alert: boolean | null;
+    whatsapp_alert: boolean | null;
 }
 
 type TaxType = 'ALL' | 'RENTA' | 'IVA' | 'RETENCION' | 'GMF' | 'EXOGENA' | 'PATRIMONIO';
 
 export default function CalendarioPage() {
     const supabase = createClient();
+    const { isAuthenticated, isLoading: authLoading } = useAuthStatus();
+
     const [clients, setClients] = useState<DBClient[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [processing, setProcessing] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState<TaxType>('ALL');
     const [error, setError] = useState<string | null>(null);
 
-    const [formData, setFormData] = useState({
-        clientName: '',
-        nit: '',
-        classification: 'JURIDICA' as 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE',
-        ivaPeriodicity: 'BIMESTRAL' as 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE',
-        isRetentionAgent: true,
-        hasGmf: false,
-        requiresExogena: false,
-        hasPatrimonyTax: false,
-        alertDays: [7, 3, 1],
-    });
+    // Delete confirmation state
+    const [deleteTarget, setDeleteTarget] = useState<DBClient | null>(null);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-    // Load clients from Supabase
+    // Load clients - from Supabase if authenticated, localStorage if not
     const loadClients = useCallback(async () => {
-        try {
-            const { data, error } = await supabase
-                .from('clients')
-                .select('id, name, nit, classification, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days')
-                .order('name');
+        // Wait until auth state is determined
+        if (authLoading) return;
 
-            if (error) throw error;
-            setClients(data || []);
+        try {
+            if (isAuthenticated) {
+                // Authenticated: Load from Supabase
+                const { data, error } = await supabase
+                    .from('clients')
+                    .select('id, name, nit, classification, tax_regime, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days, email_alert, whatsapp_alert')
+                    .order('name');
+
+                if (error) throw error;
+                setClients(data || []);
+            } else {
+                // Anonymous: Load from localStorage
+                const localClients = getLocalClients();
+                // Map LocalClient to DBClient format
+                const mappedClients: DBClient[] = localClients.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    nit: c.nit,
+                    classification: c.classification,
+                    tax_regime: c.tax_regime,
+                    iva_periodicity: c.iva_periodicity,
+                    is_retention_agent: c.is_retention_agent,
+                    has_gmf: c.has_gmf,
+                    requires_exogena: c.requires_exogena,
+                    has_patrimony_tax: c.has_patrimony_tax,
+                    alert_days: c.alert_days,
+                    email_alert: c.email_alert,
+                    whatsapp_alert: c.whatsapp_alert,
+                }));
+                setClients(mappedClients);
+            }
         } catch {
             console.error('Error loading clients');
             setError('Error cargando clientes');
         } finally {
             setLoading(false);
         }
-    }, [supabase]);
+    }, [supabase, isAuthenticated, authLoading]);
 
     useEffect(() => {
         loadClients();
     }, [loadClients]);
 
-    const handleAddClient = async () => {
-        setSaving(true);
+    const handleCreateCalendar = async (formData: any) => {
+        setProcessing(true);
         setError(null);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('No user');
+            if (isAuthenticated) {
+                // Authenticated: Save to Supabase
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('No user');
 
-            const { data, error } = await supabase
-                .from('clients')
-                .insert({
-                    user_id: user.id,
-                    name: formData.clientName,
+                const { data, error } = await supabase
+                    .from('clients')
+                    .insert({
+                        user_id: user.id,
+                        name: formData.name,
+                        nit: formData.nit,
+                        classification: formData.classification,
+                        tax_regime: formData.taxRegime,
+                        iva_periodicity: formData.ivaPeriodicity,
+                        is_retention_agent: formData.taxRegime !== 'SIMPLE',
+                        has_gmf: true,
+                        requires_exogena: false,
+                        has_patrimony_tax: false,
+                        alert_days: formData.alertDays,
+                        email_alert: formData.emailAlert,
+                        whatsapp_alert: formData.whatsappAlert
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                setClients([...clients, data]);
+                setSelectedClientId(data.id);
+            } else {
+                // Anonymous: Save to localStorage
+                const newClient = addLocalClient({
+                    name: formData.name,
                     nit: formData.nit,
                     classification: formData.classification,
+                    tax_regime: formData.taxRegime,
                     iva_periodicity: formData.ivaPeriodicity,
-                    is_retention_agent: formData.isRetentionAgent,
-                    has_gmf: formData.hasGmf,
-                    requires_exogena: formData.requiresExogena,
-                    has_patrimony_tax: formData.hasPatrimonyTax,
+                    is_retention_agent: formData.taxRegime !== 'SIMPLE',
+                    has_gmf: true,
+                    requires_exogena: false,
+                    has_patrimony_tax: false,
                     alert_days: formData.alertDays,
-                })
-                .select()
-                .single();
+                    email_alert: false, // Disabled for anonymous
+                    whatsapp_alert: false,
+                });
 
-            if (error) throw error;
-            setClients([...clients, data]);
+                // Map to DBClient and add to state
+                const mappedClient: DBClient = {
+                    id: newClient.id,
+                    name: newClient.name,
+                    nit: newClient.nit,
+                    classification: newClient.classification,
+                    tax_regime: newClient.tax_regime,
+                    iva_periodicity: newClient.iva_periodicity,
+                    is_retention_agent: newClient.is_retention_agent,
+                    has_gmf: newClient.has_gmf,
+                    requires_exogena: newClient.requires_exogena,
+                    has_patrimony_tax: newClient.has_patrimony_tax,
+                    alert_days: newClient.alert_days,
+                    email_alert: newClient.email_alert,
+                    whatsapp_alert: newClient.whatsapp_alert,
+                };
+                setClients([...clients, mappedClient]);
+                setSelectedClientId(newClient.id);
+            }
             setShowForm(false);
-            resetForm();
         } catch (err) {
             console.error('Error adding client:', err);
-            setError('Error agregando cliente');
+            setError('Error agregando calendario');
         } finally {
-            setSaving(false);
+            setProcessing(false);
         }
     };
 
-    const handleDeleteClient = async (id: string) => {
-        if (!confirm('¿Eliminar este cliente?')) return;
+    const handleDeleteClient = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const client = clients.find(c => c.id === id);
+        if (client) {
+            setDeleteTarget(client);
+            setDeleteConfirmText('');
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteTarget || deleteConfirmText !== deleteTarget.name) return;
+
+        setProcessing(true);
         try {
-            const { error } = await supabase.from('clients').delete().eq('id', id);
-            if (error) throw error;
-            setClients(clients.filter(c => c.id !== id));
-            if (selectedClientId === id) setSelectedClientId(null);
+            if (isAuthenticated) {
+                // Authenticated: Delete from Supabase
+                const { error } = await supabase.from('clients').delete().eq('id', deleteTarget.id);
+                if (error) throw error;
+            } else {
+                // Anonymous: Delete from localStorage
+                deleteLocalClient(deleteTarget.id);
+            }
+
+            setClients(clients.filter(c => c.id !== deleteTarget.id));
+            if (selectedClientId === deleteTarget.id) setSelectedClientId(null);
+            setDeleteTarget(null);
+            setDeleteConfirmText('');
         } catch {
             setError('Error eliminando cliente');
+        } finally {
+            setProcessing(false);
         }
-    };
-
-    const resetForm = () => {
-        setFormData({
-            clientName: '',
-            nit: '',
-            classification: 'JURIDICA',
-            ivaPeriodicity: 'BIMESTRAL',
-            isRetentionAgent: true,
-            hasGmf: false,
-            requiresExogena: false,
-            hasPatrimonyTax: false,
-            alertDays: [7, 3, 1],
-        });
     };
 
     const getStatusColor = (date: string) => {
@@ -145,368 +230,269 @@ export default function CalendarioPage() {
         const dueDate = new Date(date);
         const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (diffDays < 0) return 'bg-gray-100 text-gray-500 border-gray-200';
-        if (diffDays <= 5) return 'bg-red-50 text-red-700 border-red-200';
-        if (diffDays <= 15) return 'bg-orange-50 text-orange-700 border-orange-200';
-        return 'bg-green-50 text-green-700 border-green-200';
+        if (diffDays < 0) return 'bg-gray-50 border-gray-200 text-gray-400 grayscale'; // Expired
+        if (diffDays <= 5) return 'bg-red-50 border-red-200 text-red-700 shadow-red-100'; // Critical
+        if (diffDays <= 15) return 'bg-orange-50 border-orange-200 text-orange-700 shadow-orange-100'; // Warning
+        return 'bg-green-50 border-green-200 text-green-700 shadow-green-100'; // Safe
     };
 
-    const getTypeColor = (type: string) => {
-        const colors: Record<string, string> = {
-            'RENTA': 'bg-blue-100 text-blue-700',
-            'IVA': 'bg-purple-100 text-purple-700',
-            'RETENCION': 'bg-orange-100 text-orange-700',
-            'GMF': 'bg-pink-100 text-pink-700',
-            'EXOGENA': 'bg-teal-100 text-teal-700',
-            'PATRIMONIO': 'bg-indigo-100 text-indigo-700',
-        };
-        return colors[type] || 'bg-gray-100 text-gray-700';
-    };
-
-    // Convert DB client to TaxClientConfig
+    // Helper: Convert DB client to TaxClientConfig (approximated for now)
     const toTaxConfig = (client: DBClient): TaxClientConfig => ({
         nit: client.nit || '',
-        classification: (client.classification as TaxClientConfig['classification']) || 'JURIDICA',
-        ivaPeriodicity: (client.iva_periodicity as TaxClientConfig['ivaPeriodicity']) || 'BIMESTRAL',
+        classification: (client.classification as any) || 'JURIDICA',
+        taxRegime: (client.tax_regime as any) || 'ORDINARIO',
+        ivaPeriodicity: (client.iva_periodicity as any) || 'BIMESTRAL',
         isRetentionAgent: client.is_retention_agent || false,
         hasGmf: client.has_gmf || false,
         requiresExogena: client.requires_exogena || false,
         hasPatrimonyTax: client.has_patrimony_tax || false,
     });
 
-    // Calculate all events
-    const allEvents = useMemo(() => {
-        const clientsToUse = selectedClientId
-            ? clients.filter(c => c.id === selectedClientId)
-            : clients;
+    const activeEvents = useMemo(() => {
+        if (!selectedClientId) return [];
+        const client = clients.find(c => c.id === selectedClientId);
+        if (!client) return [];
+        const allEvents = getTaxDeadlines(toTaxConfig(client));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        const events = clientsToUse.flatMap(client =>
-            getTaxDeadlines(toTaxConfig(client)).map(event => ({
-                ...event,
-                clientName: client.name,
-                clientNit: client.nit,
-                clientId: client.id,
-            }))
-        );
+        // Filter to only show future events (or events happening today)
+        return allEvents
+            .filter(event => new Date(event.date) >= today)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }, [clients, selectedClientId]);
 
-        // Apply type filter
-        if (filterType !== 'ALL') {
-            return events.filter(e => e.type === filterType);
-        }
-        return events;
-    }, [clients, selectedClientId, filterType]);
-
-    const filteredClients = clients.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (c.nit && c.nit.includes(searchTerm))
-    );
-
-    if (loading) {
+    if (loading || authLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1AB1B1]" />
+            <div className="flex items-center justify-center h-screen bg-gray-50">
+                <Loader2 className="w-10 h-10 animate-spin text-black" />
             </div>
         );
     }
 
     return (
-        <div className="animate-fade-in">
-            {/* Header */}
-            <div className="flex items-start justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-black text-[#002D44] mb-2">Calendario Tributario</h1>
-                    <p className="text-gray-500">Vigilancia de vencimientos DIAN por NIT</p>
-                </div>
-                <button
-                    onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 bg-[#1AB1B1] text-white px-6 py-3 rounded-xl font-bold hover:scale-105 transition-all shadow-lg shadow-teal-500/20"
-                >
-                    <Plus className="w-5 h-5" />
-                    Agregar Cliente
-                </button>
-            </div>
-
-            {/* Error */}
-            {error && (
-                <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between">
-                    <span className="text-red-700">{error}</span>
-                    <button onClick={() => setError(null)}><X className="w-4 h-4 text-red-500" /></button>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Panel - Client List */}
-                <div className="space-y-6">
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por NIT o nombre..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent"
-                        />
+        <>
+            <div className="min-h-screen bg-gray-50/50 p-8 pb-20 font-sans animate-fade-in">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 className="text-3xl font-black text-[#002D44] flex items-center gap-3">
+                            <CalendarDays className="w-8 h-8 text-[#4B6BFB]" />
+                            Mis Calendarios Contables
+                        </h1>
+                        <p className="text-gray-500 font-medium ml-11">Gestión automatizada de vencimientos 2025.</p>
                     </div>
+                    <button
+                        onClick={() => setShowForm(true)}
+                        className="bg-black text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-all shadow-xl shadow-black/10"
+                    >
+                        <Plus className="w-5 h-5" />
+                        Agregar Calendario
+                    </button>
+                </div>
 
-                    {/* Client Cards */}
-                    {clients.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center">
-                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <Building2 className="w-8 h-8 text-gray-400" />
+                {clients.length === 0 ? (
+                    <div className="h-[60vh]">
+                        <TaxCalendarEmptyState />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* Left List - Clients */}
+                        <div className="lg:col-span-4 space-y-4">
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar cliente..."
+                                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-black/5 bg-white shadow-sm"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
                             </div>
-                            <p className="text-lg font-bold text-gray-400 mb-2">Sin clientes</p>
-                            <p className="text-sm text-gray-400">Agrega un cliente para ver su calendario tributario</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {/* All clients button */}
-                            <button
-                                onClick={() => setSelectedClientId(null)}
-                                className={`w-full text-left p-4 rounded-xl border transition-all ${selectedClientId === null
-                                        ? 'border-[#1AB1B1] bg-teal-50'
-                                        : 'border-gray-100 bg-white hover:shadow-md'
-                                    }`}
-                            >
-                                <p className="font-bold text-[#002D44]">📊 Todos los clientes</p>
-                                <p className="text-sm text-gray-500">{clients.length} clientes registrados</p>
-                            </button>
 
-                            {filteredClients.map((client) => (
-                                <div
-                                    key={client.id}
-                                    onClick={() => setSelectedClientId(client.id)}
-                                    className={`bg-white rounded-2xl border p-4 cursor-pointer transition-all ${selectedClientId === client.id
-                                        ? 'border-[#1AB1B1] shadow-lg'
-                                        : 'border-gray-100 hover:shadow-md'
-                                        }`}
-                                >
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div>
-                                            <p className="font-bold text-[#002D44]">{client.name}</p>
-                                            <p className="text-sm text-gray-400 font-mono">{client.nit}</p>
+                            <div className="space-y-3">
+                                {clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())).map(client => (
+                                    <div
+                                        key={client.id}
+                                        onClick={() => setSelectedClientId(client.id)}
+                                        className={`group p-5 rounded-2xl border cursor-pointer transition-all relative overflow-hidden ${selectedClientId === client.id
+                                            ? 'bg-white border-black ring-1 ring-black shadow-lg'
+                                            : 'bg-white border-gray-100 hover:border-gray-300'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h3 className="font-bold text-[#002D44] text-lg leading-tight">{client.name}</h3>
+                                                <p className="text-xs font-mono text-gray-400 mt-1">{client.nit}</p>
+                                            </div>
+                                            {selectedClientId === client.id && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-xs font-bold px-2 py-1 rounded-full ${client.classification === 'GRAN_CONTRIBUYENTE' ? 'bg-purple-100 text-purple-700' :
-                                                    client.classification === 'JURIDICA' ? 'bg-blue-100 text-blue-700' :
-                                                        'bg-green-100 text-green-700'
-                                                }`}>
+                                        <div className="flex items-center gap-2 mt-4">
+                                            <span className="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded text-gray-600 uppercase">
                                                 {client.classification}
                                             </span>
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteClient(client.id); }}
-                                                className="p-1 hover:bg-red-50 rounded"
+                                                onClick={(e) => handleDeleteClient(client.id, e)}
+                                                className="ml-auto p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-lg"
                                             >
-                                                <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <Bell className="w-3 h-3" />
-                                        {client.is_retention_agent && <span className="bg-orange-50 px-2 py-0.5 rounded">Retenedor</span>}
-                                        {client.has_gmf && <span className="bg-pink-50 px-2 py-0.5 rounded">GMF</span>}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Right Panel - Timeline */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Filter */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <Filter className="w-4 h-4 text-gray-400" />
-                        {(['ALL', 'RENTA', 'IVA', 'RETENCION', 'GMF', 'EXOGENA', 'PATRIMONIO'] as TaxType[]).map(type => (
-                            <button
-                                key={type}
-                                onClick={() => setFilterType(type)}
-                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${filterType === type
-                                        ? 'bg-[#1AB1B1] text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                            >
-                                {type === 'ALL' ? 'Todos' : type}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gray-50">
-                            <h3 className="font-bold text-[#002D44] flex items-center gap-2">
-                                <CalendarDays className="w-5 h-5" />
-                                Próximos Vencimientos
-                                {selectedClientId && (
-                                    <span className="text-sm font-normal text-gray-500">
-                                        - {clients.find(c => c.id === selectedClientId)?.name}
-                                    </span>
-                                )}
-                            </h3>
-                        </div>
-
-                        {allEvents.length === 0 ? (
-                            <div className="p-12 text-center">
-                                <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                                <p className="text-gray-400">
-                                    {clients.length === 0
-                                        ? 'Agrega clientes para ver sus vencimientos'
-                                        : 'No hay vencimientos para el filtro seleccionado'}
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto">
-                                {allEvents.slice(0, 50).map((event, idx) => (
-                                    <div
-                                        key={`${event.id}-${(event as TaxEvent & { clientId: string }).clientId}-${idx}`}
-                                        className={`flex items-center gap-4 p-4 rounded-xl border ${getStatusColor(event.date)}`}
-                                    >
-                                        <div className="w-12 h-12 bg-white rounded-xl flex flex-col items-center justify-center shadow-sm">
-                                            <span className="text-xs font-bold text-gray-400">
-                                                {new Date(event.date).toLocaleDateString('es-CO', { month: 'short' }).toUpperCase()}
-                                            </span>
-                                            <span className="text-lg font-black text-[#002D44]">
-                                                {new Date(event.date).getDate()}
-                                            </span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-[#002D44] truncate">{event.title}</p>
-                                            <p className="text-sm text-gray-500 truncate">
-                                                {(event as TaxEvent & { clientName: string }).clientName} • {(event as TaxEvent & { clientNit: string }).clientNit}
-                                            </p>
-                                        </div>
-                                        <span className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ${getTypeColor(event.type)}`}>
-                                            {event.type}
-                                        </span>
-                                    </div>
                                 ))}
                             </div>
-                        )}
+                        </div>
+
+                        {/* Right Panel - Timeline */}
+                        <div className="lg:col-span-8">
+                            {selectedClientId ? (
+                                <div className="bg-white rounded-[30px] border border-gray-100 shadow-sm p-8 min-h-[600px]">
+                                    <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-6">
+                                        <div>
+                                            <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Próximo Vencimiento</p>
+                                            <h2 className="text-3xl font-black text-[#002D44]">
+                                                {activeEvents[0]?.title || 'Al día'}
+                                            </h2>
+                                        </div>
+                                        {activeEvents[0] && (() => {
+                                            const daysLeft = Math.ceil((new Date(activeEvents[0].date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                                            const isUrgent = daysLeft <= 5;
+                                            const isWarning = daysLeft <= 15;
+                                            return (
+                                                <div className={`text-center px-6 py-3 rounded-2xl border ${isUrgent ? 'bg-red-50 border-red-100' :
+                                                    isWarning ? 'bg-orange-50 border-orange-100' :
+                                                        'bg-green-50 border-green-100'
+                                                    }`}>
+                                                    <p className={`font-bold text-3xl ${isUrgent ? 'text-red-600' :
+                                                        isWarning ? 'text-orange-600' :
+                                                            'text-green-600'
+                                                        }`}>
+                                                        {daysLeft}
+                                                    </p>
+                                                    <p className={`text-[10px] font-bold uppercase ${isUrgent ? 'text-red-400' :
+                                                        isWarning ? 'text-orange-400' :
+                                                            'text-green-400'
+                                                        }`}>Días Restantes</p>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* Timeline */}
+                                    <div className="space-y-4">
+                                        {activeEvents.map((event, idx) => {
+                                            const date = new Date(event.date);
+                                            const statusClasses = getStatusColor(event.date);
+
+                                            return (
+                                                <div key={idx} className={`flex items-center gap-6 p-5 rounded-2xl border hover:scale-[1.01] transition-transform ${statusClasses} bg-opacity-40`}>
+                                                    <div className="flex flex-col items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-sm flex-shrink-0">
+                                                        <span className="text-xs font-bold text-gray-400 uppercase">{date.toLocaleDateString('es-CO', { month: 'short' })}</span>
+                                                        <span className="text-2xl font-black text-slate-800">{date.getDate()}</span>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="font-bold text-lg mb-1">{event.title}</h4>
+                                                        <p className="text-xs opacity-80 font-medium">{event.description}</p>
+                                                    </div>
+                                                    <div className="flex-shrink-0">
+                                                        <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 bg-white/50 rounded-full border border-black/5">
+                                                            {event.type}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-white rounded-[30px] border border-gray-100 shadow-sm p-12 text-center h-full flex flex-col items-center justify-center">
+                                    <Clock className="w-16 h-16 text-gray-200 mb-4" />
+                                    <h3 className="text-xl font-bold text-gray-400">Selecciona un cliente</h3>
+                                    <p className="text-gray-400">Visualiza el calendario de obligaciones detallado.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
+
+                {showForm && (
+                    <TaxCalendarForm
+                        onSubmit={handleCreateCalendar}
+                        onCancel={() => setShowForm(false)}
+                        isLoading={processing}
+                        isGuest={!isAuthenticated}
+                    />
+                )}
+
+                {/* Delete Confirmation Modal */}
+                {deleteTarget && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                                    <Trash2 className="w-6 h-6 text-red-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">Eliminar Calendario</h3>
+                                    <p className="text-sm text-gray-500">Esta acción no se puede deshacer</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-4">
+                                <p className="text-sm text-red-800">
+                                    Se eliminará permanentemente el calendario de{' '}
+                                    <span className="font-bold">{deleteTarget.name}</span> junto con toda su configuración.
+                                </p>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                    Para confirmar, escribe: <span className="text-red-600">{deleteTarget.name}</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmText}
+                                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                    placeholder="Escribe el nombre exacto..."
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-200 focus:border-red-400 outline-none font-medium"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setDeleteTarget(null);
+                                        setDeleteConfirmText('');
+                                    }}
+                                    disabled={processing}
+                                    className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    disabled={processing || deleteConfirmText !== deleteTarget.name}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${deleteConfirmText === deleteTarget.name
+                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                        }`}
+                                >
+                                    {processing ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <Trash2 className="w-5 h-5" />
+                                    )}
+                                    Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Add Client Modal */}
-            {showForm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl max-w-lg w-full p-8 animate-fade-in max-h-[90vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-black text-[#002D44]">Agregar Cliente</h2>
-                            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Cliente</label>
-                                <input
-                                    type="text"
-                                    value={formData.clientName}
-                                    onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1]"
-                                    placeholder="Empresa S.A.S"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">NIT</label>
-                                <input
-                                    type="text"
-                                    value={formData.nit}
-                                    onChange={(e) => setFormData({ ...formData, nit: e.target.value })}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1]"
-                                    placeholder="900123456-1"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Clasificación</label>
-                                <select
-                                    value={formData.classification}
-                                    onChange={(e) => setFormData({ ...formData, classification: e.target.value as typeof formData.classification })}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] bg-white"
-                                >
-                                    <option value="NATURAL">Persona Natural</option>
-                                    <option value="JURIDICA">Persona Jurídica</option>
-                                    <option value="GRAN_CONTRIBUYENTE">Gran Contribuyente</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Periodicidad IVA</label>
-                                <select
-                                    value={formData.ivaPeriodicity}
-                                    onChange={(e) => setFormData({ ...formData, ivaPeriodicity: e.target.value as typeof formData.ivaPeriodicity })}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] bg-white"
-                                >
-                                    <option value="BIMESTRAL">Bimestral</option>
-                                    <option value="CUATRIMESTRAL">Cuatrimestral</option>
-                                    <option value="NONE">No aplica</option>
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.isRetentionAgent}
-                                        onChange={(e) => setFormData({ ...formData, isRetentionAgent: e.target.checked })}
-                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                    />
-                                    <span className="text-sm text-gray-700">Agente retenedor</span>
-                                </label>
-
-                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.hasGmf}
-                                        onChange={(e) => setFormData({ ...formData, hasGmf: e.target.checked })}
-                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                    />
-                                    <span className="text-sm text-gray-700">GMF (4x1000)</span>
-                                </label>
-
-                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.requiresExogena}
-                                        onChange={(e) => setFormData({ ...formData, requiresExogena: e.target.checked })}
-                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                    />
-                                    <span className="text-sm text-gray-700">Info Exógena</span>
-                                </label>
-
-                                <label className="flex items-center gap-2 cursor-pointer p-3 border rounded-xl hover:bg-gray-50">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.hasPatrimonyTax}
-                                        onChange={(e) => setFormData({ ...formData, hasPatrimonyTax: e.target.checked })}
-                                        className="rounded text-[#1AB1B1] focus:ring-[#1AB1B1]"
-                                    />
-                                    <span className="text-sm text-gray-700">Imp. Patrimonio</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4 mt-8">
-                            <button
-                                onClick={() => setShowForm(false)}
-                                className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleAddClient}
-                                disabled={!formData.clientName || !formData.nit || saving}
-                                className="flex-1 py-3 bg-[#1AB1B1] text-white rounded-xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                Guardar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+            {/* Guest Banner for anonymous users */}
+            {!isAuthenticated && <GuestBanner />}
+        </>
     );
 }
