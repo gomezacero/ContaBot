@@ -1,10 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 import { OCRResult, OCRItem } from '@/types/ocr';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
-const EXTRACTION_PROMPT = `Analiza este documento contable colombiano (factura, recibo, comprobante) y extrae la información en formato JSON.
+const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, comprobante) y extrae la información en formato JSON.
 
 IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown.
 
@@ -30,29 +29,19 @@ El JSON debe tener esta estructura exacta:
   "confidence": 0.95
 }
 
-Categorías válidas para Colombia:
+Categorías válidas:
 - Equipos de Cómputo (código 152405)
 - Suministros de Oficina (código 519530)
 - Servicios Públicos (código 513505)
-- Arrendamiento (código 512010)
-- Honorarios Profesionales (código 511025)
 - Publicidad y Marketing (código 522010)
-- Gastos de Viaje (código 521505)
-- Alimentación (código 519595)
-- Transporte (código 523560)
-- Mantenimiento (código 527535)
 - Software y Licencias (código 516515)
 - Telecomunicaciones (código 513530)
-- Seguros (código 516005)
-- Impuestos (código 511505)
-- Gastos Financieros (código 530505)
 - Otros Gastos (código 529595)
 
 Incluye el código PUC entre paréntesis en la categoría.
-El campo "confidence" por item indica qué tan seguro estás de cada extracción (0 a 1).
-Si no puedes leer algo claramente, pon confidence bajo y marca la descripción con [?].`;
+El campo "confidence" indica qué tan seguro estás de cada extracción (0 a 1).`;
 
-const TEXT_EXTRACTION_PROMPT = `Analiza el siguiente texto que contiene información de gastos o facturas colombianas y extrae los datos en formato JSON.
+const TEXT_EXTRACTION_PROMPT = `Analiza el siguiente texto que contiene información de gastos o facturas y extrae los datos en formato JSON.
 
 TEXTO A ANALIZAR:
 {TEXT_CONTENT}
@@ -83,18 +72,49 @@ Cada objeto debe tener esta estructura:
 
 Extrae TODOS los gastos/facturas que puedas identificar en el texto.`;
 
+// Direct REST API call to Gemini
+async function callGeminiAPI(contents: object[], apiKey: string): Promise<string> {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            contents: contents,
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 8192,
+            }
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini API Error:', response.status, errorText);
+        throw new Error(`Gemini API returned ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+        throw new Error('Invalid response structure from Gemini');
+    }
+
+    return data.candidates[0].content.parts[0].text;
+}
+
 export async function POST(request: NextRequest) {
     try {
         const contentType = request.headers.get('content-type') || '';
+        const apiKey = process.env.GEMINI_API_KEY;
 
-        if (!process.env.GEMINI_API_KEY) {
+        if (!apiKey) {
             return NextResponse.json(
                 { success: false, error: 'GEMINI_API_KEY not configured' },
                 { status: 500 }
             );
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
         const results: OCRResult[] = [];
 
         // Handle text input
@@ -110,9 +130,12 @@ export async function POST(request: NextRequest) {
             }
 
             const prompt = TEXT_EXTRACTION_PROMPT.replace('{TEXT_CONTENT}', text);
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const responseText = response.text();
+
+            const contents = [{
+                parts: [{ text: prompt }]
+            }];
+
+            const responseText = await callGeminiAPI(contents, apiKey);
 
             try {
                 let cleanText = responseText.trim();
@@ -168,32 +191,33 @@ export async function POST(request: NextRequest) {
                 const base64 = Buffer.from(bytes).toString('base64');
 
                 let mimeType = file.type;
-                // Enforce correct MIME types for Gemini
                 if (!mimeType || mimeType === 'application/octet-stream') {
                     const ext = file.name.split('.').pop()?.toLowerCase();
                     if (ext === 'pdf') mimeType = 'application/pdf';
                     else if (ext === 'png') mimeType = 'image/png';
                     else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-                    else mimeType = 'image/png'; // Default fallback
+                    else mimeType = 'image/png';
                 }
 
-                console.log(`Processing file: ${file.name}, MIME: ${mimeType}, Size: ${bytes.byteLength} bytes`);
+                console.log(`Processing: ${file.name}, MIME: ${mimeType}, Size: ${bytes.byteLength} bytes`);
 
-                const part = {
-                    inlineData: {
-                        mimeType,
-                        data: base64
-                    }
-                };
+                const contents = [{
+                    parts: [
+                        { text: EXTRACTION_PROMPT },
+                        {
+                            inlineData: {
+                                mimeType,
+                                data: base64
+                            }
+                        }
+                    ]
+                }];
 
-                const result = await model.generateContent([EXTRACTION_PROMPT, part]);
-
-                const response = await result.response;
-                const text = response.text();
+                const responseText = await callGeminiAPI(contents, apiKey);
 
                 let parsed;
                 try {
-                    let cleanText = text.trim();
+                    let cleanText = responseText.trim();
                     if (cleanText.startsWith('```json')) cleanText = cleanText.slice(7);
                     if (cleanText.startsWith('```')) cleanText = cleanText.slice(3);
                     if (cleanText.endsWith('```')) cleanText = cleanText.slice(0, -3);
@@ -229,10 +253,10 @@ export async function POST(request: NextRequest) {
                 });
             } catch (fileError) {
                 const errorMessage = fileError instanceof Error ? fileError.message : 'Unknown error';
-                console.error(`Error processing file ${file.name}:`, errorMessage, fileError);
+                console.error(`Error processing file ${file.name}:`, errorMessage);
                 results.push({
                     fileName: file.name,
-                    entity: `Error: ${errorMessage.slice(0, 50)}`,
+                    entity: `Error: ${errorMessage.slice(0, 80)}`,
                     nit: '',
                     date: new Date().toISOString().split('T')[0],
                     invoiceNumber: '',
@@ -248,8 +272,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, results, clientId });
     } catch (error) {
         console.error('OCR API Error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Error processing documents';
         return NextResponse.json(
-            { success: false, error: 'Error processing documents' },
+            { success: false, error: errorMessage },
             { status: 500 }
         );
     }
