@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OCRResult, OCRItem } from '@/types/ocr';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, comprobante) y extrae la información en formato JSON.
 
