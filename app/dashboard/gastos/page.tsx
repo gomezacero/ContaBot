@@ -81,6 +81,53 @@ export default function GastosPage() {
         loadClients();
     }, [loadClients]);
 
+    // Load saved OCR results for the selected client
+    const loadSavedResults = useCallback(async () => {
+        if (!isAuthenticated || !selectedClientId) {
+            setResults([]);
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('ocr_results')
+                .select('*')
+                .eq('client_id', selectedClientId)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error loading saved results:', error);
+                return;
+            }
+
+            if (data && data.length > 0) {
+                // Transform DB records to OCRResult format
+                const loadedResults: OCRResult[] = data.map(record => ({
+                    fileName: record.filename || 'Documento',
+                    entity: record.vendor || 'Desconocido',
+                    nit: '',
+                    date: record.invoice_date || '',
+                    invoiceNumber: record.invoice_number || '',
+                    subtotal: record.subtotal || 0,
+                    iva: record.iva || 0,
+                    total: record.total || 0,
+                    items: record.items || [],
+                    confidence: record.confidence || 0.5,
+                }));
+                setResults(loadedResults);
+            } else {
+                setResults([]);
+            }
+        } catch (err) {
+            console.error('Error loading results:', err);
+        }
+    }, [supabase, isAuthenticated, selectedClientId]);
+
+    // Load results when client changes
+    useEffect(() => {
+        loadSavedResults();
+    }, [loadSavedResults]);
+
     // Create new folder/client
     const handleCreateFolder = async () => {
         if (!newFolderName.trim()) return;
@@ -186,15 +233,15 @@ export default function GastosPage() {
                             await supabase.from('ocr_results').insert({
                                 user_id: user.id,
                                 client_id: selectedClientId,
-                                filename: result.filename || 'text_input',
+                                filename: result.fileName || 'text_input',
                                 file_type: inputMode === 'FILE' ? 'image' : 'text',
-                                vendor: result.vendor,
+                                vendor: result.entity, // API returns 'entity' as vendor name
                                 invoice_number: result.invoiceNumber,
                                 invoice_date: result.date,
                                 subtotal: result.subtotal || 0,
                                 iva: result.iva || 0,
-                                total: result.total,
-                                items: result.items,
+                                total: result.total || 0,
+                                items: result.items || [],
                                 confidence: result.confidence || 0
                             });
                             savedThisSession++;
