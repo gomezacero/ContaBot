@@ -1,0 +1,5 @@
+{
+  "name": "Contabot",
+  "description": "Suite contable inteligente con IA. Nómina, Extracción de documentos y Auditoría Exógena.",
+  "requestFramePermissions": []
+}
