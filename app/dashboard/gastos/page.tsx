@@ -54,6 +54,8 @@ export default function GastosPage() {
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState<OCRResult[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [showHistory, setShowHistory] = useState(false);
+    const [savedCount, setSavedCount] = useState(0);
 
     // Load clients
     const loadClients = useCallback(async () => {
@@ -160,6 +162,37 @@ export default function GastosPage() {
             }
 
             setResults(prev => [...prev, ...data.results]);
+
+            // Auto-save to Supabase for authenticated users
+            if (isAuthenticated && data.results.length > 0) {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    let savedThisSession = 0;
+                    for (const result of data.results) {
+                        try {
+                            await supabase.from('ocr_results').insert({
+                                user_id: user.id,
+                                client_id: selectedClientId,
+                                filename: result.filename || 'text_input',
+                                file_type: inputMode === 'FILE' ? 'image' : 'text',
+                                vendor: result.vendor,
+                                invoice_number: result.invoiceNumber,
+                                invoice_date: result.date,
+                                subtotal: result.subtotal || 0,
+                                iva: result.iva || 0,
+                                total: result.total,
+                                items: result.items,
+                                confidence: result.confidence || 0
+                            });
+                            savedThisSession++;
+                        } catch (saveErr) {
+                            console.error('Error saving OCR result:', saveErr);
+                        }
+                    }
+                    setSavedCount(prev => prev + savedThisSession);
+                }
+            }
+
             // Clear inputs after successful processing
             if (inputMode === 'FILE') setFiles([]);
             if (inputMode === 'TEXT') setTextInput('');
