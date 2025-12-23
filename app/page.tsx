@@ -43,7 +43,7 @@ export default function HomePage() {
               Login
             </Link>
             <Link
-              href="/register"
+              href="/dashboard"
               className="bg-[#1AB1B1] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20 hover:scale-105 transition-all"
             >
               Empieza Gratis
@@ -142,10 +142,10 @@ export default function HomePage() {
           </p>
           <div className="flex justify-center">
             <Link
-              href="/register"
+              href="/dashboard"
               className="bg-[#1AB1B1] text-white px-12 py-5 rounded-full font-black text-xl hover:scale-105 transition-all shadow-xl shadow-teal-500/20"
             >
-              Get Started Now
+              Comenzar Gratis
             </Link>
           </div>
         </section>

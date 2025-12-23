@@ -34,17 +34,20 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Protected routes - redirect to login if not authenticated
-    const protectedPaths = ['/dashboard', '/nomina', '/gastos', '/calendario', '/perfil']
-    const isProtectedPath = protectedPaths.some(path =>
-        request.nextUrl.pathname.startsWith(path)
-    )
-
-    if (isProtectedPath && !user) {
-        const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
-    }
+    // FREEMIUM MODEL: Dashboard routes are now accessible without authentication
+    // Anonymous users will have their data stored in localStorage
+    // Authenticated users will have their data stored in Supabase
+    // 
+    // Note: If you need to protect specific routes in the future, add them here:
+    // const protectedPaths = ['/admin', '/billing']
+    // const isProtectedPath = protectedPaths.some(path =>
+    //     request.nextUrl.pathname.startsWith(path)
+    // )
+    // if (isProtectedPath && !user) {
+    //     const url = request.nextUrl.clone()
+    //     url.pathname = '/login'
+    //     return NextResponse.redirect(url)
+    // }
 
     // Redirect authenticated users away from auth pages
     const authPaths = ['/login', '/register']
