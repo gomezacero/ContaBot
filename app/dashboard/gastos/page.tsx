@@ -56,6 +56,8 @@ export default function GastosPage() {
     const [error, setError] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const [savedCount, setSavedCount] = useState(0);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [clearing, setClearing] = useState(false);
 
     // Load clients
     const loadClients = useCallback(async () => {
@@ -263,9 +265,38 @@ export default function GastosPage() {
         }
     };
 
-    // Clear all results
-    const clearResults = () => {
-        setResults([]);
+    // Clear all results - shows confirmation first
+    const handleClearClick = () => {
+        if (results.length === 0) return;
+        setShowClearConfirm(true);
+    };
+
+    // Confirm clear - deletes from database
+    const confirmClear = async () => {
+        if (!selectedClientId) return;
+
+        setClearing(true);
+        try {
+            // Delete from database
+            const { error } = await supabase
+                .from('ocr_results')
+                .delete()
+                .eq('client_id', selectedClientId);
+
+            if (error) {
+                console.error('Error deleting OCR results:', error);
+                setError('Error al limpiar los datos');
+            } else {
+                setResults([]);
+                setSavedCount(0);
+            }
+        } catch (err) {
+            console.error('Error clearing:', err);
+            setError('Error al limpiar');
+        } finally {
+            setClearing(false);
+            setShowClearConfirm(false);
+        }
     };
 
     // Export to Excel/CSV
@@ -614,7 +645,7 @@ export default function GastosPage() {
                             {results.length > 0 && (
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={clearResults}
+                                        onClick={handleClearClick}
                                         className="flex items-center gap-1 text-gray-500 hover:text-red-500 text-sm"
                                     >
                                         <Trash2 className="w-4 h-4" />
@@ -764,6 +795,62 @@ export default function GastosPage() {
                     )}
                 </div>
             </div>
+
+            {/* Clear Confirmation Modal */}
+            {showClearConfirm && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                                <Trash2 className="w-6 h-6 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-[#002D44]">¿Limpiar Datos?</h3>
+                                <p className="text-sm text-gray-500">{results.length} registros serán eliminados</p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-600 mb-4">
+                            Esta acción eliminará <strong>permanentemente</strong> todos los registros OCR de la carpeta actual.
+                            Esta acción no se puede deshacer.
+                        </p>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6">
+                            <p className="text-sm text-amber-700 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4" />
+                                Esto eliminará {formatCurrency(totalAmount)} en registros
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowClearConfirm(false)}
+                                disabled={clearing}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmClear}
+                                disabled={clearing}
+                                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
+                            >
+                                {clearing ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Eliminando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-5 h-5" />
+                                        Sí, Eliminar Todo
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
