@@ -18,7 +18,8 @@ import {
     Filter,
     ArrowRight,
     Cloud,
-    HardDrive
+    HardDrive,
+    CloudUpload
 } from 'lucide-react';
 import { TaxCalendarEmptyState } from '@/components/tax-calendar/EmptyState';
 import { TaxCalendarForm } from '@/components/tax-calendar/TaxCalendarForm';
@@ -28,8 +29,10 @@ import {
     getLocalClients,
     addLocalClient,
     deleteLocalClient,
+    clearLocalClients,
     LocalClient
 } from '@/lib/local-storage';
+import { hasLocalDataToMigrate, getLocalDataCount, migrateLocalDataToSupabase } from '@/lib/migrate-local-data';
 
 interface DBClient {
     id: string;
@@ -65,6 +68,11 @@ export default function CalendarioPage() {
     // Delete confirmation state
     const [deleteTarget, setDeleteTarget] = useState<DBClient | null>(null);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+    // Migration state
+    const [showMigrationModal, setShowMigrationModal] = useState(false);
+    const [migrating, setMigrating] = useState(false);
+    const [localDataCount, setLocalDataCount] = useState(0);
 
     // Load clients - from Supabase if authenticated, localStorage if not
     const loadClients = useCallback(async () => {
@@ -113,6 +121,47 @@ export default function CalendarioPage() {
     useEffect(() => {
         loadClients();
     }, [loadClients]);
+
+    // Check for local data to migrate when authenticated
+    useEffect(() => {
+        if (isAuthenticated && !authLoading) {
+            const count = getLocalDataCount();
+            if (count > 0) {
+                setLocalDataCount(count);
+                setShowMigrationModal(true);
+            }
+        }
+    }, [isAuthenticated, authLoading]);
+
+    // Handle migration of local data to Supabase
+    const handleMigration = async () => {
+        setMigrating(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('No user');
+
+            const result = await migrateLocalDataToSupabase(user.id, supabase);
+
+            if (result.success) {
+                setShowMigrationModal(false);
+                // Reload clients from Supabase
+                loadClients();
+            } else {
+                setError(`Error en migración: ${result.errors.join(', ')}`);
+            }
+        } catch (err) {
+            setError('Error migrando datos');
+            console.error(err);
+        } finally {
+            setMigrating(false);
+        }
+    };
+
+    // Skip migration and clear local data
+    const skipMigration = () => {
+        clearLocalClients();
+        setShowMigrationModal(false);
+    };
 
     const handleCreateCalendar = async (formData: any) => {
         setProcessing(true);
@@ -490,6 +539,55 @@ export default function CalendarioPage() {
                     </div>
                 )}
             </div>
+
+            {/* Migration Modal */}
+            {showMigrationModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
+                                <CloudUpload className="w-6 h-6 text-teal-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-[#002D44]">¡Datos Locales Encontrados!</h3>
+                                <p className="text-sm text-gray-500">Tienes {localDataCount} calendario(s) guardado(s) localmente</p>
+                            </div>
+                        </div>
+
+                        <p className="text-gray-600 mb-6">
+                            ¿Deseas migrar tus calendarios guardados en este navegador a tu cuenta?
+                            Así no los perderás y podrás acceder desde cualquier dispositivo.
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={skipMigration}
+                                disabled={migrating}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Descartar
+                            </button>
+                            <button
+                                onClick={handleMigration}
+                                disabled={migrating}
+                                className="flex-1 py-3 rounded-xl bg-[#1AB1B1] text-white font-bold hover:bg-teal-600 transition-all flex items-center justify-center gap-2"
+                            >
+                                {migrating ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Migrando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CloudUpload className="w-5 h-5" />
+                                        Migrar a la Nube
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Guest Banner for anonymous users */}
             {!isAuthenticated && <GuestBanner />}
