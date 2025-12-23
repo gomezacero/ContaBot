@@ -168,23 +168,25 @@ export async function POST(request: NextRequest) {
                 const base64 = Buffer.from(bytes).toString('base64');
 
                 let mimeType = file.type;
+                // Enforce correct MIME types for Gemini
                 if (!mimeType || mimeType === 'application/octet-stream') {
                     const ext = file.name.split('.').pop()?.toLowerCase();
                     if (ext === 'pdf') mimeType = 'application/pdf';
                     else if (ext === 'png') mimeType = 'image/png';
                     else if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-                    else mimeType = 'image/png';
+                    else mimeType = 'image/png'; // Default fallback
                 }
 
-                const result = await model.generateContent([
-                    EXTRACTION_PROMPT,
-                    {
-                        inlineData: {
-                            mimeType,
-                            data: base64,
-                        },
-                    },
-                ]);
+                console.log(`Processing file: ${file.name}, MIME: ${mimeType}, Size: ${bytes.byteLength} bytes`);
+
+                const part = {
+                    inlineData: {
+                        mimeType,
+                        data: base64
+                    }
+                };
+
+                const result = await model.generateContent([EXTRACTION_PROMPT, part]);
 
                 const response = await result.response;
                 const text = response.text();
@@ -226,10 +228,11 @@ export async function POST(request: NextRequest) {
                     confidence: parsed.confidence || 0.5,
                 });
             } catch (fileError) {
-                console.error(`Error processing file ${file.name}:`, fileError);
+                const errorMessage = fileError instanceof Error ? fileError.message : 'Unknown error';
+                console.error(`Error processing file ${file.name}:`, errorMessage, fileError);
                 results.push({
                     fileName: file.name,
-                    entity: 'Error al procesar',
+                    entity: `Error: ${errorMessage.slice(0, 50)}`,
                     nit: '',
                     date: new Date().toISOString().split('T')[0],
                     invoiceNumber: '',
