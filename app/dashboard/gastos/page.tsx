@@ -126,8 +126,16 @@ export default function GastosPage() {
 
     // Process documents
     const handleProcess = async () => {
-        if (inputMode === 'FILE' && files.length === 0) return;
-        if (inputMode === 'TEXT' && !textInput.trim()) return;
+        console.log('🚀 handleProcess called', { inputMode, filesCount: files.length, textLength: textInput.length });
+
+        if (inputMode === 'FILE' && files.length === 0) {
+            console.log('❌ No files to process');
+            return;
+        }
+        if (inputMode === 'TEXT' && !textInput.trim()) {
+            console.log('❌ No text to process');
+            return;
+        }
 
         setProcessing(true);
         setError(null);
@@ -136,6 +144,7 @@ export default function GastosPage() {
             let response;
 
             if (inputMode === 'TEXT') {
+                console.log('📝 Sending text to OCR API...');
                 response = await fetch('/api/ocr', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -145,6 +154,7 @@ export default function GastosPage() {
                     }),
                 });
             } else {
+                console.log('📁 Sending files to OCR API...', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
                 const formData = new FormData();
                 files.forEach(file => formData.append('files', file));
                 if (selectedClientId) formData.append('clientId', selectedClientId);
@@ -155,13 +165,16 @@ export default function GastosPage() {
                 });
             }
 
+            console.log('📥 API Response status:', response.status);
             const data = await response.json();
+            console.log('📦 API Response data:', data);
 
             if (!data.success) {
                 throw new Error(data.error || 'Error procesando documentos');
             }
 
             setResults(prev => [...prev, ...data.results]);
+            console.log('✅ Results set:', data.results.length, 'items');
 
             // Auto-save to Supabase for authenticated users
             if (isAuthenticated && data.results.length > 0) {
@@ -597,8 +610,46 @@ export default function GastosPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {results.flatMap((result, rIdx) =>
-                                            result.items.map((item, iIdx) => (
+                                        {results.flatMap((result, rIdx) => {
+                                            // If no items, show a fallback row with the document total
+                                            if (!result.items || result.items.length === 0) {
+                                                return [(
+                                                    <tr key={`${rIdx}-total`} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <FileText className="w-4 h-4 text-gray-400" />
+                                                                <span className="text-xs text-gray-500 truncate max-w-[100px]">
+                                                                    {result.fileName}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <p className="font-medium text-[#002D44]">{result.entity || 'Sin proveedor'}</p>
+                                                            <p className="text-xs text-gray-400">{result.nit || ''}</p>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <p>Factura #{result.invoiceNumber || 'N/A'}</p>
+                                                            <p className="text-xs text-gray-400">{result.date}</p>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                                                Sin categorizar
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-bold">
+                                                            {formatCurrency(result.total)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className={`text-xs px-2 py-1 rounded-full font-bold ${getConfidenceColor(result.confidence || 0.5)}`}>
+                                                                {Math.round((result.confidence || 0.5) * 100)}%
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )];
+                                            }
+
+                                            // If items exist, render each item
+                                            return result.items.map((item, iIdx) => (
                                                 <tr key={`${rIdx}-${iIdx}`} className="hover:bg-gray-50">
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center gap-2">
@@ -634,8 +685,8 @@ export default function GastosPage() {
                                                         )}
                                                     </td>
                                                 </tr>
-                                            ))
-                                        )}
+                                            ));
+                                        })}
                                     </tbody>
                                     <tfoot className="bg-gray-50 font-bold">
                                         <tr>
