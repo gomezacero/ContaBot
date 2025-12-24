@@ -1,13 +1,34 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Bot, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Bot, Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react';
+
+// Mapeo de mensajes de error de Supabase a español
+const ERROR_MESSAGES: Record<string, string> = {
+    'Invalid login credentials': 'Correo o contraseña incorrectos',
+    'Email not confirmed': 'Por favor confirma tu correo electrónico antes de iniciar sesión',
+    'Invalid email or password': 'Correo o contraseña incorrectos',
+    'User not found': 'No existe una cuenta con este correo',
+    'Too many requests': 'Demasiados intentos. Por favor espera unos minutos.',
+    'Network request failed': 'Error de conexión. Verifica tu internet.',
+};
+
+function getErrorMessage(error: string): string {
+    // Buscar coincidencia parcial en las claves
+    for (const [key, value] of Object.entries(ERROR_MESSAGES)) {
+        if (error.toLowerCase().includes(key.toLowerCase())) {
+            return value;
+        }
+    }
+    return 'Error al iniciar sesión. Intenta de nuevo.';
+}
 
 export default function LoginPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const supabase = createClient();
 
     const [email, setEmail] = useState('');
@@ -15,11 +36,29 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [info, setInfo] = useState<string | null>(null);
+
+    // Mostrar mensaje si viene de callback con error
+    useEffect(() => {
+        const errorParam = searchParams.get('error');
+        if (errorParam) {
+            setError(decodeURIComponent(errorParam));
+        }
+    }, [searchParams]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setInfo(null);
+
+        // Validar formato de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError('Por favor ingresa un correo electrónico válido');
+            setLoading(false);
+            return;
+        }
 
         try {
             const { error } = await supabase.auth.signInWithPassword({
@@ -28,7 +67,7 @@ export default function LoginPage() {
             });
 
             if (error) {
-                setError(error.message);
+                setError(getErrorMessage(error.message));
                 return;
             }
 

@@ -281,6 +281,67 @@ export interface Database {
                     updated_at?: string
                 }
             }
+            api_usage: {
+                Row: {
+                    id: string
+                    user_id: string
+                    usage_date: string
+                    ocr_requests_count: number
+                    files_processed: number
+                    bytes_processed: number
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    usage_date?: string
+                    ocr_requests_count?: number
+                    files_processed?: number
+                    bytes_processed?: number
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    usage_date?: string
+                    ocr_requests_count?: number
+                    files_processed?: number
+                    bytes_processed?: number
+                    created_at?: string
+                    updated_at?: string
+                }
+            }
         }
     }
 }
+
+// Tipos de uso de API para el frontend
+export interface ApiUsageStats {
+    daily: {
+        ocr_requests: number
+        files_processed: number
+        bytes_processed: number
+    }
+    monthly: {
+        total_requests: number
+        total_files: number
+        total_bytes: number
+    }
+    limits: {
+        daily_ocr_requests: number
+        monthly_files: number
+        max_file_size_mb: number
+    }
+    remaining: {
+        daily_requests: number
+        monthly_files: number
+    }
+    percentage: {
+        daily: number
+        monthly: number
+    }
+}
+
+export type MembershipType = 'FREEMIUM' | 'PRO' | 'ENTERPRISE'

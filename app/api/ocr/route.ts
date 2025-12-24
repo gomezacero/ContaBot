@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OCRResult, OCRItem } from '@/types/ocr';
+import { createClient } from '@/lib/supabase/server';
+import {
+    FILE_LIMITS,
+    ERROR_MESSAGES,
+    validateMimeType,
+    getLimitsForMembership,
+} from '@/lib/usage-limits';
+import {
+    checkCanMakeRequest,
+    incrementUsage,
+    getUserMembershipType,
+} from '@/lib/services/usage-service';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -115,7 +127,40 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ===== VERIFICACIÓN DE AUTENTICACIÓN =====
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: ERROR_MESSAGES.AUTH_REQUIRED,
+                    code: 'AUTH_REQUIRED'
+                },
+                { status: 401 }
+            );
+        }
+
+        // ===== OBTENER TIPO DE MEMBRESÍA Y VERIFICAR LÍMITES =====
+        const membershipType = await getUserMembershipType(user.id);
+        const usageCheck = await checkCanMakeRequest(user.id, membershipType);
+
+        if (!usageCheck.allowed) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: usageCheck.reason,
+                    code: usageCheck.code,
+                    remaining: 0
+                },
+                { status: 429 }
+            );
+        }
+
         const results: OCRResult[] = [];
+        let totalBytesProcessed = 0;
+        let filesProcessedCount = 0;
 
         // Handle text input
         if (contentType.includes('application/json')) {
@@ -170,7 +215,20 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            return NextResponse.json({ success: true, results, clientId });
+            // Incrementar uso para entrada de texto
+            const textBytes = new TextEncoder().encode(text).length;
+            await incrementUsage(user.id, results.length, textBytes);
+
+            return NextResponse.json({
+                success: true,
+                results,
+                clientId,
+                usage: {
+                    filesProcessed: results.length,
+                    bytesProcessed: textBytes,
+                    remaining: usageCheck.remaining - 1,
+                }
+            });
         }
 
         // Handle file upload (FormData)
@@ -185,10 +243,57 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ===== VALIDACIÓN DE TAMAÑO DE ARCHIVOS =====
+        const limits = getLimitsForMembership(membershipType);
+        const maxFileSize = limits.max_file_size_mb * 1024 * 1024;
+        let totalRequestSize = 0;
+
+        for (const file of files) {
+            // Validar tamaño individual
+            if (file.size > maxFileSize) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: ERROR_MESSAGES.FILE_TOO_LARGE(file.name, limits.max_file_size_mb),
+                        code: 'FILE_TOO_LARGE'
+                    },
+                    { status: 400 }
+                );
+            }
+
+            // Validar tipo de archivo
+            const mimeValidation = validateMimeType(file.type);
+            if (!mimeValidation.valid) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: ERROR_MESSAGES.INVALID_FILE_TYPE(file.name),
+                        code: 'INVALID_FILE_TYPE'
+                    },
+                    { status: 400 }
+                );
+            }
+
+            totalRequestSize += file.size;
+        }
+
+        // Validar tamaño total de la solicitud
+        if (totalRequestSize > FILE_LIMITS.MAX_TOTAL_REQUEST_BYTES) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: ERROR_MESSAGES.TOTAL_TOO_LARGE(50),
+                    code: 'TOTAL_TOO_LARGE'
+                },
+                { status: 400 }
+            );
+        }
+
         for (const file of files) {
             try {
                 const bytes = await file.arrayBuffer();
                 const base64 = Buffer.from(bytes).toString('base64');
+                totalBytesProcessed += bytes.byteLength;
 
                 let mimeType = file.type;
                 if (!mimeType || mimeType === 'application/octet-stream') {
@@ -251,6 +356,7 @@ export async function POST(request: NextRequest) {
                     })),
                     confidence: parsed.confidence || 0.5,
                 });
+                filesProcessedCount++;
             } catch (fileError) {
                 const errorMessage = fileError instanceof Error ? fileError.message : 'Unknown error';
                 console.error(`Error processing file ${file.name}:`, errorMessage);
@@ -269,7 +375,21 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        return NextResponse.json({ success: true, results, clientId });
+        // ===== INCREMENTAR CONTADOR DE USO =====
+        if (filesProcessedCount > 0) {
+            await incrementUsage(user.id, filesProcessedCount, totalBytesProcessed);
+        }
+
+        return NextResponse.json({
+            success: true,
+            results,
+            clientId,
+            usage: {
+                filesProcessed: filesProcessedCount,
+                bytesProcessed: totalBytesProcessed,
+                remaining: usageCheck.remaining - 1,
+            }
+        });
     } catch (error) {
         console.error('OCR API Error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Error processing documents';

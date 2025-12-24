@@ -26,20 +26,68 @@ export default function RegisterPage() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    // Validar fortaleza de contraseña
+    const validatePassword = (pwd: string): { valid: boolean; message?: string } => {
+        if (pwd.length < 8) {
+            return { valid: false, message: 'La contraseña debe tener al menos 8 caracteres' };
+        }
+        if (!/[A-Z]/.test(pwd)) {
+            return { valid: false, message: 'La contraseña debe tener al menos una mayúscula' };
+        }
+        if (!/[a-z]/.test(pwd)) {
+            return { valid: false, message: 'La contraseña debe tener al menos una minúscula' };
+        }
+        if (!/[0-9]/.test(pwd)) {
+            return { valid: false, message: 'La contraseña debe tener al menos un número' };
+        }
+        return { valid: true };
+    };
+
+    // Mapeo de mensajes de error de Supabase a español
+    const getErrorMessage = (error: string): string => {
+        if (error.includes('already registered') || error.includes('already exists')) {
+            return 'Ya existe una cuenta con este correo electrónico';
+        }
+        if (error.includes('invalid email')) {
+            return 'Por favor ingresa un correo electrónico válido';
+        }
+        if (error.includes('weak password')) {
+            return 'La contraseña es muy débil';
+        }
+        return 'Error al registrarse. Intenta de nuevo.';
+    };
+
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        // Validations
+        // Validar formato de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            setError('Por favor ingresa un correo electrónico válido');
+            setLoading(false);
+            return;
+        }
+
+        // Validar que las contraseñas coincidan
         if (formData.password !== formData.confirmPassword) {
             setError('Las contraseñas no coinciden');
             setLoading(false);
             return;
         }
 
-        if (formData.password.length < 6) {
-            setError('La contraseña debe tener al menos 6 caracteres');
+        // Validar fortaleza de contraseña
+        const passwordValidation = validatePassword(formData.password);
+        if (!passwordValidation.valid) {
+            setError(passwordValidation.message || 'Contraseña inválida');
+            setLoading(false);
+            return;
+        }
+
+        // Validar nombre
+        if (formData.name.trim().length < 2) {
+            setError('Por favor ingresa tu nombre completo');
             setLoading(false);
             return;
         }
@@ -50,6 +98,7 @@ export default function RegisterPage() {
                 email: formData.email,
                 password: formData.password,
                 options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
                     data: {
                         name: formData.name,
                         phone: formData.phone,
@@ -60,7 +109,7 @@ export default function RegisterPage() {
             });
 
             if (authError) {
-                setError(authError.message);
+                setError(getErrorMessage(authError.message));
                 return;
             }
 
@@ -80,7 +129,11 @@ export default function RegisterPage() {
 
                 if (profileError) {
                     console.error('Error creating profile:', profileError);
-                    // Continue anyway - profile can be created later
+                    // Si falla la creación del perfil, intentar eliminar el usuario de auth
+                    // para mantener consistencia (aunque esto rara vez debería fallar)
+                    setError('Error al crear el perfil. Por favor intenta de nuevo.');
+                    setLoading(false);
+                    return;
                 }
             }
 
@@ -192,9 +245,10 @@ export default function RegisterPage() {
                                         name="password"
                                         value={formData.password}
                                         onChange={handleChange}
-                                        placeholder="••••••"
+                                        placeholder="••••••••"
                                         className="w-full pl-12 pr-11 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent outline-none transition-all"
                                         required
+                                        minLength={8}
                                     />
                                     <button
                                         type="button"
@@ -214,10 +268,27 @@ export default function RegisterPage() {
                                     name="confirmPassword"
                                     value={formData.confirmPassword}
                                     onChange={handleChange}
-                                    placeholder="••••••"
+                                    placeholder="••••••••"
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent outline-none transition-all"
                                     required
+                                    minLength={8}
                                 />
+                            </div>
+                        </div>
+
+                        {/* Password strength indicators */}
+                        <div className="text-xs text-gray-500 space-y-1">
+                            <div className={`flex items-center gap-2 ${formData.password.length >= 8 ? 'text-green-600' : ''}`}>
+                                <div className={`w-2 h-2 rounded-full ${formData.password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                Mínimo 8 caracteres
+                            </div>
+                            <div className={`flex items-center gap-2 ${/[A-Z]/.test(formData.password) ? 'text-green-600' : ''}`}>
+                                <div className={`w-2 h-2 rounded-full ${/[A-Z]/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                Una mayúscula
+                            </div>
+                            <div className={`flex items-center gap-2 ${/[0-9]/.test(formData.password) ? 'text-green-600' : ''}`}>
+                                <div className={`w-2 h-2 rounded-full ${/[0-9]/.test(formData.password) ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                Un número
                             </div>
                         </div>
 

@@ -32,6 +32,8 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { OCRResult, OCRItem } from '@/types/ocr';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
+import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
+import { FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
 
 interface DBClient {
     id: string;
@@ -46,6 +48,7 @@ export default function GastosPage() {
     const { isAuthenticated, isLoading: authLoading } = useAuthStatus();
     const isGuest = !isAuthenticated;
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { stats: usageStats, refresh: refreshUsage } = useUsageStats();
 
     // Client state
     const [clients, setClients] = useState<DBClient[]>([]);
@@ -161,19 +164,73 @@ export default function GastosPage() {
         }
     };
 
+    // Validar archivos antes de añadir
+    const validateFiles = (newFiles: File[]): { valid: File[]; errors: string[] } => {
+        const valid: File[] = [];
+        const errors: string[] = [];
+        const maxSize = FILE_LIMITS.MAX_FILE_SIZE_BYTES; // 10MB
+
+        for (const file of newFiles) {
+            // Validar tamaño
+            if (file.size > maxSize) {
+                errors.push(`"${file.name}" excede el límite de 10MB (${formatBytes(file.size)})`);
+                continue;
+            }
+
+            // Validar tipo
+            const allowedTypes = FILE_LIMITS.ALLOWED_MIME_TYPES as readonly string[];
+            if (!allowedTypes.includes(file.type) && file.type !== '') {
+                // También verificar por extensión
+                const ext = file.name.split('.').pop()?.toLowerCase();
+                const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+                if (!ext || !allowedExts.includes(ext)) {
+                    errors.push(`"${file.name}" no es un tipo de archivo soportado. Usa JPG, PNG o PDF`);
+                    continue;
+                }
+            }
+
+            valid.push(file);
+        }
+
+        return { valid, errors };
+    };
+
     // File handlers
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
-            setError(null);
+            const { valid, errors } = validateFiles(Array.from(e.target.files));
+
+            if (errors.length > 0) {
+                setError(errors.join('. '));
+            } else {
+                setError(null);
+            }
+
+            if (valid.length > 0) {
+                setFiles(prev => [...prev, ...valid]);
+            }
+
+            // Reset input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
     };
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         if (e.dataTransfer.files) {
-            setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
-            setError(null);
+            const { valid, errors } = validateFiles(Array.from(e.dataTransfer.files));
+
+            if (errors.length > 0) {
+                setError(errors.join('. '));
+            } else {
+                setError(null);
+            }
+
+            if (valid.length > 0) {
+                setFiles(prev => [...prev, ...valid]);
+            }
         }
     };
 
@@ -217,11 +274,27 @@ export default function GastosPage() {
 
             const data = await response.json();
 
+            // Manejar errores de límite de uso
+            if (response.status === 429) {
+                setError(data.error || 'Has alcanzado el límite de solicitudes. Vuelve mañana o actualiza tu plan.');
+                await refreshUsage();
+                return;
+            }
+
+            // Manejar error de autenticación
+            if (response.status === 401) {
+                setError('Debes iniciar sesión para usar esta función');
+                return;
+            }
+
             if (!data.success) {
                 throw new Error(data.error || 'Error procesando documentos');
             }
 
             setResults(prev => [...prev, ...data.results]);
+
+            // Refrescar estadísticas de uso
+            await refreshUsage();
 
             // Auto-save to Supabase for authenticated users
             if (isAuthenticated && data.results.length > 0) {
@@ -393,6 +466,11 @@ export default function GastosPage() {
                         <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest self-center mr-2">Acceso Invitado</span>
                     </div>
                 </div>
+            )}
+
+            {/* USAGE INDICATOR - Para usuarios autenticados */}
+            {isAuthenticated && (
+                <UsageIndicator showMonthly={false} className="max-w-md" />
             )}
 
             {/* Header Section */}
