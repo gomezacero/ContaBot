@@ -92,16 +92,15 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
     const fsp = ibc * fspRate;
 
     // --- LOGICA RETENCIÓN EN LA FUENTE ---
-    // Asegurar que todos los campos de deducciones tengan valores por defecto
-    // usando spread para manejar objetos parciales o vacíos desde la DB
+    // Extraer valores con defaults usando nullish coalescing
+    const inputDedParams = input.deductionsParameters || {};
     const dedParams = {
-        housingInterest: 0,
-        prepaidMedicine: 0,
-        voluntaryPension: 0,
-        voluntaryPensionExempt: 0,
-        afc: 0,
-        hasDependents: false,
-        ...(input.deductionsParameters || {}),
+        housingInterest: inputDedParams.housingInterest ?? 0,
+        prepaidMedicine: inputDedParams.prepaidMedicine ?? 0,
+        voluntaryPension: inputDedParams.voluntaryPension ?? 0,
+        voluntaryPensionExempt: inputDedParams.voluntaryPensionExempt ?? 0,
+        afc: inputDedParams.afc ?? 0,
+        hasDependents: inputDedParams.hasDependents ?? false,
     };
 
     let retencion = 0;
