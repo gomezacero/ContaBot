@@ -58,15 +58,14 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
     // Asegurar que base_salary sea un número válido
     const baseSalary = Number(emp.base_salary) || SMMLV_2025;
 
-    // Valores por defecto para deductionsConfig
-    // Usando spread para manejar objetos vacíos {} de la DB
-    const defaultDeductions = {
-        housingInterest: 0,
-        prepaidMedicine: 0,
-        voluntaryPension: 0,
-        voluntaryPensionExempt: 0,
-        afc: 0,
-        hasDependents: false,
+    // Extraer deductions_config con tipo seguro
+    const dbDeductions = (emp.deductions_config || {}) as {
+        housingInterest?: number;
+        prepaidMedicine?: number;
+        voluntaryPension?: number;
+        voluntaryPensionExempt?: number;
+        afc?: number;
+        hasDependents?: boolean;
     };
 
     // Validar y normalizar riskLevel
@@ -92,8 +91,12 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         endDate: emp.end_date || '2025-01-30',
         enableDeductions: false,
         deductionsParameters: {
-            ...defaultDeductions,
-            ...(emp.deductions_config || {}),
+            housingInterest: dbDeductions.housingInterest ?? 0,
+            prepaidMedicine: dbDeductions.prepaidMedicine ?? 0,
+            voluntaryPension: dbDeductions.voluntaryPension ?? 0,
+            voluntaryPensionExempt: dbDeductions.voluntaryPensionExempt ?? 0,
+            afc: dbDeductions.afc ?? 0,
+            hasDependents: dbDeductions.hasDependents ?? false,
         },
         hedHours: 0,
         henHours: 0,
