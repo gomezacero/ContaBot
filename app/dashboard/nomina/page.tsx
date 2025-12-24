@@ -55,19 +55,22 @@ interface DBClient {
 
 // Convert DB employee to PayrollInput
 function dbToPayrollInput(emp: DBEmployee): PayrollInput {
+    // Asegurar que base_salary sea un número válido
+    const baseSalary = Number(emp.base_salary) || SMMLV_2025;
+
     return {
         id: emp.id,
         employerType: 'JURIDICA',
-        companyName: emp.clients?.name,
+        companyName: emp.clients?.name || '',
         companyNit: emp.clients?.nit || '',
-        name: emp.name,
+        name: emp.name || 'Empleado',
         documentNumber: emp.document_number || '',
         jobTitle: emp.job_title || '',
-        contractType: (emp.contract_type as any) || 'INDEFINIDO',
-        baseSalary: emp.base_salary,
+        contractType: (emp.contract_type as 'INDEFINIDO' | 'FIJO' | 'OBRA_LABOR') || 'INDEFINIDO',
+        baseSalary: baseSalary,
         riskLevel: (emp.risk_level as RiskLevel) || RiskLevel.I,
-        isExempt: emp.is_exempt,
-        includeTransportAid: emp.include_transport_aid,
+        isExempt: emp.is_exempt ?? true,
+        includeTransportAid: emp.include_transport_aid ?? true,
         startDate: emp.start_date || '2025-01-01',
         endDate: emp.end_date || '2025-01-30',
         enableDeductions: false,
@@ -79,8 +82,17 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
             afc: 0,
             hasDependents: false
         },
-        hedHours: 0, henHours: 0, rnHours: 0, domFestHours: 0, heddfHours: 0, hendfHours: 0,
-        commissions: 0, salaryBonuses: 0, nonSalaryBonuses: 0, loans: 0, otherDeductions: 0
+        hedHours: 0,
+        henHours: 0,
+        rnHours: 0,
+        domFestHours: 0,
+        heddfHours: 0,
+        hendfHours: 0,
+        commissions: 0,
+        salaryBonuses: 0,
+        nonSalaryBonuses: 0,
+        loans: 0,
+        otherDeductions: 0
     };
 }
 
@@ -261,12 +273,29 @@ export default function NominaPage() {
         }
     };
 
+    // Mapeo de campos PayrollInput -> DBEmployee
+    const fieldMapping: Record<string, string> = {
+        baseSalary: 'base_salary',
+        includeTransportAid: 'include_transport_aid',
+        riskLevel: 'risk_level',
+        isExempt: 'is_exempt',
+        startDate: 'start_date',
+        endDate: 'end_date',
+        documentNumber: 'document_number',
+        jobTitle: 'job_title',
+        contractType: 'contract_type',
+    };
+
     // Handle input change for active employee
     const handleInputChange = (field: keyof PayrollInput, value: any) => {
         if (selectedClientId) {
+            const dbField = fieldMapping[field] || field;
+            // Asegurar que los valores numéricos sean números
+            const processedValue = ['base_salary'].includes(dbField) ? Number(value) || 0 : value;
+
             setDbEmployees(prev => prev.map(emp =>
                 emp.id === activeEmployeeId
-                    ? { ...emp, [field === 'baseSalary' ? 'base_salary' : field === 'includeTransportAid' ? 'include_transport_aid' : field === 'riskLevel' ? 'risk_level' : field === 'isExempt' ? 'is_exempt' : field]: value }
+                    ? { ...emp, [dbField]: processedValue }
                     : emp
             ));
         } else {
