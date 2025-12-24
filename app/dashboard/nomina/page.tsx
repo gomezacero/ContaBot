@@ -58,6 +58,23 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
     // Asegurar que base_salary sea un número válido
     const baseSalary = Number(emp.base_salary) || SMMLV_2025;
 
+    // Valores por defecto para deductionsConfig
+    // Usando spread para manejar objetos vacíos {} de la DB
+    const defaultDeductions = {
+        housingInterest: 0,
+        prepaidMedicine: 0,
+        voluntaryPension: 0,
+        voluntaryPensionExempt: 0,
+        afc: 0,
+        hasDependents: false,
+    };
+
+    // Validar y normalizar riskLevel
+    const validRiskLevels = ['I', 'II', 'III', 'IV', 'V'];
+    const riskLevel = validRiskLevels.includes(emp.risk_level)
+        ? (emp.risk_level as RiskLevel)
+        : RiskLevel.I;
+
     return {
         id: emp.id,
         employerType: 'JURIDICA',
@@ -68,19 +85,15 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         jobTitle: emp.job_title || '',
         contractType: (emp.contract_type as 'INDEFINIDO' | 'FIJO' | 'OBRA_LABOR') || 'INDEFINIDO',
         baseSalary: baseSalary,
-        riskLevel: (emp.risk_level as RiskLevel) || RiskLevel.I,
+        riskLevel: riskLevel,
         isExempt: emp.is_exempt ?? true,
         includeTransportAid: emp.include_transport_aid ?? true,
         startDate: emp.start_date || '2025-01-01',
         endDate: emp.end_date || '2025-01-30',
         enableDeductions: false,
-        deductionsParameters: (emp.deductions_config as any) || {
-            housingInterest: 0,
-            prepaidMedicine: 0,
-            voluntaryPension: 0,
-            voluntaryPensionExempt: 0,
-            afc: 0,
-            hasDependents: false
+        deductionsParameters: {
+            ...defaultDeductions,
+            ...(emp.deductions_config || {}),
         },
         hedHours: 0,
         henHours: 0,
