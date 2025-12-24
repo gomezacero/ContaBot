@@ -113,11 +113,12 @@ export default function RegisterPage() {
                 return;
             }
 
-            // 2. Create profile record
+            // 2. Create or update profile record
+            // Usamos upsert porque Supabase puede tener un trigger que crea el perfil automáticamente
             if (authData.user) {
                 const { error: profileError } = await supabase
                     .from('profiles')
-                    .insert({
+                    .upsert({
                         id: authData.user.id,
                         name: formData.name,
                         phone: formData.phone || null,
@@ -125,15 +126,23 @@ export default function RegisterPage() {
                         occupation: formData.occupation,
                         role: 'ACCOUNTANT',
                         membership_type: 'FREEMIUM',
+                    }, {
+                        onConflict: 'id',
+                        ignoreDuplicates: false,
                     });
 
-                if (profileError) {
+                // Solo mostrar error si no es un conflicto (el perfil ya fue creado por trigger)
+                if (profileError && profileError.code !== '23505') {
                     console.error('Error creating profile:', profileError);
-                    // Si falla la creación del perfil, intentar eliminar el usuario de auth
-                    // para mantener consistencia (aunque esto rara vez debería fallar)
-                    setError('Error al crear el perfil. Por favor intenta de nuevo.');
-                    setLoading(false);
-                    return;
+                    // No bloquear el registro si el perfil ya existe
+                    if (profileError.code === '409' || profileError.message?.includes('duplicate')) {
+                        // El perfil ya existe, continuar normalmente
+                        console.log('Profile already exists, continuing...');
+                    } else {
+                        setError('Error al crear el perfil. Por favor intenta de nuevo.');
+                        setLoading(false);
+                        return;
+                    }
                 }
             }
 
