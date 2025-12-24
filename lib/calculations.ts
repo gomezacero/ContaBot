@@ -46,7 +46,8 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
     const smmlv = SMMLV_2025;
     const auxTransport = AUX_TRANSPORTE_2025;
 
-    const baseSalary = input.baseSalary;
+    // Asegurar que baseSalary sea un número válido
+    const baseSalary = Number(input.baseSalary) || smmlv;
 
     // 1. CALCULATE DAYS
     const liquidationDays = calculateDays360(input.startDate, input.endDate);
@@ -91,13 +92,16 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
     const fsp = ibc * fspRate;
 
     // --- LOGICA RETENCIÓN EN LA FUENTE ---
-    const dedParams = input.deductionsParameters || {
+    // Asegurar que todos los campos de deducciones tengan valores por defecto
+    // usando spread para manejar objetos parciales o vacíos desde la DB
+    const dedParams = {
         housingInterest: 0,
         prepaidMedicine: 0,
         voluntaryPension: 0,
         voluntaryPensionExempt: 0,
         afc: 0,
-        hasDependents: false
+        hasDependents: false,
+        ...(input.deductionsParameters || {}),
     };
 
     let retencion = 0;
@@ -164,7 +168,9 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
 
     const healthComp = isExempt ? 0 : ibc * 0.085;
     const pensionComp = ibc * 0.12;
-    const arlComp = ibc * RISK_LEVEL_RATES[input.riskLevel];
+    // Asegurar que riskLevel tenga un valor válido, usar Nivel I como fallback
+    const arlRate = RISK_LEVEL_RATES[input.riskLevel] ?? RISK_LEVEL_RATES[RiskLevel.I];
+    const arlComp = ibc * arlRate;
 
     const baseParafiscal = subtotalSalary + nonSalary;
 
