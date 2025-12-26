@@ -232,3 +232,47 @@ export interface ExogenaAuditResult {
         details: string;
     };
 }
+
+// ==========================================
+// LIQUIDATION TYPES
+// ==========================================
+
+export type TerminationReason =
+    | 'RENUNCIA'
+    | 'DESPIDO_JUSTA_CAUSA'
+    | 'DESPIDO_SIN_JUSTA_CAUSA'
+    | 'MUTUO_ACUERDO'
+    | 'FIN_CONTRATO';
+
+export interface LiquidationDeductions {
+    loans: number;
+    retefuente: number;
+    voluntaryContributions: number;
+    other: number;
+    total: number;
+}
+
+export interface LiquidationResult {
+    daysWorked: number;
+    baseLiquidation: number;
+    cesantias: number;
+    interesesCesantias: number;
+    prima: number;
+    vacaciones: number;
+    totalPrestaciones: number;
+    deductions: LiquidationDeductions;
+    netToPay: number;
+}
+
+export interface LiquidationRecord {
+    id: string;
+    employeeId: string;
+    hireDate: string;
+    terminationDate: string;
+    terminationReason: TerminationReason | null;
+    daysWorked: number;
+    calculationData: LiquidationResult;
+    netPay: number;
+    pdfUrl?: string;
+    createdAt: string;
+}

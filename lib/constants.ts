@@ -60,6 +60,25 @@ export const RETENTION_TABLE_2025 = [
     { min: 2300, max: 999999, rate: 0.39, deduction: 770 },
 ];
 
+// Límites UVT para Deducciones de Retención en la Fuente 2025
+export const DEDUCTION_LIMITS_UVT = {
+    HOUSING_INTEREST: 100,       // Intereses vivienda (máx 100 UVT mensuales)
+    PREPAID_MEDICINE: 16,        // Medicina prepagada (máx 16 UVT mensuales)
+    DEPENDENTS: 32,              // Dependientes 10% ingreso neto (máx 32 UVT mensuales)
+    VOLUNTARY_EXEMPT: 316,       // Aportes vol. renta exenta (máx 316 UVT anuales)
+    EXEMPT_25_ANNUAL: 790,       // 25% Renta exenta (máx 790 UVT anuales)
+    TOTAL_BENEFITS_ANNUAL: 1340, // Límite total beneficios tributarios (máx 1340 UVT anuales)
+};
+
+// Motivos de Terminación de Contrato Laboral
+export const TERMINATION_REASONS = {
+    RENUNCIA: 'Renuncia voluntaria',
+    DESPIDO_JUSTA_CAUSA: 'Despido con justa causa',
+    DESPIDO_SIN_JUSTA_CAUSA: 'Despido sin justa causa',
+    MUTUO_ACUERDO: 'Terminación de mutuo acuerdo',
+    FIN_CONTRATO: 'Terminación de contrato a término fijo',
+} as const;
+
 // Tax Calendar Constants
 export const SECTORAL_TAXES = [
     "ICA (Anual)",

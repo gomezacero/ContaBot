@@ -1,9 +1,9 @@
 import { AUX_TRANSPORTE_2025, RISK_LEVEL_RATES, SMMLV_2025, UVT_2025 } from "@/lib/constants";
-import { PayrollInput, PayrollResult, PayrollFinancials, RiskLevel } from "@/types/payroll";
+import { PayrollInput, PayrollResult, PayrollFinancials, RiskLevel, LiquidationResult } from "@/types/payroll";
 
 // Helper: Calculate Days 360
-// Used for Liquidation Logic
-const calculateDays360 = (startDateStr?: string, endDateStr?: string): number => {
+// Used for Liquidation Logic - Colombian standard (360 days per year, 30 days per month)
+export const calculateDays360 = (startDateStr?: string, endDateStr?: string): number => {
     if (!startDateStr || !endDateStr) return 30;
     const start = new Date(startDateStr);
     const end = new Date(endDateStr);
@@ -301,3 +301,81 @@ export const createDefaultEmployee = (index: number = 1): PayrollInput => ({
     loans: 0,
     otherDeductions: 0
 });
+
+// ==========================================
+// LIQUIDATION CALCULATION
+// ==========================================
+
+/**
+ * Calculates employee termination settlement (Liquidación)
+ * Uses Colombian labor law formulas for:
+ * - Cesantías: (Base × Days) / 360
+ * - Intereses Cesantías: (Cesantías × Days × 12%) / 360
+ * - Prima de Servicios: (Base × Days) / 360
+ * - Vacaciones: (Salary × Days) / 720 (without transport aid)
+ */
+export const calculateLiquidation = (
+    input: PayrollInput,
+    payrollResult: PayrollResult
+): LiquidationResult => {
+    // Calculate actual days worked using 360-day system
+    const daysWorked = calculateDays360(input.startDate, input.endDate);
+
+    // Base salary components
+    const baseSalary = Number(input.baseSalary) || SMMLV_2025;
+    const transportAid = input.includeTransportAid ? AUX_TRANSPORTE_2025 : 0;
+
+    // Overtime and variables from monthly calculation
+    const overtime = payrollResult.monthly.salaryData.overtime || 0;
+    const variables = payrollResult.monthly.salaryData.variables || 0;
+
+    // Base for benefits calculation (includes transport aid for cesantías and prima)
+    const basePrestaciones = baseSalary + transportAid + overtime + variables;
+
+    // Colombian labor law formulas
+    const cesantias = (basePrestaciones * daysWorked) / 360;
+    const interesesCesantias = (cesantias * daysWorked * 0.12) / 360;
+    const prima = (basePrestaciones * daysWorked) / 360;
+    // Vacations do NOT include transport aid
+    const vacaciones = (baseSalary * daysWorked) / 720;
+
+    const totalPrestaciones = cesantias + interesesCesantias + prima + vacaciones;
+
+    // Deductions from liquidation payment
+    const loans = input.loans || 0;
+    const retefuente = payrollResult.monthly.employeeDeductions.retencionFuente;
+    const dedParams = input.deductionsParameters || {
+        voluntaryPension: 0,
+        voluntaryPensionExempt: 0,
+        afc: 0,
+        housingInterest: 0,
+        prepaidMedicine: 0,
+        hasDependents: false
+    };
+    const voluntaryContributions =
+        (dedParams.voluntaryPension || 0) +
+        (dedParams.voluntaryPensionExempt || 0) +
+        (dedParams.afc || 0);
+    const otherDeductions = input.otherDeductions || 0;
+
+    const totalDeductions = loans + retefuente + voluntaryContributions + otherDeductions;
+    const netToPay = totalPrestaciones - totalDeductions;
+
+    return {
+        daysWorked,
+        baseLiquidation: basePrestaciones,
+        cesantias,
+        interesesCesantias,
+        prima,
+        vacaciones,
+        totalPrestaciones,
+        deductions: {
+            loans,
+            retefuente,
+            voluntaryContributions,
+            other: otherDeductions,
+            total: totalDeductions
+        },
+        netToPay: Math.max(0, netToPay) // Ensure non-negative
+    };
+};
