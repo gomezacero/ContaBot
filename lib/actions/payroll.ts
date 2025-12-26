@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { PayrollInput, PayrollResult } from '@/types/payroll';
+import { PayrollInput, PayrollResult, LiquidationResult, TerminationReason } from '@/types/payroll';
 import { revalidatePath } from 'next/cache';
 
 // Get all clients for the current user
@@ -187,6 +187,82 @@ export async function getAllEmployeesWithClients() {
       )
     `)
         .order('name');
+
+    if (error) throw error;
+    return data;
+}
+
+// ==========================================
+// LIQUIDATION ACTIONS
+// ==========================================
+
+// Save a liquidation record
+export async function saveLiquidationRecord(
+    employeeId: string,
+    hireDate: string,
+    terminationDate: string,
+    terminationReason: TerminationReason | null,
+    result: LiquidationResult
+) {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from('liquidation_records')
+        .insert({
+            employee_id: employeeId,
+            hire_date: hireDate,
+            termination_date: terminationDate,
+            termination_reason: terminationReason,
+            days_worked: result.daysWorked,
+            calculation_data: result,
+            net_pay: result.netToPay,
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+    revalidatePath('/dashboard/nomina');
+    return data;
+}
+
+// Get liquidation history for an employee
+export async function getLiquidationHistory(employeeId: string) {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from('liquidation_records')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+    if (error) throw error;
+    return data;
+}
+
+// Delete a liquidation record
+export async function deleteLiquidationRecord(recordId: string) {
+    const supabase = await createClient();
+
+    const { error } = await supabase
+        .from('liquidation_records')
+        .delete()
+        .eq('id', recordId);
+
+    if (error) throw error;
+    revalidatePath('/dashboard/nomina');
+}
+
+// Update liquidation record with PDF URL
+export async function updateLiquidationPdfUrl(recordId: string, pdfUrl: string) {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from('liquidation_records')
+        .update({ pdf_url: pdfUrl })
+        .eq('id', recordId)
+        .select()
+        .single();
 
     if (error) throw error;
     return data;

@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PayrollInput, PayrollResult } from '@/types/payroll';
+import { PayrollInput, PayrollResult, LiquidationResult } from '@/types/payroll';
 import { formatCurrency } from './calculations';
 
 interface PayrollPDFData {
@@ -9,6 +9,7 @@ interface PayrollPDFData {
     companyName?: string;
     companyNit?: string;
     periodDescription?: string;
+    liquidationResult?: LiquidationResult;
 }
 
 export function generatePayrollPDF(data: PayrollPDFData): void {
@@ -215,7 +216,7 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
 
 // Generate PDF for liquidation (Colombian format)
 export function generateLiquidationPDF(data: PayrollPDFData): void {
-    const { employee, result } = data;
+    const { employee, result, liquidationResult: liquidation } = data;
     const doc = new jsPDF();
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -228,22 +229,28 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     const greenHighlight: [number, number, number] = [220, 252, 231];
     const redText: [number, number, number] = [185, 28, 28];
 
-    // Calculate values (same as DocumentPreview)
-    const daysWorked = result.monthly.salaryData.daysWorked || 30;
+    // Use LiquidationResult if available, otherwise calculate
+    const daysWorked = liquidation?.daysWorked || result.annual?.salaryData?.daysWorked || 30;
     const baseSalary = employee.baseSalary;
     const transportAid = result.monthly.salaryData.transportAid || 0;
     const variableSalary = (result.monthly.salaryData.overtime || 0) + (result.monthly.salaryData.variables || 0);
-    const baseForBenefits = baseSalary + transportAid + variableSalary;
+    const baseForBenefits = liquidation?.baseLiquidation || (baseSalary + transportAid + variableSalary);
 
-    // Colombian formulas
-    const cesantias = (baseForBenefits * daysWorked) / 360;
-    const interesesCesantias = (cesantias * daysWorked * 0.12) / 360;
-    const prima = (baseForBenefits * daysWorked) / 360;
-    const vacaciones = (baseSalary * daysWorked) / 720;
+    // Use liquidation values if available, otherwise calculate with Colombian formulas
+    const cesantias = liquidation?.cesantias || (baseForBenefits * daysWorked) / 360;
+    const interesesCesantias = liquidation?.interesesCesantias || (cesantias * daysWorked * 0.12) / 360;
+    const prima = liquidation?.prima || (baseForBenefits * daysWorked) / 360;
+    const vacaciones = liquidation?.vacaciones || (baseSalary * daysWorked) / 720;
 
-    const totalPrestaciones = cesantias + interesesCesantias + prima + vacaciones;
-    const descuentos = employee.loans || 0;
-    const netoAPagar = totalPrestaciones - descuentos;
+    const totalPrestaciones = liquidation?.totalPrestaciones || (cesantias + interesesCesantias + prima + vacaciones);
+
+    // Deductions - use detailed breakdown if available
+    const loans = liquidation?.deductions?.loans || employee.loans || 0;
+    const retefuente = liquidation?.deductions?.retefuente || result.monthly.employeeDeductions.retencionFuente || 0;
+    const voluntaryContributions = liquidation?.deductions?.voluntaryContributions || 0;
+    const otherDeductions = liquidation?.deductions?.other || employee.otherDeductions || 0;
+    const totalDescuentos = liquidation?.deductions?.total || (loans + retefuente + voluntaryContributions + otherDeductions);
+    const netoAPagar = liquidation?.netToPay || (totalPrestaciones - totalDescuentos);
 
     // ===== HEADER =====
     doc.setFontSize(16);
@@ -453,12 +460,29 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     // ===== 5. DESCUENTOS =====
     sectionHeader('5', 'DESCUENTOS DE NÓMINA Y RETENCIONES DEL PERIODO FINAL');
 
+    // Build dynamic deductions body
+    const deductionsBody: [string, string][] = [];
+    if (loans > 0) {
+        deductionsBody.push(['Préstamos y Libranzas', formatCurrency(loans)]);
+    }
+    if (retefuente > 0) {
+        deductionsBody.push(['Retención en la Fuente (Art. 383 E.T.)', formatCurrency(retefuente)]);
+    }
+    if (voluntaryContributions > 0) {
+        deductionsBody.push(['Aportes Voluntarios (Pensión/AFC)', formatCurrency(voluntaryContributions)]);
+    }
+    if (otherDeductions > 0) {
+        deductionsBody.push(['Otras Deducciones', formatCurrency(otherDeductions)]);
+    }
+    // If no deductions, show zero row
+    if (deductionsBody.length === 0) {
+        deductionsBody.push(['Sin deducciones', formatCurrency(0)]);
+    }
+
     autoTable(doc, {
         startY: yPos,
-        body: [
-            ['Préstamos y Libranzas', formatCurrency(descuentos)],
-        ],
-        foot: [['Total descuentos del periodo', formatCurrency(descuentos)]],
+        body: deductionsBody,
+        foot: [['Total descuentos del periodo', formatCurrency(totalDescuentos)]],
         theme: 'plain',
         footStyles: { textColor: redText, fontStyle: 'bold' },
         styles: { fontSize: 8, cellPadding: 3 },
@@ -474,7 +498,7 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
         startY: yPos,
         body: [
             ['Total prestaciones acumuladas', formatCurrency(totalPrestaciones)],
-            ['(-) Descuentos periodo final', formatCurrency(descuentos)],
+            ['(-) Descuentos periodo final', formatCurrency(totalDescuentos)],
         ],
         foot: [['NETO A PAGAR AL TRABAJADOR', formatCurrency(netoAPagar)]],
         theme: 'plain',

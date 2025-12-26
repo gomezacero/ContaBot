@@ -313,6 +313,44 @@ export interface Database {
                     updated_at?: string
                 }
             }
+            liquidation_records: {
+                Row: {
+                    id: string
+                    employee_id: string
+                    hire_date: string
+                    termination_date: string
+                    termination_reason: string | null
+                    days_worked: number
+                    calculation_data: Json
+                    net_pay: number
+                    pdf_url: string | null
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    employee_id: string
+                    hire_date: string
+                    termination_date: string
+                    termination_reason?: string | null
+                    days_worked: number
+                    calculation_data: Json
+                    net_pay: number
+                    pdf_url?: string | null
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    employee_id?: string
+                    hire_date?: string
+                    termination_date?: string
+                    termination_reason?: string | null
+                    days_worked?: number
+                    calculation_data?: Json
+                    net_pay?: number
+                    pdf_url?: string | null
+                    created_at?: string
+                }
+            }
         }
     }
 }
