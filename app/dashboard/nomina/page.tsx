@@ -1093,7 +1093,7 @@ export default function NominaPage() {
                                             <tbody>
                                                 <tr className="border-b"><td className="p-2">Salario Base</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.baseSalary)}</td></tr>
                                                 <tr className="border-b bg-gray-50"><td className="p-2">Auxilio de Transporte</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.transportAid)}</td></tr>
-                                                {result.monthly.salaryData.overtime > 0 && <tr className="border-b"><td className="p-2">Horas Extra</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.overtime)}</td></tr>}
+                                                {(result.monthly.salaryData.overtime ?? 0) > 0 && <tr className="border-b"><td className="p-2">Horas Extra</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.overtime ?? 0)}</td></tr>}
                                                 <tr className="bg-teal-50 font-bold"><td className="p-2">TOTAL DEVENGADO</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.totalAccrued)}</td></tr>
                                             </tbody>
                                         </table>
