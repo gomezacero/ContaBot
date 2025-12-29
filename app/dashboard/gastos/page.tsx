@@ -596,7 +596,8 @@ export default function GastosPage() {
                                                 <Upload className="w-8 h-8" />
                                             </div>
                                             <h3 className="text-lg font-black text-[#002D44] mb-1">Cargar Soportes</h3>
-                                            <p className="text-[10px] text-gray-400 mb-6 font-bold uppercase tracking-wider">Arrastra múltiples archivos aquí</p>
+                                            <p className="text-[10px] text-gray-400 mb-2 font-bold uppercase tracking-wider">Arrastra múltiples archivos aquí</p>
+                                            <p className="text-[9px] text-gray-300 mb-4 font-medium">JPG, PNG, PDF • Máx. 10MB por archivo</p>
                                             <div className="flex gap-2">
                                                 <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-gray-400 group-hover:text-[#1AB1B1] transition-colors"><FileText className="w-4 h-4" /></div>
                                                 <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-gray-400 group-hover:text-[#99D95E] transition-colors"><ImageIcon className="w-4 h-4" /></div>

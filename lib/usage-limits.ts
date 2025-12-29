@@ -14,6 +14,8 @@ export interface UsageLimits {
     max_file_size_mb: number
     /** Tamaño máximo total por solicitud en MB */
     max_total_request_mb: number
+    /** Tamaño máximo total procesado por mes en MB */
+    monthly_bytes_mb: number
 }
 
 /**
@@ -25,18 +27,21 @@ export const USAGE_LIMITS: Record<MembershipType, UsageLimits> = {
         monthly_files: 100,
         max_file_size_mb: 10,
         max_total_request_mb: 30,
+        monthly_bytes_mb: 500,      // 500 MB/mes
     },
     PRO: {
         daily_ocr_requests: 100,
         monthly_files: 1000,
         max_file_size_mb: 25,
         max_total_request_mb: 100,
+        monthly_bytes_mb: 5000,     // 5 GB/mes
     },
     ENTERPRISE: {
         daily_ocr_requests: 1000,
         monthly_files: 10000,
         max_file_size_mb: 50,
         max_total_request_mb: 500,
+        monthly_bytes_mb: 50000,    // 50 GB/mes
     },
 }
 
@@ -75,6 +80,8 @@ export const ERROR_MESSAGES = {
         `Has alcanzado el límite de ${limit} solicitudes diarias. Vuelve mañana o actualiza tu plan.`,
     MONTHLY_LIMIT_EXCEEDED: (limit: number) =>
         `Has alcanzado el límite de ${limit} archivos mensuales. Actualiza tu plan para continuar.`,
+    MONTHLY_BYTES_EXCEEDED: (usedMB: number, limitMB: number) =>
+        `Has alcanzado el límite de ${limitMB}MB mensuales (usado: ${usedMB}MB). Actualiza tu plan para continuar.`,
     APPROACHING_LIMIT: (remaining: number) =>
         `Te quedan ${remaining} solicitudes para hoy`,
 }
