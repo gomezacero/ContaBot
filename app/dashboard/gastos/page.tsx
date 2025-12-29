@@ -37,6 +37,7 @@ import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
 import { USAGE_LIMITS, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
 import { InvoiceGroup } from './components/InvoiceGroup';
+import { CostMetrics } from '@/components/usage/CostMetrics';
 
 // Interfaces removed as they are now imported from ./types
 
@@ -320,7 +321,10 @@ export default function GastosPage() {
                                 iva: result.iva || 0,
                                 total: result.total || 0,
                                 items: result.items || [],
-                                confidence: result.confidence || 0
+                                confidence: result.confidence || 0,
+                                tokens_input: result.tokens_input || 0,
+                                tokens_output: result.tokens_output || 0,
+                                cost_estimated: result.cost_estimated || 0
                             });
                             savedThisSession++;
                         } catch (saveErr) {
@@ -474,7 +478,10 @@ export default function GastosPage() {
 
             {/* USAGE INDICATOR - Para usuarios autenticados */}
             {isAuthenticated && (
-                <UsageIndicator className="max-w-md" />
+                <div className="max-w-md space-y-4">
+                    <UsageIndicator />
+                    <CostMetrics />
+                </div>
             )}
 
             {/* Header Section */}
