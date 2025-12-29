@@ -35,7 +35,7 @@ import { createClient } from '@/lib/supabase/client';
 import { OCRItem, OCRResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
-import { USAGE_LIMITS, MembershipType, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
+import { USAGE_LIMITS, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
 import { InvoiceGroup } from './components/InvoiceGroup';
 
 // Interfaces removed as they are now imported from ./types
@@ -385,7 +385,7 @@ export default function GastosPage() {
                 rows.push([
                     pucCode,
                     item.description,
-                    result.nit,
+                    result.nit || 'S/N',
                     result.entity,
                     result.invoiceNumber,
                     result.date,
@@ -400,13 +400,12 @@ export default function GastosPage() {
                 rows.push([
                     '220505',
                     `Factura ${result.invoiceNumber || 'S/N'} - ${result.entity}`,
-                    result.nit,
+                    result.nit || 'S/N',
                     result.entity,
                     result.invoiceNumber,
-                    result.date,
                     '0',
                     result.total.toString(),
-                    `${Math.round(result.confidence * 100)}%`,
+                    `${Math.round((result.confidence || 0) * 100)}%`,
                     result.fileName,
                 ]);
             }
@@ -441,7 +440,7 @@ export default function GastosPage() {
     const totalAmount = results.reduce((sum, r) => sum + r.total, 0);
     const totalItems = results.reduce((sum, r) => sum + r.items.length, 0);
     const avgConfidence = results.length > 0
-        ? results.reduce((sum, r) => sum + r.confidence, 0) / results.length
+        ? results.reduce((sum, r) => sum + (r.confidence || 0), 0) / results.length
         : 0;
 
     if (authLoading) {
