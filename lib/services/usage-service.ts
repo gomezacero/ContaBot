@@ -17,7 +17,7 @@ export interface UsageCheckResult {
     allowed: boolean
     remaining: number
     reason?: string
-    code?: 'DAILY_LIMIT_EXCEEDED' | 'MONTHLY_LIMIT_EXCEEDED' | 'OK'
+    code?: 'DAILY_LIMIT_EXCEEDED' | 'MONTHLY_LIMIT_EXCEEDED' | 'MONTHLY_BYTES_EXCEEDED' | 'OK'
 }
 
 export interface DailyUsage {
@@ -119,6 +119,18 @@ export async function checkCanMakeRequest(
         }
     }
 
+    // Verificar límite mensual de bytes (lo que ocurra primero)
+    const monthlyBytesLimitBytes = limits.monthly_bytes_mb * 1024 * 1024
+    if (monthlyUsage.total_bytes >= monthlyBytesLimitBytes) {
+        const usedMB = Math.round(monthlyUsage.total_bytes / (1024 * 1024))
+        return {
+            allowed: false,
+            remaining: 0,
+            reason: ERROR_MESSAGES.MONTHLY_BYTES_EXCEEDED(usedMB, limits.monthly_bytes_mb),
+            code: 'MONTHLY_BYTES_EXCEEDED',
+        }
+    }
+
     const remaining = limits.daily_ocr_requests - dailyUsage.ocr_requests
 
     return {
@@ -201,10 +213,12 @@ export async function getUsageStats(
             daily_ocr_requests: limits.daily_ocr_requests,
             monthly_files: limits.monthly_files,
             max_file_size_mb: limits.max_file_size_mb,
+            monthly_bytes_mb: limits.monthly_bytes_mb,
         },
         remaining: {
             daily_requests: Math.max(0, limits.daily_ocr_requests - dailyUsage.ocr_requests),
             monthly_files: Math.max(0, limits.monthly_files - monthlyUsage.total_files),
+            monthly_bytes: Math.max(0, (limits.monthly_bytes_mb * 1024 * 1024) - monthlyUsage.total_bytes),
         },
         percentage: {
             daily: dailyPercentage,

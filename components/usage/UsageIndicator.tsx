@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Activity, AlertTriangle, CheckCircle, XCircle, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, XCircle, Zap, HardDrive } from 'lucide-react';
 import type { ApiUsageStats } from '@/types/database';
+import { USAGE_LIMITS, formatBytes } from '@/lib/usage-limits';
 
 interface UsageIndicatorProps {
     className?: string;
@@ -34,11 +35,21 @@ export function UsageIndicator({
 
             if (!user) {
                 // Usuario no autenticado - mostrar límites de invitado
+                const guestLimits = USAGE_LIMITS.FREEMIUM;
                 setStats({
                     daily: { ocr_requests: 0, files_processed: 0, bytes_processed: 0 },
                     monthly: { total_requests: 0, total_files: 0, total_bytes: 0 },
-                    limits: { daily_ocr_requests: 10, monthly_files: 100, max_file_size_mb: 10 },
-                    remaining: { daily_requests: 10, monthly_files: 100 },
+                    limits: {
+                        daily_ocr_requests: guestLimits.daily_ocr_requests,
+                        monthly_files: guestLimits.monthly_files,
+                        max_file_size_mb: guestLimits.max_file_size_mb,
+                        monthly_bytes_mb: guestLimits.monthly_bytes_mb,
+                    },
+                    remaining: {
+                        daily_requests: guestLimits.daily_ocr_requests,
+                        monthly_files: guestLimits.monthly_files,
+                        monthly_bytes: guestLimits.monthly_bytes_mb * 1024 * 1024,
+                    },
                     percentage: { daily: 0, monthly: 0 },
                 });
                 setLoading(false);
@@ -64,13 +75,14 @@ export function UsageIndicator({
 
             const membershipType = (profile?.membership_type?.toUpperCase() || 'FREEMIUM') as 'FREEMIUM' | 'PRO' | 'ENTERPRISE';
 
-            // Definir límites según membresía
-            const limitsMap: Record<string, { daily_ocr_requests: number; monthly_files: number; max_file_size_mb: number }> = {
-                FREEMIUM: { daily_ocr_requests: 10, monthly_files: 100, max_file_size_mb: 10 },
-                PRO: { daily_ocr_requests: 100, monthly_files: 1000, max_file_size_mb: 25 },
-                ENTERPRISE: { daily_ocr_requests: 1000, monthly_files: 10000, max_file_size_mb: 50 },
+            // Definir límites según membresía (usando constantes centralizadas)
+            const membershipLimits = USAGE_LIMITS[membershipType] || USAGE_LIMITS.FREEMIUM;
+            const limits = {
+                daily_ocr_requests: membershipLimits.daily_ocr_requests,
+                monthly_files: membershipLimits.monthly_files,
+                max_file_size_mb: membershipLimits.max_file_size_mb,
+                monthly_bytes_mb: membershipLimits.monthly_bytes_mb,
             };
-            const limits = limitsMap[membershipType] || limitsMap.FREEMIUM;
 
             const daily = {
                 ocr_requests: dailyData?.[0]?.ocr_requests || 0,
@@ -93,6 +105,7 @@ export function UsageIndicator({
                 100
             );
 
+            const monthlyBytesLimit = limits.monthly_bytes_mb * 1024 * 1024;
             setStats({
                 daily,
                 monthly,
@@ -100,6 +113,7 @@ export function UsageIndicator({
                 remaining: {
                     daily_requests: Math.max(0, limits.daily_ocr_requests - daily.ocr_requests),
                     monthly_files: Math.max(0, limits.monthly_files - monthly.total_files),
+                    monthly_bytes: Math.max(0, monthlyBytesLimit - monthly.total_bytes),
                 },
                 percentage: {
                     daily: dailyPercentage,
@@ -203,22 +217,47 @@ export function UsageIndicator({
 
             {/* Monthly Stats (optional) */}
             {showMonthly && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Este mes</span>
-                        <span className="font-medium text-gray-700">
-                            {stats.monthly.total_files}/{stats.limits.monthly_files} archivos
-                        </span>
+                <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                    {/* Archivos mensuales */}
+                    <div>
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500">Archivos este mes</span>
+                            <span className="font-medium text-gray-700">
+                                {stats.monthly.total_files}/{stats.limits.monthly_files}
+                            </span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                            <div
+                                className={`h-full transition-all duration-500 ${
+                                    stats.percentage.monthly >= 100 ? 'bg-red-500' :
+                                    stats.percentage.monthly >= 80 ? 'bg-amber-500' :
+                                    'bg-gray-400'
+                                }`}
+                                style={{ width: `${stats.percentage.monthly}%` }}
+                            />
+                        </div>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2">
-                        <div
-                            className={`h-full transition-all duration-500 ${
-                                stats.percentage.monthly >= 100 ? 'bg-red-500' :
-                                stats.percentage.monthly >= 80 ? 'bg-amber-500' :
-                                'bg-gray-400'
-                            }`}
-                            style={{ width: `${stats.percentage.monthly}%` }}
-                        />
+                    {/* Bytes mensuales */}
+                    <div>
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-1 text-gray-500">
+                                <HardDrive className="w-3 h-3" />
+                                <span>Datos este mes</span>
+                            </div>
+                            <span className="font-medium text-gray-700">
+                                {formatBytes(stats.monthly.total_bytes)} / {stats.limits.monthly_bytes_mb}MB
+                            </span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
+                            <div
+                                className={`h-full transition-all duration-500 ${
+                                    (stats.monthly.total_bytes / (stats.limits.monthly_bytes_mb * 1024 * 1024)) >= 1 ? 'bg-red-500' :
+                                    (stats.monthly.total_bytes / (stats.limits.monthly_bytes_mb * 1024 * 1024)) >= 0.8 ? 'bg-amber-500' :
+                                    'bg-blue-400'
+                                }`}
+                                style={{ width: `${Math.min((stats.monthly.total_bytes / (stats.limits.monthly_bytes_mb * 1024 * 1024)) * 100, 100)}%` }}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
@@ -257,12 +296,13 @@ export function useUsageStats() {
                 .single();
 
             const membershipType = (profile?.membership_type?.toUpperCase() || 'FREEMIUM') as 'FREEMIUM' | 'PRO' | 'ENTERPRISE';
-            const limitsMapHook: Record<string, { daily_ocr_requests: number; monthly_files: number; max_file_size_mb: number }> = {
-                FREEMIUM: { daily_ocr_requests: 10, monthly_files: 100, max_file_size_mb: 10 },
-                PRO: { daily_ocr_requests: 100, monthly_files: 1000, max_file_size_mb: 25 },
-                ENTERPRISE: { daily_ocr_requests: 1000, monthly_files: 10000, max_file_size_mb: 50 },
+            const membershipLimits = USAGE_LIMITS[membershipType] || USAGE_LIMITS.FREEMIUM;
+            const limits = {
+                daily_ocr_requests: membershipLimits.daily_ocr_requests,
+                monthly_files: membershipLimits.monthly_files,
+                max_file_size_mb: membershipLimits.max_file_size_mb,
+                monthly_bytes_mb: membershipLimits.monthly_bytes_mb,
             };
-            const limits = limitsMapHook[membershipType] || limitsMapHook.FREEMIUM;
 
             const daily = {
                 ocr_requests: dailyData?.[0]?.ocr_requests || 0,
@@ -276,6 +316,7 @@ export function useUsageStats() {
                 total_bytes: monthlyData?.[0]?.total_bytes || 0,
             };
 
+            const monthlyBytesLimit = limits.monthly_bytes_mb * 1024 * 1024;
             setStats({
                 daily,
                 monthly,
@@ -283,6 +324,7 @@ export function useUsageStats() {
                 remaining: {
                     daily_requests: Math.max(0, limits.daily_ocr_requests - daily.ocr_requests),
                     monthly_files: Math.max(0, limits.monthly_files - monthly.total_files),
+                    monthly_bytes: Math.max(0, monthlyBytesLimit - monthly.total_bytes),
                 },
                 percentage: {
                     daily: Math.min(Math.round((daily.ocr_requests / limits.daily_ocr_requests) * 100), 100),

@@ -371,10 +371,12 @@ export interface ApiUsageStats {
         daily_ocr_requests: number
         monthly_files: number
         max_file_size_mb: number
+        monthly_bytes_mb: number
     }
     remaining: {
         daily_requests: number
         monthly_files: number
+        monthly_bytes: number
     }
     percentage: {
         daily: number
