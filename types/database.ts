@@ -355,32 +355,24 @@ export interface Database {
     }
 }
 
-// Tipos de uso de API para el frontend
+// Tipos de uso de API para el frontend (sistema DIARIO)
 export interface ApiUsageStats {
     daily: {
-        ocr_requests: number
         files_processed: number
         bytes_processed: number
     }
-    monthly: {
-        total_requests: number
-        total_files: number
-        total_bytes: number
-    }
     limits: {
-        daily_ocr_requests: number
-        monthly_files: number
+        daily_files: number
+        daily_bytes_mb: number
         max_file_size_mb: number
-        monthly_bytes_mb: number
     }
     remaining: {
-        daily_requests: number
-        monthly_files: number
-        monthly_bytes: number
+        daily_files: number
+        daily_bytes: number
     }
     percentage: {
-        daily: number
-        monthly: number
+        files: number
+        bytes: number
     }
 }
 

@@ -357,7 +357,7 @@ export default function PerfilPage() {
                         </div>
 
                         <div className="p-6">
-                            <UsageIndicator showMonthly={true} />
+                            <UsageIndicator />
                         </div>
                     </div>
 

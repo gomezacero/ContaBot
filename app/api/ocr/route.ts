@@ -13,6 +13,10 @@ import {
     getUserMembershipType,
 } from '@/lib/services/usage-service';
 
+// Configuración para permitir archivos más grandes
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, comprobante) y extrae la información en formato JSON.
@@ -142,21 +146,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // ===== OBTENER TIPO DE MEMBRESÍA Y VERIFICAR LÍMITES =====
+        // ===== OBTENER TIPO DE MEMBRESÍA =====
         const membershipType = await getUserMembershipType(user.id);
-        const usageCheck = await checkCanMakeRequest(user.id, membershipType);
-
-        if (!usageCheck.allowed) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: usageCheck.reason,
-                    code: usageCheck.code,
-                    remaining: 0
-                },
-                { status: 429 }
-            );
-        }
 
         const results: OCRResult[] = [];
         let totalBytesProcessed = 0;
@@ -171,6 +162,21 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json(
                     { success: false, error: 'No text provided' },
                     { status: 400 }
+                );
+            }
+
+            // Verificar límites antes de procesar
+            const textBytes = new TextEncoder().encode(text).length;
+            const usageCheck = await checkCanMakeRequest(user.id, membershipType, 1, textBytes);
+            if (!usageCheck.allowed) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        error: usageCheck.reason,
+                        code: usageCheck.code,
+                        remaining: 0
+                    },
+                    { status: 429 }
                 );
             }
 
@@ -216,7 +222,6 @@ export async function POST(request: NextRequest) {
             }
 
             // Incrementar uso para entrada de texto
-            const textBytes = new TextEncoder().encode(text).length;
             await incrementUsage(user.id, results.length, textBytes);
 
             return NextResponse.json({
@@ -226,7 +231,7 @@ export async function POST(request: NextRequest) {
                 usage: {
                     filesProcessed: results.length,
                     bytesProcessed: textBytes,
-                    remaining: usageCheck.remaining - 1,
+                    remaining: usageCheck.remaining - results.length,
                 }
             });
         }
@@ -286,6 +291,20 @@ export async function POST(request: NextRequest) {
                     code: 'TOTAL_TOO_LARGE'
                 },
                 { status: 400 }
+            );
+        }
+
+        // ===== VERIFICAR LÍMITES DE USO DIARIO =====
+        const usageCheck = await checkCanMakeRequest(user.id, membershipType, files.length, totalRequestSize);
+        if (!usageCheck.allowed) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: usageCheck.reason,
+                    code: usageCheck.code,
+                    remaining: usageCheck.remaining
+                },
+                { status: 429 }
             );
         }
 
@@ -387,12 +406,25 @@ export async function POST(request: NextRequest) {
             usage: {
                 filesProcessed: filesProcessedCount,
                 bytesProcessed: totalBytesProcessed,
-                remaining: usageCheck.remaining - 1,
+                remaining: usageCheck.remaining - filesProcessedCount,
             }
         });
     } catch (error) {
         console.error('OCR API Error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Error processing documents';
+
+        // Mejor manejo de errores específicos
+        if (errorMessage.includes('413') || errorMessage.includes('Content Too Large')) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'El archivo es demasiado grande. El límite es 4.5MB para archivos individuales en esta plataforma. Intenta comprimir el archivo o dividirlo.',
+                    code: 'PAYLOAD_TOO_LARGE'
+                },
+                { status: 413 }
+            );
+        }
+
         return NextResponse.json(
             { success: false, error: errorMessage },
             { status: 500 }

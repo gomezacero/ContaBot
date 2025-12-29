@@ -1,14 +1,12 @@
 /**
  * Servicio de tracking y verificación de uso de API
- * ContaBot - Sistema de límites por usuario
+ * ContaBot - Sistema de límites por usuario (DIARIO)
  */
 
 import { createClient } from '@/lib/supabase/server'
 import {
-    USAGE_LIMITS,
     getLimitsForMembership,
     calculateUsagePercentage,
-    getUsageStatus,
     ERROR_MESSAGES,
 } from '@/lib/usage-limits'
 import type { ApiUsageStats, MembershipType } from '@/types/database'
@@ -17,19 +15,12 @@ export interface UsageCheckResult {
     allowed: boolean
     remaining: number
     reason?: string
-    code?: 'DAILY_LIMIT_EXCEEDED' | 'MONTHLY_LIMIT_EXCEEDED' | 'MONTHLY_BYTES_EXCEEDED' | 'OK'
+    code?: 'DAILY_FILES_EXCEEDED' | 'DAILY_BYTES_EXCEEDED' | 'OK'
 }
 
 export interface DailyUsage {
-    ocr_requests: number
     files_processed: number
     bytes_processed: number
-}
-
-export interface MonthlyUsage {
-    total_requests: number
-    total_files: number
-    total_bytes: number
 }
 
 /**
@@ -44,94 +35,55 @@ export async function getUserDailyUsage(userId: string): Promise<DailyUsage> {
 
     if (error) {
         console.error('Error fetching daily usage:', error)
-        return { ocr_requests: 0, files_processed: 0, bytes_processed: 0 }
+        return { files_processed: 0, bytes_processed: 0 }
     }
 
     if (data && data.length > 0) {
         return {
-            ocr_requests: data[0].ocr_requests || 0,
             files_processed: data[0].files || 0,
             bytes_processed: data[0].bytes || 0,
         }
     }
 
-    return { ocr_requests: 0, files_processed: 0, bytes_processed: 0 }
-}
-
-/**
- * Obtiene el uso mensual del usuario actual
- */
-export async function getUserMonthlyUsage(userId: string): Promise<MonthlyUsage> {
-    const supabase = await createClient()
-
-    const { data, error } = await supabase.rpc('get_monthly_usage', {
-        p_user_id: userId,
-    })
-
-    if (error) {
-        console.error('Error fetching monthly usage:', error)
-        return { total_requests: 0, total_files: 0, total_bytes: 0 }
-    }
-
-    if (data && data.length > 0) {
-        return {
-            total_requests: data[0].total_requests || 0,
-            total_files: data[0].total_files || 0,
-            total_bytes: data[0].total_bytes || 0,
-        }
-    }
-
-    return { total_requests: 0, total_files: 0, total_bytes: 0 }
+    return { files_processed: 0, bytes_processed: 0 }
 }
 
 /**
  * Verifica si el usuario puede hacer una solicitud OCR
+ * Ahora basado en límites DIARIOS de archivos y bytes
  */
 export async function checkCanMakeRequest(
     userId: string,
-    membershipType: string = 'FREEMIUM'
+    membershipType: string = 'FREEMIUM',
+    filesToProcess: number = 1,
+    bytesToProcess: number = 0
 ): Promise<UsageCheckResult> {
     const limits = getLimitsForMembership(membershipType)
+    const dailyUsage = await getUserDailyUsage(userId)
 
-    // Obtener uso actual
-    const [dailyUsage, monthlyUsage] = await Promise.all([
-        getUserDailyUsage(userId),
-        getUserMonthlyUsage(userId),
-    ])
-
-    // Verificar límite diario
-    if (dailyUsage.ocr_requests >= limits.daily_ocr_requests) {
+    // Verificar límite diario de archivos
+    if (dailyUsage.files_processed + filesToProcess > limits.daily_files) {
         return {
             allowed: false,
-            remaining: 0,
-            reason: ERROR_MESSAGES.DAILY_LIMIT_EXCEEDED(limits.daily_ocr_requests),
-            code: 'DAILY_LIMIT_EXCEEDED',
+            remaining: Math.max(0, limits.daily_files - dailyUsage.files_processed),
+            reason: ERROR_MESSAGES.DAILY_FILES_EXCEEDED(limits.daily_files),
+            code: 'DAILY_FILES_EXCEEDED',
         }
     }
 
-    // Verificar límite mensual de archivos
-    if (monthlyUsage.total_files >= limits.monthly_files) {
+    // Verificar límite diario de bytes
+    const dailyBytesLimit = limits.daily_bytes_mb * 1024 * 1024
+    if (dailyUsage.bytes_processed + bytesToProcess > dailyBytesLimit) {
+        const usedMB = Math.round(dailyUsage.bytes_processed / (1024 * 1024))
         return {
             allowed: false,
-            remaining: 0,
-            reason: ERROR_MESSAGES.MONTHLY_LIMIT_EXCEEDED(limits.monthly_files),
-            code: 'MONTHLY_LIMIT_EXCEEDED',
+            remaining: Math.max(0, limits.daily_files - dailyUsage.files_processed),
+            reason: ERROR_MESSAGES.DAILY_BYTES_EXCEEDED(usedMB, limits.daily_bytes_mb),
+            code: 'DAILY_BYTES_EXCEEDED',
         }
     }
 
-    // Verificar límite mensual de bytes (lo que ocurra primero)
-    const monthlyBytesLimitBytes = limits.monthly_bytes_mb * 1024 * 1024
-    if (monthlyUsage.total_bytes >= monthlyBytesLimitBytes) {
-        const usedMB = Math.round(monthlyUsage.total_bytes / (1024 * 1024))
-        return {
-            allowed: false,
-            remaining: 0,
-            reason: ERROR_MESSAGES.MONTHLY_BYTES_EXCEEDED(usedMB, limits.monthly_bytes_mb),
-            code: 'MONTHLY_BYTES_EXCEEDED',
-        }
-    }
-
-    const remaining = limits.daily_ocr_requests - dailyUsage.ocr_requests
+    const remaining = limits.daily_files - dailyUsage.files_processed
 
     return {
         allowed: true,
@@ -165,7 +117,6 @@ export async function incrementUsage(
         return {
             success: true,
             newUsage: {
-                ocr_requests: data[0].ocr_requests,
                 files_processed: data[0].files,
                 bytes_processed: data[0].bytes,
             },
@@ -177,52 +128,41 @@ export async function incrementUsage(
 
 /**
  * Obtiene estadísticas completas de uso para mostrar en UI
+ * Ahora solo tracking DIARIO
  */
 export async function getUsageStats(
     userId: string,
     membershipType: string = 'FREEMIUM'
 ): Promise<ApiUsageStats> {
     const limits = getLimitsForMembership(membershipType)
+    const dailyUsage = await getUserDailyUsage(userId)
 
-    const [dailyUsage, monthlyUsage] = await Promise.all([
-        getUserDailyUsage(userId),
-        getUserMonthlyUsage(userId),
-    ])
-
-    const dailyPercentage = calculateUsagePercentage(
-        dailyUsage.ocr_requests,
-        limits.daily_ocr_requests
+    const filesPercentage = calculateUsagePercentage(
+        dailyUsage.files_processed,
+        limits.daily_files
     )
-    const monthlyPercentage = calculateUsagePercentage(
-        monthlyUsage.total_files,
-        limits.monthly_files
+    const bytesPercentage = calculateUsagePercentage(
+        dailyUsage.bytes_processed,
+        limits.daily_bytes_mb * 1024 * 1024
     )
 
     return {
         daily: {
-            ocr_requests: dailyUsage.ocr_requests,
             files_processed: dailyUsage.files_processed,
             bytes_processed: dailyUsage.bytes_processed,
         },
-        monthly: {
-            total_requests: monthlyUsage.total_requests,
-            total_files: monthlyUsage.total_files,
-            total_bytes: monthlyUsage.total_bytes,
-        },
         limits: {
-            daily_ocr_requests: limits.daily_ocr_requests,
-            monthly_files: limits.monthly_files,
+            daily_files: limits.daily_files,
+            daily_bytes_mb: limits.daily_bytes_mb,
             max_file_size_mb: limits.max_file_size_mb,
-            monthly_bytes_mb: limits.monthly_bytes_mb,
         },
         remaining: {
-            daily_requests: Math.max(0, limits.daily_ocr_requests - dailyUsage.ocr_requests),
-            monthly_files: Math.max(0, limits.monthly_files - monthlyUsage.total_files),
-            monthly_bytes: Math.max(0, (limits.monthly_bytes_mb * 1024 * 1024) - monthlyUsage.total_bytes),
+            daily_files: Math.max(0, limits.daily_files - dailyUsage.files_processed),
+            daily_bytes: Math.max(0, (limits.daily_bytes_mb * 1024 * 1024) - dailyUsage.bytes_processed),
         },
         percentage: {
-            daily: dailyPercentage,
-            monthly: monthlyPercentage,
+            files: filesPercentage,
+            bytes: bytesPercentage,
         },
     }
 }
