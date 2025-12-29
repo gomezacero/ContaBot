@@ -21,62 +21,69 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 
 const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, cuenta de cobro) y extrae la información en un JSON estructurado.
 
-OBJETIVO CRÍTICO: Identificar correctamente al PROVEEDOR/EMISOR y su NIT.
-1. Busca el NIT o RUT en todo el documento (encabezado, pie de página, textos verticales). Formatos comunes en Colombia: 900.123.456-7, 890987654-1, 1020304050.
-2. Identifica la Razón Social Exacta. No confundir con el cliente (quien recibe). El emisor suele tener el logo más grande o estar en la parte superior.
+OBJETIVO CRÍTICO: Identificar al PROVEEDOR, NIT, DATOS TRIBUTARIOS Y PROPINA.
+1. Busca el NIT o RUT (Ej: 900.123.456-7).
+2. Identifica la Razón Social Exacta.
+3. DETECTA LA MONEDA: ($, COP, USD, EUR).
+4. DESGLOSA IMPUESTOS Y VALORES:
+    - SUBTOTAL: Valor antes de impuestos y propina.
+    - IVA: Impuesto sobre las ventas (Generalmente 19% o 5%).
+    - INC: Impuesto Nacional al Consumo (Generalmente 8% en restaurantes).
+    - PROPINA / SERVICIO: Valor voluntario sugerido (Tip).
+    - RETENCIONES: (ReteFuente, ReteIVA, ReteICA).
 
-IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown.
+IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido.
 
 Estructura JSON requerida:
 {
-  "entity": "Razón Social del Emisor (Ej: Sodimac Colombia SA, no Homecenter)",
-  "nit": "NIT del emisor (Ej: 890900608-9)",
-  "date": "Fecha de factura (YYYY-MM-DD)",
-  "invoiceNumber": "Número de documento (Prefijo + Número)",
+  "entity": "Razón Social Emisor",
+  "nit": "NIT Emisor",
+  "date": "YYYY-MM-DD",
+  "invoiceNumber": "Prefijo + Número",
+  "currency": "COP" | "USD" | "EUR",
   "subtotal": 0,
   "iva": 0,
+  "tax_inc": 0,
+  "tip": 0,
+  "retentions": {
+      "reteFuente": 0,
+      "reteIca": 0,
+      "reteIva": 0
+  },
   "total": 0,
   "items": [
     {
-      "description": "Descripción clara del producto/servicio",
+      "description": "Nombre producto/servicio",
       "quantity": 1,
       "unitPrice": 0,
       "total": 0,
-      "category": "Categoría contable + Código PUC",
+      "category": "Categoría + Código PUC",
       "confidence": 0.95
     }
   ],
   "confidence": 0.95
 }
-
-Categorías sugeridas (Códigos PUC):
-- Equipos de Cómputo (152405) | Software (516515) | Licencias (516515)
-- Papelería y Útiles (519530) | Aseo y Cafetería (519525)
-- Arrendamientos (512010) | Servicios Públicos (513505)
-- Publicidad (522010) | Transporte (524515)
-- Restaurante/Consumo (529595 - Gastos Diversos)
-
-REGLAS DE CLASIFICACIÓN:
-- Si es comida/restaurante -> Otros Gastos (529595)
-- Si es Uber/Didi -> Servicio de Transporte (524515)
-- Si es hospedaje web/dominios -> Software (516515)
 `;
 
 const TEXT_EXTRACTION_PROMPT = `Analiza el texto y extrae facturas/gastos en JSON.
 
-OBJETIVO: Agrupar por proveedor y extraer NITs.
+OBJETIVO: Agrupar por proveedor, extraer NITs, DETALLES TRIBUTARIOS y PROPINAS.
 
 TEXTO A ANALIZAR:
 {TEXT_CONTENT}
 
-Responde ÚNICAMENTE con un ARRAY JSON de objetos. Estructura por factura:
+Responde ÚNICAMENTE con un ARRAY JSON. Estructura por factura:
 {
   "entity": "Nombre Empresa",
-  "nit": "NIT (Busca patrones como 800.xxx.xxx-x)",
+  "nit": "NIT",
   "date": "YYYY-MM-DD",
   "invoiceNumber": "N° Factura",
+  "currency": "COP",
   "subtotal": 0,
   "iva": 0,
+  "tax_inc": 0,
+  "tip": 0,
+  "retentions": { "reteFuente": 0, "reteIca": 0, "reteIva": 0 },
   "total": 0,
   "items": [...],
   "confidence": 0.9
