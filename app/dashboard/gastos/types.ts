@@ -12,10 +12,18 @@ export interface OCRResult {
     nit?: string;
     date: string;
     invoiceNumber: string;
+    currency?: string; // e.g. 'COP', 'USD'
     subtotal: number;
     iva: number;
+    tax_inc?: number; // Impoconsumo
+    tip?: number; // Propina / Servicio Voluntario
+    retentions?: {
+        reteFuente?: number;
+        reteIca?: number;
+        reteIva?: number;
+    };
     total: number;
     items: OCRItem[];
-    fileName: string; // Added to track source
+    fileName: string;
     confidence?: number;
 }

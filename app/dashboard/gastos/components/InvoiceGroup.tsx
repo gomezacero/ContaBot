@@ -6,6 +6,17 @@ interface GroupedInvoiceData {
     nit: string;
     entity: string;
     total: number;
+    // Aggregated tax data for the group
+    subtotal: number;
+    iva: number;
+    tax_inc: number;
+    tip: number;
+    retentions: {
+        reteFuente: number;
+        reteIca: number;
+        reteIva: number;
+    };
+    currency: string;
     items: (OCRItem & { fileName: string })[];
     invoiceCount: number;
 }
@@ -49,8 +60,11 @@ export function InvoiceGroup({ group, formatCurrency }: InvoiceGroupProps) {
 
                 <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
                     <div className="text-right">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Grupo</p>
-                        <p className="font-black text-[#002D44] text-xl">{formatCurrency(group.total)}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Grupo ({group.currency || 'COP'})</p>
+                        <p className="font-black text-[#002D44] text-xl text-right">
+                            {formatCurrency(group.total)}
+                            <span className="text-xs text-gray-400 ml-1">{group.currency || 'COP'}</span>
+                        </p>
                     </div>
 
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${expanded ? 'bg-[#1AB1B1] text-white rotate-180' : 'bg-gray-100 text-gray-400'}`}>
@@ -94,6 +108,49 @@ export function InvoiceGroup({ group, formatCurrency }: InvoiceGroupProps) {
                                     </tr>
                                 ))}
                             </tbody>
+                            {/* Tax Summary Footer */}
+                            <tfoot className="bg-gray-50/80 border-t border-gray-200">
+                                <tr>
+                                    <td colSpan={3} className="px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Subtotal</td>
+                                    <td className="px-8 py-3 text-right font-mono text-sm text-gray-600">{formatCurrency(group.subtotal)}</td>
+                                    <td></td>
+                                </tr>
+                                {group.iva > 0 && (
+                                    <tr>
+                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">IVA (19%)</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-gray-600">{formatCurrency(group.iva)}</td>
+                                        <td></td>
+                                    </tr>
+                                )}
+                                {group.tax_inc > 0 && (
+                                    <tr>
+                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Impoconsumo</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-gray-600">{formatCurrency(group.tax_inc)}</td>
+                                        <td></td>
+                                    </tr>
+                                )}
+                                {group.tip > 0 && (
+                                    <tr>
+                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-[#1AB1B1] uppercase tracking-wider">Propina / Servicio</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-[#1AB1B1]">{formatCurrency(group.tip)}</td>
+                                        <td></td>
+                                    </tr>
+                                )}
+                                {(group.retentions.reteFuente > 0 || group.retentions.reteIca > 0 || group.retentions.reteIva > 0) && (
+                                    <tr>
+                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-red-400 uppercase tracking-wider">Menos Retenciones</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-red-500">
+                                            - {formatCurrency(group.retentions.reteFuente + group.retentions.reteIca + group.retentions.reteIva)}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                )}
+                                <tr className="border-t border-gray-200">
+                                    <td colSpan={3} className="px-8 py-4 text-right text-sm font-black text-[#002D44] uppercase tracking-wider">Total a Pagar</td>
+                                    <td className="px-8 py-4 text-right font-black text-lg text-[#002D44]">{formatCurrency(group.total)}</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                     {/* Optional Footer for the group */}

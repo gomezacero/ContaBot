@@ -35,10 +35,16 @@ import { createClient } from '@/lib/supabase/client';
 import { OCRItem, OCRResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
-import { USAGE_LIMITS, MembershipType } from '@/lib/usage-limits';
+import { USAGE_LIMITS, MembershipType, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
 import { InvoiceGroup } from './components/InvoiceGroup';
 
 // Interfaces removed as they are now imported from ./types
+
+interface DBClient {
+    id: string;
+    name: string;
+    nit: string | null;
+}
 
 type InputMode = 'FILE' | 'TEXT';
 
@@ -703,16 +709,49 @@ export default function GastosPage() {
                                                 nit: result.nit || 'S/N',
                                                 entity: result.entity,
                                                 total: 0,
+                                                subtotal: 0,
+                                                iva: 0,
+                                                tax_inc: 0,
+                                                tip: 0,
+                                                retentions: {
+                                                    reteFuente: 0,
+                                                    reteIca: 0,
+                                                    reteIva: 0
+                                                },
+                                                currency: result.currency || 'COP',
                                                 items: [] as (OCRItem & { fileName: string })[],
                                                 invoiceCount: 0
                                             });
                                         }
                                         const entry = map.get(key)!;
                                         entry.total += result.total;
+                                        entry.subtotal += result.subtotal || 0;
+                                        entry.iva += result.iva || 0;
+                                        entry.tax_inc += result.tax_inc || 0;
+                                        entry.tip += result.tip || 0;
+
+                                        if (result.retentions) {
+                                            entry.retentions.reteFuente += result.retentions.reteFuente || 0;
+                                            entry.retentions.reteIca += result.retentions.reteIca || 0;
+                                            entry.retentions.reteIva += result.retentions.reteIva || 0;
+                                        }
+
                                         entry.invoiceCount += 1;
                                         entry.items.push(...result.items.map(item => ({ ...item, fileName: result.fileName })));
                                         return map;
-                                    }, new Map<string, { nit: string, entity: string, total: number, items: (OCRItem & { fileName: string })[], invoiceCount: number }>())
+                                    }, new Map<string, {
+                                        nit: string,
+                                        entity: string,
+                                        total: number,
+                                        subtotal: number,
+                                        iva: number,
+                                        tax_inc: number,
+                                        tip: number,
+                                        retentions: { reteFuente: number, reteIca: number, reteIva: number },
+                                        currency: string,
+                                        items: (OCRItem & { fileName: string })[],
+                                        invoiceCount: number
+                                    }>())
                                 ).map(([key, group], idx) => (
                                     <InvoiceGroup key={idx} group={group} formatCurrency={formatCurrency} />
                                 ))}
