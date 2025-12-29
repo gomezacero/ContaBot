@@ -6,16 +6,14 @@
 import type { MembershipType } from '@/types/database'
 
 export interface UsageLimits {
-    /** Número máximo de solicitudes OCR por día */
-    daily_ocr_requests: number
-    /** Número máximo de archivos procesados por mes */
-    monthly_files: number
+    /** Número máximo de archivos procesados por día */
+    daily_files: number
+    /** Tamaño máximo de bytes procesados por día en MB */
+    daily_bytes_mb: number
     /** Tamaño máximo por archivo individual en MB */
     max_file_size_mb: number
     /** Tamaño máximo total por solicitud en MB */
     max_total_request_mb: number
-    /** Tamaño máximo total procesado por mes en MB */
-    monthly_bytes_mb: number
 }
 
 /**
@@ -23,25 +21,22 @@ export interface UsageLimits {
  */
 export const USAGE_LIMITS: Record<MembershipType, UsageLimits> = {
     FREEMIUM: {
-        daily_ocr_requests: 10,
-        monthly_files: 100,
+        daily_files: 10,            // 10 archivos/día
+        daily_bytes_mb: 50,         // 50 MB/día
         max_file_size_mb: 10,
         max_total_request_mb: 30,
-        monthly_bytes_mb: 500,      // 500 MB/mes
     },
     PRO: {
-        daily_ocr_requests: 100,
-        monthly_files: 1000,
+        daily_files: 100,           // 100 archivos/día
+        daily_bytes_mb: 500,        // 500 MB/día
         max_file_size_mb: 25,
         max_total_request_mb: 100,
-        monthly_bytes_mb: 5000,     // 5 GB/mes
     },
     ENTERPRISE: {
-        daily_ocr_requests: 1000,
-        monthly_files: 10000,
+        daily_files: 1000,          // 1000 archivos/día
+        daily_bytes_mb: 5000,       // 5 GB/día
         max_file_size_mb: 50,
         max_total_request_mb: 500,
-        monthly_bytes_mb: 50000,    // 50 GB/mes
     },
 }
 
@@ -76,14 +71,12 @@ export const ERROR_MESSAGES = {
         `El tamaño total de los archivos excede ${maxMB}MB`,
     INVALID_FILE_TYPE: (fileName: string) =>
         `Tipo de archivo no soportado: "${fileName}". Usa JPG, PNG o PDF`,
-    DAILY_LIMIT_EXCEEDED: (limit: number) =>
-        `Has alcanzado el límite de ${limit} solicitudes diarias. Vuelve mañana o actualiza tu plan.`,
-    MONTHLY_LIMIT_EXCEEDED: (limit: number) =>
-        `Has alcanzado el límite de ${limit} archivos mensuales. Actualiza tu plan para continuar.`,
-    MONTHLY_BYTES_EXCEEDED: (usedMB: number, limitMB: number) =>
-        `Has alcanzado el límite de ${limitMB}MB mensuales (usado: ${usedMB}MB). Actualiza tu plan para continuar.`,
+    DAILY_FILES_EXCEEDED: (limit: number) =>
+        `Has alcanzado el límite de ${limit} archivos diarios. Vuelve mañana o actualiza tu plan.`,
+    DAILY_BYTES_EXCEEDED: (usedMB: number, limitMB: number) =>
+        `Has alcanzado el límite de ${limitMB}MB diarios (usado: ${usedMB}MB). Vuelve mañana o actualiza tu plan.`,
     APPROACHING_LIMIT: (remaining: number) =>
-        `Te quedan ${remaining} solicitudes para hoy`,
+        `Te quedan ${remaining} archivos para hoy`,
 }
 
 /**

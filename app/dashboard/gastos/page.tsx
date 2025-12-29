@@ -470,7 +470,7 @@ export default function GastosPage() {
 
             {/* USAGE INDICATOR - Para usuarios autenticados */}
             {isAuthenticated && (
-                <UsageIndicator showMonthly={false} className="max-w-md" />
+                <UsageIndicator className="max-w-md" />
             )}
 
             {/* Header Section */}
