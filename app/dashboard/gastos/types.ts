@@ -26,4 +26,7 @@ export interface OCRResult {
     items: OCRItem[];
     fileName: string;
     confidence?: number;
+    tokens_input?: number;
+    tokens_output?: number;
+    cost_estimated?: number;
 }

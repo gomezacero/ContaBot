@@ -21,6 +21,9 @@ export interface OCRResult {
     items: OCRItem[];
     confidence: number;
     rawText?: string;
+    tokens_input?: number;
+    tokens_output?: number;
+    cost_estimated?: number;
 }
 
 export interface OCRResponse {

@@ -91,7 +91,7 @@ Responde ÚNICAMENTE con un ARRAY JSON. Estructura por factura:
 `;
 
 // Direct REST API call to Gemini
-async function callGeminiAPI(contents: object[], apiKey: string): Promise<string> {
+async function callGeminiAPI(contents: object[], apiKey: string): Promise<{ text: string, usage?: { promptTokenCount: number, candidatesTokenCount: number, totalTokenCount: number } }> {
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: {
@@ -118,7 +118,10 @@ async function callGeminiAPI(contents: object[], apiKey: string): Promise<string
         throw new Error('Invalid response structure from Gemini');
     }
 
-    return data.candidates[0].content.parts[0].text;
+    return {
+        text: data.candidates[0].content.parts[0].text,
+        usage: data.usageMetadata
+    };
 }
 
 export async function POST(request: NextRequest) {
@@ -188,7 +191,9 @@ export async function POST(request: NextRequest) {
                 parts: [{ text: prompt }]
             }];
 
-            const responseText = await callGeminiAPI(contents, apiKey);
+            const responseData = await callGeminiAPI(contents, apiKey);
+            const responseText = responseData.text;
+            const usage = responseData.usage;
 
             try {
                 let cleanText = responseText.trim();
@@ -198,6 +203,20 @@ export async function POST(request: NextRequest) {
 
                 const parsed = JSON.parse(cleanText.trim());
                 const items = Array.isArray(parsed) ? parsed : [parsed];
+
+                // Calculate cost
+                let costEstimated = 0;
+                let tokensInput = 0;
+                let tokensOutput = 0;
+
+                if (usage) {
+                    tokensInput = usage.promptTokenCount;
+                    tokensOutput = usage.candidatesTokenCount;
+                    // Gemini 2.0 Flash pricing: $0.10/1M input, $0.40/1M output
+                    const costInput = (tokensInput / 1_000_000) * 0.10;
+                    const costOutput = (tokensOutput / 1_000_000) * 0.40;
+                    costEstimated = costInput + costOutput;
+                }
 
                 items.forEach((item: OCRResult, idx: number) => {
                     results.push({
@@ -214,6 +233,9 @@ export async function POST(request: NextRequest) {
                             confidence: i.confidence || 0.8
                         })),
                         confidence: item.confidence || 0.7,
+                        tokens_input: idx === 0 ? tokensInput : 0, // Attribute cost to first item or split? Let's just put it on first
+                        tokens_output: idx === 0 ? tokensOutput : 0,
+                        cost_estimated: idx === 0 ? costEstimated : 0
                     });
                 });
             } catch {
@@ -339,7 +361,9 @@ export async function POST(request: NextRequest) {
                     ]
                 }];
 
-                const responseText = await callGeminiAPI(contents, apiKey);
+                const responseData = await callGeminiAPI(contents, apiKey);
+                const responseText = responseData.text;
+                const usage = responseData.usage;
 
                 let parsed;
                 try {
@@ -362,6 +386,20 @@ export async function POST(request: NextRequest) {
                     };
                 }
 
+                // Calculate cost
+                let costEstimated = 0;
+                let tokensInput = 0;
+                let tokensOutput = 0;
+
+                if (usage) {
+                    tokensInput = usage.promptTokenCount;
+                    tokensOutput = usage.candidatesTokenCount;
+                    // Gemini 2.0 Flash pricing: $0.10/1M input, $0.40/1M output
+                    const costInput = (tokensInput / 1_000_000) * 0.10;
+                    const costOutput = (tokensOutput / 1_000_000) * 0.40;
+                    costEstimated = costInput + costOutput;
+                }
+
                 results.push({
                     fileName: file.name,
                     entity: parsed.entity || 'Desconocido',
@@ -376,6 +414,9 @@ export async function POST(request: NextRequest) {
                         confidence: i.confidence || 0.8
                     })),
                     confidence: parsed.confidence || 0.5,
+                    tokens_input: tokensInput,
+                    tokens_output: tokensOutput,
+                    cost_estimated: costEstimated
                 });
                 filesProcessedCount++;
             } catch (fileError) {
