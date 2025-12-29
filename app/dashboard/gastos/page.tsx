@@ -124,11 +124,14 @@ export default function GastosPage() {
                 const loadedResults: OCRResult[] = data.map(record => ({
                     fileName: record.filename || 'Documento',
                     entity: record.vendor || 'Desconocido',
-                    nit: '',
+                    nit: record.nit || '',
                     date: record.invoice_date || '',
                     invoiceNumber: record.invoice_number || '',
                     subtotal: record.subtotal || 0,
                     iva: record.iva || 0,
+                    tax_inc: record.tax_inc || 0,
+                    tip: record.tip || 0,
+                    retentions: record.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
                     total: record.total || 0,
                     items: record.items || [],
                     confidence: record.confidence || 0.5,
@@ -315,10 +318,14 @@ export default function GastosPage() {
                                 filename: result.fileName || 'text_input',
                                 file_type: inputMode === 'FILE' ? 'image' : 'text',
                                 vendor: result.entity,
+                                nit: result.nit || null,
                                 invoice_number: result.invoiceNumber,
                                 invoice_date: result.date,
                                 subtotal: result.subtotal || 0,
                                 iva: result.iva || 0,
+                                tax_inc: result.tax_inc || 0,
+                                tip: result.tip || 0,
+                                retentions: result.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
                                 total: result.total || 0,
                                 items: result.items || [],
                                 confidence: result.confidence || 0,
@@ -372,6 +379,28 @@ export default function GastosPage() {
         } finally {
             setClearing(false);
             setShowClearConfirm(false);
+        }
+    };
+
+    const handleDeleteGroup = async (entity: string) => {
+        if (!selectedClientId) return;
+
+        try {
+            const { error } = await supabase
+                .from('ocr_results')
+                .delete()
+                .eq('client_id', selectedClientId)
+                .eq('vendor', entity);
+
+            if (error) {
+                console.error('Error deleting group:', error);
+                setError('Error al eliminar el grupo');
+            } else {
+                setResults(prev => prev.filter(r => r.entity !== entity));
+            }
+        } catch (err) {
+            console.error('Error in handleDeleteGroup:', err);
+            setError('Error al eliminar');
         }
     };
 
@@ -759,7 +788,12 @@ export default function GastosPage() {
                                         invoiceCount: number
                                     }>())
                                 ).map(([key, group], idx) => (
-                                    <InvoiceGroup key={idx} group={group} formatCurrency={formatCurrency} />
+                                    <InvoiceGroup
+                                        key={idx}
+                                        group={group}
+                                        formatCurrency={formatCurrency}
+                                        onDelete={handleDeleteGroup}
+                                    />
                                 ))}
                             </div>
 
