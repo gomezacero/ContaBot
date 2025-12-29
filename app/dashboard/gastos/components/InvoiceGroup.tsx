@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, ShoppingBag, Calendar, Hash } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, ShoppingBag, Calendar, Hash, Trash2 } from 'lucide-react';
 import { OCRItem } from '../types';
 
 interface GroupedInvoiceData {
@@ -24,9 +24,10 @@ interface GroupedInvoiceData {
 interface InvoiceGroupProps {
     group: GroupedInvoiceData;
     formatCurrency: (amount: number) => string;
+    onDelete?: (entity: string) => void;
 }
 
-export function InvoiceGroup({ group, formatCurrency }: InvoiceGroupProps) {
+export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupProps) {
     const [expanded, setExpanded] = useState(false);
 
     // Calculate aggregated confidence (mock logic or real if available)
@@ -67,8 +68,23 @@ export function InvoiceGroup({ group, formatCurrency }: InvoiceGroupProps) {
                         </p>
                     </div>
 
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${expanded ? 'bg-[#1AB1B1] text-white rotate-180' : 'bg-gray-100 text-gray-400'}`}>
-                        <ChevronDown className="w-5 h-5" />
+                    <div className="flex items-center gap-2">
+                        {onDelete && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(group.entity);
+                                }}
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="Eliminar grupo"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        )}
+
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${expanded ? 'bg-[#1AB1B1] text-white rotate-180' : 'bg-gray-100 text-gray-400'}`}>
+                            <ChevronDown className="w-5 h-5" />
+                        </div>
                     </div>
                 </div>
             </div>
