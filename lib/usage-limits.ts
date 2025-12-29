@@ -3,7 +3,7 @@
  * ContaBot - Sistema de límites para usuarios
  */
 
-import type { MembershipType } from '@/types/database'
+export type { MembershipType } from '@/types/database'
 
 export interface UsageLimits {
     /** Número máximo de archivos procesados por día */
