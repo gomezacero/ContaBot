@@ -19,74 +19,69 @@ export const maxDuration = 60;
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, comprobante) y extrae la información en formato JSON.
+const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, cuenta de cobro) y extrae la información en un JSON estructurado.
+
+OBJETIVO CRÍTICO: Identificar correctamente al PROVEEDOR/EMISOR y su NIT.
+1. Busca el NIT o RUT en todo el documento (encabezado, pie de página, textos verticales). Formatos comunes en Colombia: 900.123.456-7, 890987654-1, 1020304050.
+2. Identifica la Razón Social Exacta. No confundir con el cliente (quien recibe). El emisor suele tener el logo más grande o estar en la parte superior.
 
 IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown.
 
-El JSON debe tener esta estructura exacta:
+Estructura JSON requerida:
 {
-  "entity": "Nombre de la empresa emisora",
-  "nit": "NIT del emisor (solo números y guión)",
-  "date": "Fecha en formato YYYY-MM-DD",
-  "invoiceNumber": "Número de factura o documento",
+  "entity": "Razón Social del Emisor (Ej: Sodimac Colombia SA, no Homecenter)",
+  "nit": "NIT del emisor (Ej: 890900608-9)",
+  "date": "Fecha de factura (YYYY-MM-DD)",
+  "invoiceNumber": "Número de documento (Prefijo + Número)",
   "subtotal": 0,
   "iva": 0,
   "total": 0,
   "items": [
     {
-      "description": "Descripción del producto/servicio",
+      "description": "Descripción clara del producto/servicio",
       "quantity": 1,
       "unitPrice": 0,
       "total": 0,
-      "category": "Categoría contable",
+      "category": "Categoría contable + Código PUC",
       "confidence": 0.95
     }
   ],
   "confidence": 0.95
 }
 
-Categorías válidas:
-- Equipos de Cómputo (código 152405)
-- Suministros de Oficina (código 519530)
-- Servicios Públicos (código 513505)
-- Publicidad y Marketing (código 522010)
-- Software y Licencias (código 516515)
-- Telecomunicaciones (código 513530)
-- Otros Gastos (código 529595)
+Categorías sugeridas (Códigos PUC):
+- Equipos de Cómputo (152405) | Software (516515) | Licencias (516515)
+- Papelería y Útiles (519530) | Aseo y Cafetería (519525)
+- Arrendamientos (512010) | Servicios Públicos (513505)
+- Publicidad (522010) | Transporte (524515)
+- Restaurante/Consumo (529595 - Gastos Diversos)
 
-Incluye el código PUC entre paréntesis en la categoría.
-El campo "confidence" indica qué tan seguro estás de cada extracción (0 a 1).`;
+REGLAS DE CLASIFICACIÓN:
+- Si es comida/restaurante -> Otros Gastos (529595)
+- Si es Uber/Didi -> Servicio de Transporte (524515)
+- Si es hospedaje web/dominios -> Software (516515)
+`;
 
-const TEXT_EXTRACTION_PROMPT = `Analiza el siguiente texto que contiene información de gastos o facturas y extrae los datos en formato JSON.
+const TEXT_EXTRACTION_PROMPT = `Analiza el texto y extrae facturas/gastos en JSON.
+
+OBJETIVO: Agrupar por proveedor y extraer NITs.
 
 TEXTO A ANALIZAR:
 {TEXT_CONTENT}
 
-IMPORTANTE: Responde ÚNICAMENTE con un array JSON de objetos, sin texto adicional.
-
-Cada objeto debe tener esta estructura:
+Responde ÚNICAMENTE con un ARRAY JSON de objetos. Estructura por factura:
 {
-  "entity": "Nombre de la empresa/proveedor",
-  "nit": "NIT si está disponible",
-  "date": "Fecha en formato YYYY-MM-DD",
-  "invoiceNumber": "Número de factura si está",
+  "entity": "Nombre Empresa",
+  "nit": "NIT (Busca patrones como 800.xxx.xxx-x)",
+  "date": "YYYY-MM-DD",
+  "invoiceNumber": "N° Factura",
   "subtotal": 0,
   "iva": 0,
   "total": 0,
-  "items": [
-    {
-      "description": "Descripción",
-      "quantity": 1,
-      "unitPrice": 0,
-      "total": 0,
-      "category": "Categoría con código PUC",
-      "confidence": 0.9
-    }
-  ],
+  "items": [...],
   "confidence": 0.9
 }
-
-Extrae TODOS los gastos/facturas que puedas identificar en el texto.`;
+`;
 
 // Direct REST API call to Gemini
 async function callGeminiAPI(contents: object[], apiKey: string): Promise<string> {

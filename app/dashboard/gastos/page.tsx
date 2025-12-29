@@ -27,19 +27,18 @@ import {
     DatabaseZap,
     History,
     Folder,
-    ArrowRight
+    ArrowRight,
+    FileOutput
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
-import { OCRResult, OCRItem } from '@/types/ocr';
+import { OCRItem, OCRResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
-import { FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
+import { USAGE_LIMITS, MembershipType } from '@/lib/usage-limits';
+import { InvoiceGroup } from './components/InvoiceGroup';
 
-interface DBClient {
-    id: string;
-    name: string;
-    nit: string | null;
-}
+// Interfaces removed as they are now imported from ./types
 
 type InputMode = 'FILE' | 'TEXT';
 
@@ -675,137 +674,60 @@ export default function GastosPage() {
                                     </div>
                                     <div>
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Lote Procesado:</p>
-                                        <p className="font-black text-[#002D44] text-sm">{results.length} Documentos Cargados</p>
+                                        <p className="font-black text-[#002D44] text-sm">{results.length} Facturas</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 bg-gray-50 px-6 py-2 rounded-2xl border border-gray-100">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Acumulado:</span>
-                                    <span className="font-black text-[#002D44] text-lg">{formatCurrency(totalAmount)}</span>
-                                </div>
-                            </div>
-
-                            {/* Table Container */}
-                            <div className="bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden flex flex-col" style={{ height: '700px' }}>
-                                <div className="px-10 py-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <Table2 className="w-5 h-5 text-[#1AB1B1]" />
-                                        <h3 className="font-black text-[#002D44] uppercase text-xs tracking-[0.2em]">Asiento Contable Unificado</h3>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={handleClearClick}
-                                            className="flex items-center gap-1 text-gray-400 hover:text-red-500 text-xs font-bold transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                            Limpiar
-                                        </button>
-                                        <span className="text-[9px] font-black text-white bg-[#002D44] px-3 py-1 rounded-full uppercase tracking-widest flex items-center gap-1.5">
-                                            <FileCheck className="w-3 h-3 text-[#99D95E]" /> {totalItems} Líneas
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead className="bg-white text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] sticky top-0 z-10 border-b border-gray-100 shadow-sm">
-                                            <tr>
-                                                <th className="px-10 py-6">Concepto Extraído</th>
-                                                <th className="px-6 py-6 text-center">Cant.</th>
-                                                <th className="px-8 py-6 text-right">Unitario</th>
-                                                <th className="px-10 py-6 text-right">Total</th>
-                                                <th className="px-8 py-6 text-center">Archivo Fuente</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {results.flatMap((result, rIdx) => {
-                                                if (!result.items || result.items.length === 0) {
-                                                    return [(
-                                                        <tr key={`${rIdx}-total`} className="hover:bg-teal-50/10 transition-colors group">
-                                                            <td className="px-10 py-7">
-                                                                <div className="flex flex-col gap-1">
-                                                                    <span className="font-black text-[#002D44] text-sm group-hover:text-[#1AB1B1] transition-colors">
-                                                                        Factura #{result.invoiceNumber || 'N/A'} - {result.entity}
-                                                                    </span>
-                                                                    <span className="text-[10px] font-black text-[#1AB1B1] uppercase tracking-wider">
-                                                                        Cat: General
-                                                                    </span>
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-7 text-center font-mono text-xs font-bold text-gray-600">1</td>
-                                                            <td className="px-8 py-7 text-right font-mono text-xs font-bold text-gray-600">-</td>
-                                                            <td className="px-10 py-7 text-right font-black text-[#002D44] text-sm tabular-nums">
-                                                                {formatCurrency(result.total)}
-                                                            </td>
-                                                            <td className="px-8 py-7 text-center">
-                                                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg border border-gray-100 group-hover:bg-teal-50 group-hover:text-[#1AB1B1] group-hover:border-teal-100 transition-colors">
-                                                                    <FileText className="w-3 h-3" />
-                                                                    <span className="text-[9px] font-bold truncate max-w-[80px]">{result.fileName || 'Manual'}</span>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )];
-                                                }
-
-                                                return result.items.map((item, iIdx) => (
-                                                    <tr key={`${rIdx}-${iIdx}`} className="hover:bg-teal-50/10 transition-colors group">
-                                                        <td className="px-10 py-7">
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="font-black text-[#002D44] text-sm group-hover:text-[#1AB1B1] transition-colors">{item.description}</span>
-                                                                <span className="text-[10px] font-black text-[#1AB1B1] uppercase tracking-wider">Cat: {item.category || 'General'}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-7 text-center font-mono text-xs font-bold text-gray-600">{item.quantity || '-'}</td>
-                                                        <td className="px-8 py-7 text-right font-mono text-xs font-bold text-gray-600">
-                                                            {item.unitPrice ? formatCurrency(item.unitPrice) : '-'}
-                                                        </td>
-                                                        <td className="px-10 py-7 text-right font-black text-[#002D44] text-sm tabular-nums">
-                                                            {formatCurrency(item.total)}
-                                                        </td>
-                                                        <td className="px-8 py-7 text-center">
-                                                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg border border-gray-100 group-hover:bg-teal-50 group-hover:text-[#1AB1B1] group-hover:border-teal-100 transition-colors">
-                                                                <FileText className="w-3 h-3" />
-                                                                <span className="text-[9px] font-bold truncate max-w-[80px]">{result.fileName || 'Manual'}</span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ));
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Footer area with metrics and EXPORT BUTTON */}
-                                <div className="bg-[#002D44] px-10 py-6 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6">
-                                    <div className="flex items-center gap-8">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-[#99D95E] animate-pulse"></span>
-                                            <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Confianza Lote: {(avgConfidence * 100).toFixed(0)}%</span>
-                                        </div>
-                                        <span className="text-[10px] font-black text-[#1AB1B1] uppercase tracking-[0.2em]">{totalItems} Registros Consolidados</span>
-                                    </div>
-
+                                <div className="flex items-center gap-4">
                                     <button
-                                        onClick={exportToExcel}
-                                        className="w-full md:w-auto bg-[#1AB1B1] hover:bg-[#169a9a] text-white px-10 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-teal-500/10 flex items-center justify-center gap-3 transition-all active:scale-95 group"
+                                        onClick={handleClearClick}
+                                        className="flex items-center gap-1 text-gray-400 hover:text-red-500 text-xs font-bold transition-colors px-3 py-2"
                                     >
-                                        <FileSpreadsheet className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                        Exportar Lote a Excel
+                                        <Trash2 className="w-4 h-4" />
+                                        Limpiar Todo
                                     </button>
+                                    <div className="flex items-center gap-4 bg-gray-50 px-6 py-2 rounded-2xl border border-gray-100">
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Acumulado:</span>
+                                        <span className="font-black text-[#002D44] text-lg">{formatCurrency(totalAmount)}</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Low confidence warning */}
-                            {results.some(r => r.items.some(i => (i.confidence || 0.8) < 0.7)) && (
-                                <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
-                                    <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5" />
-                                    <div>
-                                        <p className="font-bold text-orange-700">Revisión requerida</p>
-                                        <p className="text-sm text-orange-600">
-                                            Algunos items tienen baja confianza. Revisa estos datos antes de exportar.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                            {/* GROUPED INVOICE LIST */}
+                            <div className="space-y-4 pb-20">
+                                {Array.from(
+                                    results.reduce((map, result) => {
+                                        // Key for grouping: Use NIT if available, otherwise fallback to Entity Name
+                                        const key = result.nit && result.nit.length > 5 ? result.nit : result.entity;
+                                        if (!map.has(key)) {
+                                            map.set(key, {
+                                                nit: result.nit || 'S/N',
+                                                entity: result.entity,
+                                                total: 0,
+                                                items: [] as (OCRItem & { fileName: string })[],
+                                                invoiceCount: 0
+                                            });
+                                        }
+                                        const entry = map.get(key)!;
+                                        entry.total += result.total;
+                                        entry.invoiceCount += 1;
+                                        entry.items.push(...result.items.map(item => ({ ...item, fileName: result.fileName })));
+                                        return map;
+                                    }, new Map<string, { nit: string, entity: string, total: number, items: (OCRItem & { fileName: string })[], invoiceCount: number }>())
+                                ).map(([key, group], idx) => (
+                                    <InvoiceGroup key={idx} group={group} formatCurrency={formatCurrency} />
+                                ))}
+                            </div>
+
+                            {/* Footer Floating Action Button for Export */}
+                            <div className="fixed bottom-8 right-8 z-40">
+                                <button
+                                    onClick={exportToExcel}
+                                    className="bg-[#002D44] hover:bg-[#001E2E] text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 transition-all hover:scale-105"
+                                >
+                                    <FileSpreadsheet className="w-5 h-5 text-[#99D95E]" />
+                                    Exportar Asiento ({totalItems} Líneas)
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
