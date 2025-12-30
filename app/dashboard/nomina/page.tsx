@@ -191,6 +191,7 @@ export default function NominaPage() {
     const [newClientNit, setNewClientNit] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState<string | null>('section1');
+    const [activeTab, setActiveTab] = useState<'nomina' | 'liquidacion'>('nomina');
 
     // Preview and Feedback states
     const [showPreviewModal, setShowPreviewModal] = useState<'nomina' | 'liquidacion' | null>(null);
@@ -755,244 +756,279 @@ export default function NominaPage() {
 
                 {/* RIGHT PANEL: RESULTS DASHBOARD (5 cols) */}
                 <div className="xl:col-span-5 space-y-6 xl:sticky xl:top-28">
-                    {result && (
-                        <div className="bg-white rounded-3xl shadow-xl border border-purple-100 overflow-hidden">
-                            <div className="bg-purple-900 p-6 text-white relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-8 opacity-10 transform rotate-12">
-                                    <DollarSign className="w-32 h-32" />
-                                </div>
-                                <p className="text-purple-200 text-xs font-bold uppercase tracking-widest mb-1">Neto a Pagar</p>
-                                <h2 className="text-4xl font-bold tracking-tight mb-4">{formatCurrency(result.monthly.netPay)}</h2>
 
-                                <div className="grid grid-cols-2 gap-4 border-t border-purple-700/50 pt-4">
-                                    <div>
-                                        <p className="text-xs text-purple-300">Total Devengado</p>
-                                        <p className="font-semibold">{formatCurrency(result.monthly.salaryData.totalAccrued)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-purple-300">Total Deducciones</p>
-                                        <p className="font-semibold">{formatCurrency(result.monthly.employeeDeductions.totalDeductions)}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-6 space-y-6">
-                                {/* SS Detail */}
-                                <div>
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Detalle Seguridad Social</h3>
-                                    <div className="space-y-2 text-sm">
-                                        <ResultRow label="Salud (Empleado)" value={result.monthly.employeeDeductions.health} />
-                                        <ResultRow label="Pensión (Empleado)" value={result.monthly.employeeDeductions.pension} />
-                                        <ResultRow label="Fondo Solidaridad" value={result.monthly.employeeDeductions.solidarityFund} isBold={result.monthly.employeeDeductions.solidarityFund > 0} />
-                                    </div>
-                                </div>
-
-                                {/* Employer Costs */}
-                                <div>
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Costo Empleador</h3>
-                                    <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm border border-gray-100">
-                                        <ResultRow label="Salud (Patrono)" value={result.monthly.employerCosts.health} />
-                                        <ResultRow label="Pensión (Patrono)" value={result.monthly.employerCosts.pension} />
-                                        <ResultRow label="ARL" value={result.monthly.employerCosts.arl} />
-                                        <ResultRow label="Parafiscales (CCF+ICBF+SENA)" value={result.monthly.employerCosts.compensationBox + result.monthly.employerCosts.sena + result.monthly.employerCosts.icbf} />
-                                        <div className="border-t border-gray-200 my-2 pt-2 font-bold text-gray-900 flex justify-between">
-                                            <span>Total Provisiones</span>
-                                            <span>{formatCurrency(result.monthly.employerCosts.cesantias + result.monthly.employerCosts.interesesCesantias + result.monthly.employerCosts.prima + result.monthly.employerCosts.vacations)}</span>
-                                        </div>
-                                        <div className="pt-2 text-right">
-                                            <span className="text-xs text-gray-500 mr-2">Costo Total Nómina:</span>
-                                            <span className="font-bold text-purple-700">{formatCurrency(result.monthly.totals.grandTotalCost)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-2 text-xs text-purple-700">
-                                    <Building2 className="w-4 h-4" />
-                                    <span>IBC Calculado: <strong>{formatCurrency(result.monthly.salaryData.baseSalary)}</strong></span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* LIQUIDATION SECTION */}
-                    {liquidationResult && activeEmployee && (
-                        <div className="bg-white rounded-3xl shadow-xl border border-amber-200 overflow-hidden">
-                            <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-6 text-white relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-8 opacity-10 transform rotate-12">
-                                    <Wallet className="w-32 h-32" />
-                                </div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <FileText className="w-5 h-5 text-amber-200" />
-                                    <p className="text-amber-100 text-xs font-bold uppercase tracking-widest">2. Liquidación a la Fecha</p>
-                                </div>
-                                <p className="text-amber-200 text-xs mb-1">Prestaciones Acumuladas</p>
-                                <h2 className="text-4xl font-bold tracking-tight mb-2">{formatCurrency(liquidationResult.netToPay)}</h2>
-                                <p className="text-amber-200 text-xs">
-                                    <User className="w-3 h-3 inline mr-1" />
-                                    Total a Pagar al Empleado
-                                </p>
-                            </div>
-
-                            <div className="p-6 space-y-4">
-                                {/* Días Trabajados */}
-                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-amber-700">
-                                        <Calendar className="w-4 h-4" />
-                                        <span className="text-xs font-medium">Días Trabajados (Sistema 360)</span>
-                                    </div>
-                                    <span className="text-amber-800 font-bold">{liquidationResult.daysWorked} días</span>
-                                </div>
-
-                                {/* Prestaciones Grid */}
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Cesantías + Int.</p>
-                                        <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.cesantias + liquidationResult.interesesCesantias)}</p>
-                                        <p className="text-[9px] text-gray-400 mt-1">
-                                            Ces: {formatCurrency(liquidationResult.cesantias)}
-                                        </p>
-                                        <p className="text-[9px] text-gray-400">
-                                            Int: {formatCurrency(liquidationResult.interesesCesantias)}
-                                        </p>
-                                    </div>
-                                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Prima Servicios</p>
-                                        <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.prima)}</p>
-                                        <p className="text-[9px] text-gray-400 mt-1">Proporcional</p>
-                                    </div>
-                                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Vacaciones</p>
-                                        <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.vacaciones)}</p>
-                                        <p className="text-[9px] text-gray-400 mt-1">Proporcional</p>
-                                    </div>
-                                </div>
-
-                                {/* Total Prestaciones */}
-                                <div className="flex justify-between items-center py-2 border-t border-gray-100">
-                                    <span className="text-sm text-gray-600">Total Prestaciones Sociales</span>
-                                    <span className="font-bold text-gray-900">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
-                                </div>
-
-                                {/* Deducciones (si hay) */}
-                                {liquidationResult.deductions.total > 0 && (
-                                    <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-                                        <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-2">Deducciones</p>
-                                        <div className="space-y-1 text-sm">
-                                            {liquidationResult.deductions.loans > 0 && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-red-600">Préstamos</span>
-                                                    <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.loans)}</span>
-                                                </div>
-                                            )}
-                                            {liquidationResult.deductions.retefuente > 0 && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-red-600">Retención Fuente</span>
-                                                    <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.retefuente)}</span>
-                                                </div>
-                                            )}
-                                            {liquidationResult.deductions.voluntaryContributions > 0 && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-red-600">Aportes Voluntarios</span>
-                                                    <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.voluntaryContributions)}</span>
-                                                </div>
-                                            )}
-                                            {liquidationResult.deductions.other > 0 && (
-                                                <div className="flex justify-between">
-                                                    <span className="text-red-600">Otras Deducciones</span>
-                                                    <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.other)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Base Info */}
-                                <div className="text-xs text-gray-500 space-y-1 pt-2 border-t border-gray-100">
-                                    <p><strong>Base Liquidación:</strong> {formatCurrency(liquidationResult.baseLiquidation)}</p>
-                                    <p><strong>Período:</strong> {activeEmployee.startDate} a {activeEmployee.endDate}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Export Actions */}
-                    <div className="space-y-4">
-                        {/* Nómina Actions */}
-                        <div className="bg-white rounded-xl p-4 border border-gray-200 space-y-3">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Comprobante de Nómina</p>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setShowPreviewModal('nomina')}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-gray-200 transition-colors"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    Vista Previa
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (activeEmployee && result) {
-                                            const selectedClient = clients.find(c => c.id === selectedClientId);
-                                            generatePayrollPDF({
-                                                employee: activeEmployee,
-                                                result,
-                                                companyName: selectedClient?.name,
-                                                companyNit: selectedClient?.nit || undefined,
-                                                periodDescription: `Período: ${activeEmployee.startDate || '2025-01-01'} - ${activeEmployee.endDate || '2025-01-30'}`
-                                            });
-                                        }
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-purple-900 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    Descargar PDF
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Liquidación Actions */}
-                        <div className="bg-white rounded-xl p-4 border border-amber-200 space-y-3">
-                            <p className="text-xs font-bold text-amber-600 uppercase tracking-wide">Liquidación de Prestaciones</p>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setShowPreviewModal('liquidacion')}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-amber-50 text-amber-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-amber-100 transition-colors"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    Vista Previa
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (activeEmployee && result && liquidationResult) {
-                                            const selectedClient = clients.find(c => c.id === selectedClientId);
-                                            generateLiquidationPDF({
-                                                employee: activeEmployee,
-                                                result,
-                                                liquidationResult,
-                                                companyName: selectedClient?.name,
-                                                companyNit: selectedClient?.nit || undefined,
-                                            });
-                                        }
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-amber-600 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-amber-700 transition-colors"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    Descargar PDF
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Save to History */}
-                        {selectedClientId && (
-                            <button
-                                onClick={handleSavePayroll}
-                                disabled={saving}
-                                className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all"
-                            >
-                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                Guardar en Histórico
-                            </button>
-                        )}
+                    {/* TABS SWITCHER */}
+                    <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 flex">
+                        <button
+                            onClick={() => setActiveTab('nomina')}
+                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <DollarSign className="w-4 h-4" />
+                            Nómina
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('liquidacion')}
+                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        >
+                            <Wallet className="w-4 h-4" />
+                            Liquidación
+                        </button>
                     </div>
+
+                    {/* PAYROLL CONTENT (TAB: NOMINA) */}
+                    {activeTab === 'nomina' && result && (
+                        <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6">
+                            <div className="bg-white rounded-3xl shadow-xl border border-purple-100 overflow-hidden">
+                                <div className="bg-purple-900 p-6 text-white relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-8 opacity-10 transform rotate-12">
+                                        <DollarSign className="w-32 h-32" />
+                                    </div>
+                                    <p className="text-purple-200 text-xs font-bold uppercase tracking-widest mb-1">Neto a Pagar</p>
+                                    <h2 className="text-4xl font-bold tracking-tight mb-4">{formatCurrency(result.monthly.netPay)}</h2>
+
+                                    <div className="grid grid-cols-2 gap-4 border-t border-purple-700/50 pt-4">
+                                        <div>
+                                            <p className="text-xs text-purple-300">Total Devengado</p>
+                                            <p className="font-semibold">{formatCurrency(result.monthly.salaryData.totalAccrued)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-purple-300">Total Deducciones</p>
+                                            <p className="font-semibold">{formatCurrency(result.monthly.employeeDeductions.totalDeductions)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 space-y-6">
+                                    {/* SS Detail */}
+                                    <div>
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Detalle Seguridad Social</h3>
+                                        <div className="space-y-2 text-sm">
+                                            <ResultRow label="Salud (Empleado)" value={result.monthly.employeeDeductions.health} />
+                                            <ResultRow label="Pensión (Empleado)" value={result.monthly.employeeDeductions.pension} />
+                                            <ResultRow label="Fondo Solidaridad" value={result.monthly.employeeDeductions.solidarityFund} isBold={result.monthly.employeeDeductions.solidarityFund > 0} />
+                                        </div>
+                                    </div>
+
+                                    {/* Employer Costs */}
+                                    <div>
+                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Costo Empleador</h3>
+                                        <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm border border-gray-100">
+                                            <ResultRow label="Salud (Patrono)" value={result.monthly.employerCosts.health} />
+                                            <ResultRow label="Pensión (Patrono)" value={result.monthly.employerCosts.pension} />
+                                            <ResultRow label="ARL" value={result.monthly.employerCosts.arl} />
+                                            <ResultRow label="Parafiscales (CCF+ICBF+SENA)" value={result.monthly.employerCosts.compensationBox + result.monthly.employerCosts.sena + result.monthly.employerCosts.icbf} />
+                                            <div className="border-t border-gray-200 my-2 pt-2 font-bold text-gray-900 flex justify-between">
+                                                <span>Total Provisiones</span>
+                                                <span>{formatCurrency(result.monthly.employerCosts.cesantias + result.monthly.employerCosts.interesesCesantias + result.monthly.employerCosts.prima + result.monthly.employerCosts.vacations)}</span>
+                                            </div>
+                                            <div className="pt-2 text-right">
+                                                <span className="text-xs text-gray-500 mr-2">Costo Total Nómina:</span>
+                                                <span className="font-bold text-purple-700">{formatCurrency(result.monthly.totals.grandTotalCost)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-2 text-xs text-purple-700">
+                                        <Building2 className="w-4 h-4" />
+                                        <span>IBC Calculado: <strong>{formatCurrency(result.monthly.salaryData.baseSalary)}</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Nomina Actions */}
+                            <div className="space-y-3">
+                                <div className="bg-white rounded-xl p-4 border border-gray-200 space-y-3 shadow-sm">
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Acciones de Nómina</p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setShowPreviewModal('nomina')}
+                                            className="flex-1 flex items-center justify-center gap-2 bg-gray-50 text-gray-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-gray-100 transition-colors"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            Vista Previa
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                if (activeEmployee && result) {
+                                                    const selectedClient = clients.find(c => c.id === selectedClientId);
+                                                    generatePayrollPDF({
+                                                        employee: activeEmployee,
+                                                        result,
+                                                        companyName: selectedClient?.name,
+                                                        companyNit: selectedClient?.nit || undefined,
+                                                        periodDescription: `Período: ${activeEmployee.startDate || '2025-01-01'} - ${activeEmployee.endDate || '2025-01-30'}`
+                                                    });
+                                                }
+                                            }}
+                                            className="flex-1 flex items-center justify-center gap-2 bg-purple-900 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            Descargar PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Save to History */}
+                                {selectedClientId && (
+                                    <button
+                                        onClick={handleSavePayroll}
+                                        disabled={saving}
+                                        className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md"
+                                    >
+                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                        Guardar en Histórico
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* LIQUIDATION CONTENT (TAB: LIQUIDACION) */}
+                    {activeTab === 'liquidacion' && (
+                        <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6">
+                            {liquidationResult && activeEmployee ? (
+                                <>
+                                    <div className="bg-white rounded-3xl shadow-xl border border-amber-200 overflow-hidden">
+                                        <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-6 text-white relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 p-8 opacity-10 transform rotate-12">
+                                                <Wallet className="w-32 h-32" />
+                                            </div>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <FileText className="w-5 h-5 text-amber-200" />
+                                                <p className="text-amber-100 text-xs font-bold uppercase tracking-widest">Liquidación Definitiva</p>
+                                            </div>
+                                            <p className="text-amber-200 text-xs mb-1">Prestaciones Acumuladas</p>
+                                            <h2 className="text-4xl font-bold tracking-tight mb-2">{formatCurrency(liquidationResult.netToPay)}</h2>
+                                            <p className="text-amber-200 text-xs">
+                                                <User className="w-3 h-3 inline mr-1" />
+                                                Total a Pagar al Empleado
+                                            </p>
+                                        </div>
+
+                                        <div className="p-6 space-y-4">
+                                            {/* Días Trabajados */}
+                                            <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-center justify-between">
+                                                <div className="flex items-center gap-2 text-amber-700">
+                                                    <Calendar className="w-4 h-4" />
+                                                    <span className="text-xs font-medium">Días Trabajados (Sistema 360)</span>
+                                                </div>
+                                                <span className="text-amber-800 font-bold">{liquidationResult.daysWorked} días</span>
+                                            </div>
+
+                                            {/* Prestaciones Grid */}
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Cesantías + Int.</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.cesantias + liquidationResult.interesesCesantias)}</p>
+                                                    <p className="text-[9px] text-gray-400 mt-1">
+                                                        Ces: {formatCurrency(liquidationResult.cesantias)}
+                                                    </p>
+                                                    <p className="text-[9px] text-gray-400">
+                                                        Int: {formatCurrency(liquidationResult.interesesCesantias)}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Prima Servicios</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.prima)}</p>
+                                                    <p className="text-[9px] text-gray-400 mt-1">Proporcional</p>
+                                                </div>
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Vacaciones</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.vacaciones)}</p>
+                                                    <p className="text-[9px] text-gray-400 mt-1">Proporcional</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Total Prestaciones */}
+                                            <div className="flex justify-between items-center py-2 border-t border-gray-100">
+                                                <span className="text-sm text-gray-600">Total Prestaciones Sociales</span>
+                                                <span className="font-bold text-gray-900">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
+                                            </div>
+
+                                            {/* Deducciones (si hay) */}
+                                            {liquidationResult.deductions.total > 0 && (
+                                                <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                                                    <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-2">Deducciones</p>
+                                                    <div className="space-y-1 text-sm">
+                                                        {liquidationResult.deductions.loans > 0 && (
+                                                            <div className="flex justify-between">
+                                                                <span className="text-red-600">Préstamos</span>
+                                                                <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.loans)}</span>
+                                                            </div>
+                                                        )}
+                                                        {liquidationResult.deductions.retefuente > 0 && (
+                                                            <div className="flex justify-between">
+                                                                <span className="text-red-600">Retención Fuente</span>
+                                                                <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.retefuente)}</span>
+                                                            </div>
+                                                        )}
+                                                        {liquidationResult.deductions.voluntaryContributions > 0 && (
+                                                            <div className="flex justify-between">
+                                                                <span className="text-red-600">Aportes Voluntarios</span>
+                                                                <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.voluntaryContributions)}</span>
+                                                            </div>
+                                                        )}
+                                                        {liquidationResult.deductions.other > 0 && (
+                                                            <div className="flex justify-between">
+                                                                <span className="text-red-600">Otras Deducciones</span>
+                                                                <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.other)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Base Info */}
+                                            <div className="text-xs text-gray-500 space-y-1 pt-2 border-t border-gray-100">
+                                                <p><strong>Base Liquidación:</strong> {formatCurrency(liquidationResult.baseLiquidation)}</p>
+                                                <p><strong>Período:</strong> {activeEmployee.startDate} a {activeEmployee.endDate}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Liquidación Actions */}
+                                    <div className="bg-white rounded-xl p-4 border border-amber-200 space-y-3 shadow-sm">
+                                        <p className="text-xs font-bold text-amber-600 uppercase tracking-wide">Acciones de Liquidación</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setShowPreviewModal('liquidacion')}
+                                                className="flex-1 flex items-center justify-center gap-2 bg-amber-50 text-amber-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-amber-100 transition-colors"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                                Vista Previa
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (activeEmployee && result && liquidationResult) {
+                                                        const selectedClient = clients.find(c => c.id === selectedClientId);
+                                                        generateLiquidationPDF({
+                                                            employee: activeEmployee,
+                                                            result,
+                                                            liquidationResult,
+                                                            companyName: selectedClient?.name,
+                                                            companyNit: selectedClient?.nit || undefined,
+                                                        });
+                                                    }
+                                                }}
+                                                className="flex-1 flex items-center justify-center gap-2 bg-amber-600 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:bg-amber-700 transition-colors"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                Descargar PDF
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="bg-white rounded-[2rem] p-10 text-center border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-gray-400">
+                                    <div className="p-4 bg-gray-50 rounded-full mb-4">
+                                        <Calculator className="w-8 h-8 text-gray-300" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-600">Calculando Prestaciones...</h3>
+                                    <p className="text-sm max-w-xs mt-2">Complete los datos del empleado y el período para ver la proyección de liquidación definitiva.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

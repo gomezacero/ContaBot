@@ -17,6 +17,13 @@ export interface OCRResult {
     invoiceNumber: string;
     subtotal: number;
     iva: number;
+    tax_inc?: number; // Impoconsumo
+    tip?: number; // Propina / Servicio Voluntario
+    retentions?: {
+        reteFuente?: number;
+        reteIca?: number;
+        reteIva?: number;
+    };
     total: number;
     items: OCRItem[];
     confidence: number;

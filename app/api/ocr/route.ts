@@ -19,18 +19,38 @@ export const maxDuration = 60;
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-const EXTRACTION_PROMPT = `Analiza este documento contable (factura, recibo, cuenta de cobro) y extrae la información en un JSON estructurado.
+const EXTRACTION_PROMPT = `Actúa como un experto contable y auditor de facturación. Tu misión es extraer información con precisión MILIMÉTRICA de este documento (factura POS, electrónica o recibo).
 
-OBJETIVO CRÍTICO: Identificar al PROVEEDOR, NIT, DATOS TRIBUTARIOS Y PROPINA.
-1. Busca el NIT o RUT (Ej: 900.123.456-7).
-2. Identifica la Razón Social Exacta.
-3. DETECTA LA MONEDA: ($, COP, USD, EUR).
-4. DESGLOSA IMPUESTOS Y VALORES:
-    - SUBTOTAL: Valor antes de impuestos y propina.
-    - IVA: Impuesto sobre las ventas (Generalmente 19% o 5%).
-    - INC: Impuesto Nacional al Consumo (Generalmente 8% en restaurantes).
-    - PROPINA / SERVICIO: Valor voluntario sugerido (Tip).
-    - RETENCIONES: (ReteFuente, ReteIVA, ReteICA).
+REGLA DE ORO: Si la imagen es borrosa o difícil de leer, usa tu razonamiento lógico para deducir números basados en sumas y contextos (ej: Precio x Cantidad = Total).
+
+EXTRAE EXACTAMENTE ESTOS DATOS:
+1.  **PROVEEDOR**: Nombre legal completo (Busca "S.A.S", "Limitada", etc).
+2.  **IDENTIFICACIÓN**: NIT o RUT (Ej: 900.432.416-9).
+3.  **FACTURA**: Número de consecutivo/factura.
+4.  **FECHA**: Fecha de emisión.
+5.  **MONEDA**: Detecta si es COP, USD, etc.
+6.  **DESGLOSE TRIBUTARIO (CRÍTICO)**:
+    -   Busca secciones de "INFORMACION TRIBUTARIA", "DESGLOSE" o porcentajes al final.
+    -   **IMPOCONSUMO (INC)**: Busca explícitamente "IPO", "IMPOCONSUMO", "INC", "CONSUMO". **IMPORTANTE: Si dice IMPOCONSUMO, el valor va en 'tax_inc', NO en 'iva'.**
+    -   **IVA**: Impuesto al valor agregado. Solo asigna aquí si dice explícitamente "IVA".
+    -   **PROPINA**: Busca "Servicio Voluntario", "Tip", "Propina".
+7.  **ITEMS**: Extrae los items si es legible.
+
+ESTRUCTURA DE RESPUESTA (JSON ÚNICAMENTE):
+{
+  "entity": "Nombre del Establecimiento",
+  "nit": "NIT o Documento",
+  "date": "YYYY-MM-DD",
+  "invoiceNumber": "Número detectado",
+  "currency": "COP",
+  "subtotal": 0 (Base antes de impuestos),
+  "iva": 0 (Solo si es IVA),
+  "tax_inc": 0 (Valor del Impoconsumo/INC),
+  "tip": 0 (Propina),
+  "total": 0 (Total a pagar),
+  "retentions": {
+      "reteFuente": 0,
+      "reteIca": 0,
 
 IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido.
 
@@ -227,6 +247,9 @@ export async function POST(request: NextRequest) {
                         invoiceNumber: item.invoiceNumber || '',
                         subtotal: item.subtotal || 0,
                         iva: item.iva || 0,
+                        tax_inc: item.tax_inc || 0,
+                        tip: item.tip || 0,
+                        retentions: item.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
                         total: item.total || 0,
                         items: (item.items || []).map((i: OCRItem) => ({
                             ...i,
@@ -408,6 +431,9 @@ export async function POST(request: NextRequest) {
                     invoiceNumber: parsed.invoiceNumber || '',
                     subtotal: parsed.subtotal || 0,
                     iva: parsed.iva || 0,
+                    tax_inc: parsed.tax_inc || 0,
+                    tip: parsed.tip || 0,
+                    retentions: parsed.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
                     total: parsed.total || 0,
                     items: (parsed.items || []).map((i: OCRItem) => ({
                         ...i,
