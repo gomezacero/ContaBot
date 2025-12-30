@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { PayrollInput, PayrollResult, LiquidationResult, TerminationReason } from '@/types/payroll';
+import { SoftDeleteResult, RestoreResult, DeletedRecord, DeletableTable, Json } from '@/types/database';
 import { revalidatePath } from 'next/cache';
 
 // Get all clients for the current user
@@ -90,17 +91,41 @@ export async function updateEmployee(employeeId: string, employee: Partial<Payro
     return data;
 }
 
-// Delete an employee
-export async function deleteEmployee(employeeId: string) {
+// Soft delete an employee (can be restored later)
+export async function deleteEmployee(employeeId: string, reason?: string): Promise<SoftDeleteResult> {
     const supabase = await createClient();
 
-    const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', employeeId);
+    const { data, error } = await supabase.rpc('soft_delete_record', {
+        p_table_name: 'employees',
+        p_record_id: employeeId,
+        p_reason: reason || 'Usuario elimino empleado'
+    });
 
-    if (error) throw error;
+    if (error) {
+        console.error('Error soft deleting employee:', error);
+        return { success: false, error: error.message };
+    }
+
     revalidatePath('/dashboard/nomina');
+    return data as SoftDeleteResult;
+}
+
+// Restore a soft-deleted employee
+export async function restoreEmployee(employeeId: string): Promise<RestoreResult> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc('restore_deleted_record', {
+        p_table_name: 'employees',
+        p_record_id: employeeId
+    });
+
+    if (error) {
+        console.error('Error restoring employee:', error);
+        return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/nomina');
+    return data as RestoreResult;
 }
 
 // Save a payroll calculation
@@ -240,17 +265,41 @@ export async function getLiquidationHistory(employeeId: string) {
     return data;
 }
 
-// Delete a liquidation record
-export async function deleteLiquidationRecord(recordId: string) {
+// Soft delete a liquidation record (can be restored later)
+export async function deleteLiquidationRecord(recordId: string, reason?: string): Promise<SoftDeleteResult> {
     const supabase = await createClient();
 
-    const { error } = await supabase
-        .from('liquidation_records')
-        .delete()
-        .eq('id', recordId);
+    const { data, error } = await supabase.rpc('soft_delete_record', {
+        p_table_name: 'liquidation_records',
+        p_record_id: recordId,
+        p_reason: reason || 'Usuario elimino registro de liquidacion'
+    });
 
-    if (error) throw error;
+    if (error) {
+        console.error('Error soft deleting liquidation record:', error);
+        return { success: false, error: error.message };
+    }
+
     revalidatePath('/dashboard/nomina');
+    return data as SoftDeleteResult;
+}
+
+// Restore a soft-deleted liquidation record
+export async function restoreLiquidationRecord(recordId: string): Promise<RestoreResult> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc('restore_deleted_record', {
+        p_table_name: 'liquidation_records',
+        p_record_id: recordId
+    });
+
+    if (error) {
+        console.error('Error restoring liquidation record:', error);
+        return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/nomina');
+    return data as RestoreResult;
 }
 
 // Update liquidation record with PDF URL
@@ -266,4 +315,121 @@ export async function updateLiquidationPdfUrl(recordId: string, pdfUrl: string) 
 
     if (error) throw error;
     return data;
+}
+
+// ==========================================
+// SOFT DELETE UTILITY ACTIONS
+// ==========================================
+
+// Soft delete a client (can be restored later)
+export async function deleteClient(clientId: string, reason?: string): Promise<SoftDeleteResult> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc('soft_delete_record', {
+        p_table_name: 'clients',
+        p_record_id: clientId,
+        p_reason: reason || 'Usuario elimino cliente'
+    });
+
+    if (error) {
+        console.error('Error soft deleting client:', error);
+        return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/calendario');
+    revalidatePath('/dashboard/nomina');
+    return data as SoftDeleteResult;
+}
+
+// Restore a soft-deleted client
+export async function restoreClient(clientId: string): Promise<RestoreResult> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc('restore_deleted_record', {
+        p_table_name: 'clients',
+        p_record_id: clientId
+    });
+
+    if (error) {
+        console.error('Error restoring client:', error);
+        return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard/calendario');
+    revalidatePath('/dashboard/nomina');
+    return data as RestoreResult;
+}
+
+// Get deleted records for the papelera (trash) UI
+export async function getDeletedRecords(tableName?: DeletableTable, limit: number = 50): Promise<DeletedRecord[]> {
+    const supabase = await createClient();
+
+    let query = supabase
+        .from('audit_log')
+        .select('table_name, record_id, record_snapshot, created_at, user_email')
+        .eq('action', 'SOFT_DELETE')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (tableName) {
+        query = query.eq('table_name', tableName);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error('Error fetching deleted records:', error);
+        return [];
+    }
+
+    return (data || []).map(row => ({
+        table_name: row.table_name,
+        id: row.record_id,
+        display_name: extractDisplayName(row.record_snapshot as Json, row.table_name),
+        deleted_at: row.created_at,
+        deleted_by: row.user_email,
+        record_snapshot: row.record_snapshot as Json
+    }));
+}
+
+// Generic restore function for any table
+export async function restoreRecord(tableName: DeletableTable, recordId: string): Promise<RestoreResult> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.rpc('restore_deleted_record', {
+        p_table_name: tableName,
+        p_record_id: recordId
+    });
+
+    if (error) {
+        console.error(`Error restoring ${tableName} record:`, error);
+        return { success: false, error: error.message };
+    }
+
+    // Revalidate relevant paths
+    revalidatePath('/dashboard/nomina');
+    revalidatePath('/dashboard/calendario');
+    revalidatePath('/dashboard/gastos');
+    return data as RestoreResult;
+}
+
+// Helper to extract display name from snapshot
+function extractDisplayName(snapshot: Json, tableName: string): string {
+    if (!snapshot || typeof snapshot !== 'object') return 'Registro eliminado';
+
+    const record = snapshot as Record<string, unknown>;
+
+    switch (tableName) {
+        case 'clients':
+        case 'employees':
+            return (record.name as string) || 'Sin nombre';
+        case 'ocr_results':
+            return (record.filename as string) || (record.vendor as string) || 'Documento';
+        case 'payroll_records':
+            return `Nomina ${record.period_start || ''} - ${record.period_end || ''}`;
+        case 'liquidation_records':
+            return `Liquidacion ${record.termination_date || ''}`;
+        default:
+            return (record.name as string) || (record.id as string) || 'Registro';
+    }
 }

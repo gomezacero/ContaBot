@@ -1,9 +1,9 @@
 import { RiskLevel } from "@/types/payroll";
 
-// 2025 Official Values
-export const SMMLV_2025 = 1423500;
-export const AUX_TRANSPORTE_2025 = 200000;
-export const UVT_2025 = 49799; // Art. 1.2.1 Resolución 000227 DIAN (2025)
+// 2026 Official Values
+export const SMMLV_2026 = 1750905;
+export const AUX_TRANSPORTE_2026 = 249095;
+export const UVT_2026 = 49799; // Art. 1.2.1 Resolución 000227 DIAN (2025)
 
 // Regulatory References
 export const DIAN_RESOLUTION_REF = "Resolución 000227 del 23 SEP 2025";

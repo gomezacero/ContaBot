@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PayrollInput, RiskLevel, LiquidationResult } from '@/types/payroll';
 import { calculatePayroll, formatCurrency, createDefaultEmployee, calculateLiquidation } from '@/lib/calculations';
 import { generatePayrollPDF, generateLiquidationPDF } from '@/lib/pdf-generator';
-import { SMMLV_2025 } from '@/lib/constants';
+import { SMMLV_2026 } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import {
     Plus,
@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
 import { Tooltip } from '@/components/ui/Tooltip';
+import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
+import { useToast } from '@/components/ui/Toast';
 
 interface DBEmployee {
     id: string;
@@ -69,7 +71,7 @@ interface DBClient {
 // Convert DB employee to PayrollInput
 function dbToPayrollInput(emp: DBEmployee): PayrollInput {
     // Asegurar que base_salary sea un número válido
-    const baseSalary = Number(emp.base_salary) || SMMLV_2025;
+    const baseSalary = Number(emp.base_salary) || SMMLV_2026;
 
     // Extraer deductions_config con tipo seguro
     const dbDeductions = (emp.deductions_config || {}) as {
@@ -205,6 +207,14 @@ export default function NominaPage() {
     const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
     const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
+    // Delete modal state
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; employeeId: string; employeeName: string }>({
+        isOpen: false,
+        employeeId: '',
+        employeeName: ''
+    });
+    const { addToast } = useToast();
+
     // Determine which employees to show
     const employees = selectedClientId
         ? dbEmployees.map(dbToPayrollInput)
@@ -292,7 +302,7 @@ export default function NominaPage() {
                     .insert({
                         client_id: selectedClientId,
                         name: `Empleado ${dbEmployees.length + 1}`,
-                        base_salary: SMMLV_2025,
+                        base_salary: SMMLV_2026,
                         risk_level: 'I',
                         include_transport_aid: true,
                         is_exempt: true,
@@ -409,29 +419,57 @@ export default function NominaPage() {
         }
     };
 
-    // Handle deleting employee
-    const handleDeleteEmployee = async (id: string, e: React.MouseEvent) => {
+    // Handle opening delete modal
+    const openDeleteModal = (id: string, name: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!window.confirm('¿Estás seguro de eliminar este empleado? Esta acción no se puede deshacer.')) return;
+        setDeleteModal({ isOpen: true, employeeId: id, employeeName: name });
+    };
+
+    // Handle deleting employee (soft delete - can be restored from papelera)
+    const handleDeleteEmployee = async () => {
+        const { employeeId: id, employeeName } = deleteModal;
 
         if (selectedClientId) {
-            setSaving(true);
             try {
-                const { error } = await supabase.from('employees').delete().eq('id', id);
+                // Use soft delete via RPC for safe deletion with audit trail
+                const { error } = await supabase.rpc('soft_delete_record', {
+                    p_table_name: 'employees',
+                    p_record_id: id,
+                    p_reason: 'Usuario elimino empleado desde nomina'
+                });
                 if (error) throw error;
                 const newList = dbEmployees.filter(emp => emp.id !== id);
                 setDbEmployees(newList);
                 if (activeEmployeeId === id && newList.length > 0) setActiveEmployeeId(newList[0].id);
+
+                addToast({
+                    type: 'success',
+                    title: 'Empleado eliminado',
+                    description: `"${employeeName}" ha sido movido a la papelera`,
+                    action: {
+                        label: 'Ver papelera',
+                        onClick: () => window.location.href = '/dashboard/papelera'
+                    }
+                });
             } catch {
                 setError('Error eliminando empleado');
-            } finally {
-                setSaving(false);
+                addToast({
+                    type: 'error',
+                    title: 'Error',
+                    description: 'No se pudo eliminar el empleado'
+                });
             }
         } else {
+            // Local employees (guest mode) - no soft delete needed
             if (localEmployees.length === 1) return;
             const newEmployees = localEmployees.filter(emp => emp.id !== id);
             setLocalEmployees(newEmployees);
             if (activeEmployeeId === id) setActiveEmployeeId(newEmployees[0].id);
+            addToast({
+                type: 'info',
+                title: 'Empleado eliminado',
+                description: 'El empleado ha sido eliminado (modo invitado)'
+            });
         }
     };
 
@@ -570,8 +608,8 @@ export default function NominaPage() {
 
                             {employees.length > 1 && (
                                 <button
-                                    onClick={(e) => handleDeleteEmployee(emp.id, e)}
-                                    className={`ml-1 p-1 rounded-md transition-all duration-200 
+                                    onClick={(e) => openDeleteModal(emp.id, emp.name, e)}
+                                    className={`ml-1 p-1 rounded-md transition-all duration-200
                                         ${isActive
                                             ? 'text-red-400 hover:text-red-600 hover:bg-red-50 opacity-100'
                                             : 'text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
@@ -1379,6 +1417,17 @@ export default function NominaPage() {
                     Calificar módulo
                 </span>
             </button>
+
+            {/* Delete Employee Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ isOpen: false, employeeId: '', employeeName: '' })}
+                onConfirm={handleDeleteEmployee}
+                title="Eliminar Empleado"
+                description="¿Estás seguro de que deseas eliminar este empleado? Podrás restaurarlo desde la papelera durante los próximos 30 días."
+                itemName={deleteModal.employeeName}
+                isRecoverable={!!selectedClientId}
+            />
         </div>
     );
 }

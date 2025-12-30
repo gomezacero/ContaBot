@@ -3,5 +3,11 @@
     "app/api/ocr/route.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-deleted",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

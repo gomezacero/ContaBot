@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🤖 ContaBot: Financial OS for Colombian Accountants
 
-## Getting Started
+[![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)](https://bun.sh)
+[![Next.js](https://img.shields.io/badge/next.js-%23000000.svg?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Gemini](https://img.shields.io/badge/Gemini_2.0_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
 
-First, run the development server:
+**ContaBot** is a high-performance Financial Operating System designed specifically for the Colombian accounting landscape. It combines modern web aesthetics with mission-critical tools for payroll, tax automation, and document processing.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Core Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 📊 Real-Time Dashboard
+A centralized command center that pulls live metrics directly from your Supabase instance.
+- **Dynamic Stats:** Active clients, managed employees, and monthly document trends.
+- **Smart Alerts:** Automated tax deadline warnings derived from individual client NITs.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🧾 Nómina Pro & Liquidación
+A premium payroll calculator that turns complex Colombian regulations into a smooth experience.
+- **Smart Logic:** Automatic Transport Aid calculation, Parafiscale exemptions (Ley 1607), and ARL risk levels.
+- **Premium UX:** Animated totals and contextual tooltips explaining legal terms as you type.
+- **Export Ready:** Save and track historical payroll records with a single click.
 
-## Learn More
+### 👁️ OCR Digitador (AI Engine)
+Stop manual data entry. Our high-precision engine powered by **Gemini 2.0 Flash** extracts data from invoices with incredible accuracy.
+- **Full Extraction:** Entity, NIT, Currency, Subtotal, IVA, and even **Impoconsumo** and **Tips**.
+- **Batch Processing:** Group and manage multiple invoices simultaneously.
 
-To learn more about Next.js, take a look at the following resources:
+### 📅 2025 Tax Calendar
+Never miss a deadline. Our system calculates exact dates for Renta, IVA, and Retención based on the DIAN 2025 schedule.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🛠 Tech Stack
 
-## Deploy on Vercel
+- **Framework:** Next.js 14 (App Router)
+- **Runtime:** [Bun](https://bun.sh) (Selected for speed)
+- **Database / Auth:** Supabase
+- **AI Core:** Google Gemini 2.0 Flash API
+- **Styling:** Tailwind CSS + Framer Motion
+- **Icons:** Lucide React
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ⚙️ Quick Start (Developer Mode)
+
+ContaBot is optimized for the **Bun** ecosystem.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/gomezacero/ContaBot.git
+   cd ContaBot
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   bun install
+   ```
+
+3. **Set up Environment Variables:**
+   Create a `.env.local` file with:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `GEMINI_API_KEY`
+
+4. **Run development server:**
+   ```bash
+   bun dev
+   ```
+
+---
+
+## 🎨 Visual Philosophy
+ContaBot follows the **2025 Design Language**:
+- **Glassmorphism:** Light, translucent surfaces.
+- **Vibrant Gradients:** Focused on purple and indigo palettes.
+- **Micro-interactions:** Every interaction should feel alive (animations, hovers, and pulses).
+
+---
+
+Developed with ❤️ for accountants who value time and design.
