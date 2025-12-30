@@ -377,3 +377,78 @@ export interface ApiUsageStats {
 }
 
 export type MembershipType = 'FREEMIUM' | 'PRO' | 'ENTERPRISE'
+
+// ===========================================
+// SOFT DELETE TYPES
+// ===========================================
+
+// Columns added to tables with soft delete support
+export interface SoftDeleteColumns {
+    deleted_at: string | null
+    deleted_by: string | null
+}
+
+// Audit log table type
+export interface AuditLog {
+    Row: {
+        id: string
+        table_name: string
+        record_id: string
+        action: 'SOFT_DELETE' | 'RESTORE' | 'HARD_DELETE'
+        user_id: string | null
+        user_email: string | null
+        created_at: string
+        record_snapshot: Json | null
+        reason: string | null
+    }
+    Insert: {
+        id?: string
+        table_name: string
+        record_id: string
+        action: 'SOFT_DELETE' | 'RESTORE' | 'HARD_DELETE'
+        user_id?: string | null
+        user_email?: string | null
+        created_at?: string
+        record_snapshot?: Json | null
+        reason?: string | null
+    }
+}
+
+// Soft delete function response types
+export interface SoftDeleteResult {
+    success: boolean
+    deleted_at?: string
+    record_id?: string
+    error?: string
+}
+
+export interface RestoreResult {
+    success: boolean
+    restored_at?: string
+    record_id?: string
+    error?: string
+}
+
+export interface BulkDeleteResult {
+    success: boolean
+    deleted_count?: number
+    error?: string
+}
+
+// Deleted record for recovery UI
+export interface DeletedRecord {
+    table_name: string
+    id: string
+    display_name: string
+    deleted_at: string
+    deleted_by: string | null
+    record_snapshot?: Json
+}
+
+// Tables that support soft delete
+export type DeletableTable =
+    | 'clients'
+    | 'employees'
+    | 'payroll_records'
+    | 'liquidation_records'
+    | 'ocr_results'

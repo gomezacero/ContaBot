@@ -1,4 +1,4 @@
-import { AUX_TRANSPORTE_2025, RISK_LEVEL_RATES, SMMLV_2025, UVT_2025 } from "@/lib/constants";
+import { AUX_TRANSPORTE_2026, RISK_LEVEL_RATES, SMMLV_2026, UVT_2026 } from "@/lib/constants";
 import { PayrollInput, PayrollResult, PayrollFinancials, RiskLevel, LiquidationResult } from "@/types/payroll";
 
 // Helper: Calculate Days 360
@@ -31,7 +31,7 @@ export const calculateDays360 = (startDateStr?: string, endDateStr?: string): nu
 
 // Helper: Solidarity Rate 2025
 export const getSolidarityRate = (ibc: number): number => {
-    const m = SMMLV_2025;
+    const m = SMMLV_2026;
     if (ibc < 4 * m) return 0;
     else if (ibc < 16 * m) return 0.01;
     else if (ibc < 17 * m) return 0.012; // 1.0% + 0.2%
@@ -43,8 +43,8 @@ export const getSolidarityRate = (ibc: number): number => {
 
 // --- STANDARD MODULE CALCULATION ---
 export const calculatePayroll = (input: PayrollInput): PayrollResult => {
-    const smmlv = SMMLV_2025;
-    const auxTransport = AUX_TRANSPORTE_2025;
+    const smmlv = SMMLV_2026;
+    const auxTransport = AUX_TRANSPORTE_2026;
 
     // Asegurar que baseSalary sea un número válido
     const baseSalary = Number(input.baseSalary) || smmlv;
@@ -117,31 +117,31 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
         const netIncome = Math.max(0, grossIncome - incr);
 
         // 3. Deducciones
-        const dedHousing = Math.min(dedParams.housingInterest, 100 * UVT_2025);
-        const dedHealth = Math.min(dedParams.prepaidMedicine, 16 * UVT_2025);
+        const dedHousing = Math.min(dedParams.housingInterest, 100 * UVT_2026);
+        const dedHealth = Math.min(dedParams.prepaidMedicine, 16 * UVT_2026);
 
         // Dependientes: 10% del Ingreso Laboral Neto
         const rawDependents = netLaborBase * 0.10;
-        const dedDependents = dedParams.hasDependents ? Math.min(rawDependents, 32 * UVT_2025) : 0;
+        const dedDependents = dedParams.hasDependents ? Math.min(rawDependents, 32 * UVT_2026) : 0;
 
         const totalDeductions = dedHousing + dedHealth + dedDependents;
 
         // 4. Rentas Exentas
-        const exemptVoluntary = Math.min(dedParams.voluntaryPensionExempt + dedParams.afc, 316 * UVT_2025);
+        const exemptVoluntary = Math.min(dedParams.voluntaryPensionExempt + dedParams.afc, 316 * UVT_2026);
 
         // 5. Rentas Exentas de Trabajo (25%)
         const baseFor25 = Math.max(0, netIncome - totalDeductions - exemptVoluntary);
-        const limit25Monthly = (790 * UVT_2025) / 12;
+        const limit25Monthly = (790 * UVT_2026) / 12;
         const exempt25 = Math.min(baseFor25 * 0.25, limit25Monthly);
 
         // 6. Limitación del 40%
         const totalBenefits = totalDeductions + exemptVoluntary + exempt25;
         const limit40Val = netIncome * 0.40;
-        const limitUVTAnnual = 1340 * UVT_2025;
+        const limitUVTAnnual = 1340 * UVT_2026;
         const limitUVTMonthly = limitUVTAnnual / 12;
 
         const taxableBaseCOP = Math.max(0, netIncome - Math.min(totalBenefits, limit40Val, limitUVTMonthly));
-        const taxableBaseUVT = taxableBaseCOP / UVT_2025;
+        const taxableBaseUVT = taxableBaseCOP / UVT_2026;
 
         // Tabla Art. 383 E.T. 2025
         let retentionUVT = 0;
@@ -152,7 +152,7 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
         else if (taxableBaseUVT > 945 && taxableBaseUVT <= 2300) retentionUVT = (taxableBaseUVT - 945) * 0.37 + 268;
         else if (taxableBaseUVT > 2300) retentionUVT = (taxableBaseUVT - 2300) * 0.39 + 770;
 
-        retencion = Math.round(retentionUVT * UVT_2025);
+        retencion = Math.round(retentionUVT * UVT_2026);
     }
 
     // Total Deductions
@@ -274,7 +274,7 @@ export const createDefaultEmployee = (index: number = 1): PayrollInput => ({
     documentNumber: '',
     jobTitle: '',
     contractType: 'INDEFINIDO',
-    baseSalary: SMMLV_2025,
+    baseSalary: SMMLV_2026,
     riskLevel: RiskLevel.I,
     isExempt: true,
     includeTransportAid: true,
@@ -322,8 +322,8 @@ export const calculateLiquidation = (
     const daysWorked = calculateDays360(input.startDate, input.endDate);
 
     // Base salary components
-    const baseSalary = Number(input.baseSalary) || SMMLV_2025;
-    const transportAid = input.includeTransportAid ? AUX_TRANSPORTE_2025 : 0;
+    const baseSalary = Number(input.baseSalary) || SMMLV_2026;
+    const transportAid = input.includeTransportAid ? AUX_TRANSPORTE_2026 : 0;
 
     // Overtime and variables from monthly calculation
     const overtime = payrollResult.monthly.salaryData.overtime || 0;

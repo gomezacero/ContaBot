@@ -126,7 +126,12 @@ export interface TaxEvent {
     id: string;
     title: string;
     date: string; // YYYY-MM-DD
-    type: 'RENTA' | 'IVA' | 'RETEFUENTE' | 'RETENCION' | 'GMF' | 'EXOGENA' | 'SIMPLE' | 'PATRIMONIO' | 'EXTERIOR';
+    type:
+        | 'RENTA' | 'IVA' | 'RETEFUENTE' | 'RETENCION' | 'GMF'
+        | 'EXOGENA' | 'SIMPLE' | 'PATRIMONIO' | 'EXTERIOR'
+        // New 2026 taxes
+        | 'CARBONO' | 'BEBIDAS' | 'GASOLINA' | 'PLASTICOS'
+        | 'RUB' | 'PRECIOS_TRANSFERENCIA' | 'INFORME_PAIS';
     status: 'PENDING' | 'DUE_SOON' | 'OVERDUE' | 'COMPLETED';
     description: string;
     alertDates?: { daysBefore: number, date: string, triggered: boolean }[];

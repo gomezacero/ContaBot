@@ -38,6 +38,8 @@ import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator
 import { USAGE_LIMITS, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
 import { InvoiceGroup } from './components/InvoiceGroup';
 import { CostMetrics } from '@/components/usage/CostMetrics';
+import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
+import { useToast } from '@/components/ui/Toast';
 
 // Interfaces removed as they are now imported from ./types
 
@@ -77,6 +79,14 @@ export default function GastosPage() {
     const [savedCount, setSavedCount] = useState(0);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [clearing, setClearing] = useState(false);
+
+    // Delete modal state
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; entity: string; count: number }>({
+        isOpen: false,
+        entity: '',
+        count: 0
+    });
+    const { addToast } = useToast();
 
     // Load clients
     const loadClients = useCallback(async () => {
@@ -361,13 +371,16 @@ export default function GastosPage() {
 
         setClearing(true);
         try {
-            const { error } = await supabase
-                .from('ocr_results')
-                .delete()
-                .eq('client_id', selectedClientId);
+            // Use soft delete bulk via RPC for safe deletion with audit trail
+            const { error } = await supabase.rpc('soft_delete_bulk', {
+                p_table_name: 'ocr_results',
+                p_filter_column: 'client_id',
+                p_filter_value: selectedClientId,
+                p_reason: 'Limpieza masiva desde modulo gastos'
+            });
 
             if (error) {
-                console.error('Error deleting OCR results:', error);
+                console.error('Error soft deleting OCR results:', error);
                 setError('Error al limpiar los datos');
             } else {
                 setResults([]);
@@ -382,25 +395,62 @@ export default function GastosPage() {
         }
     };
 
-    const handleDeleteGroup = async (entity: string) => {
+    // Open delete modal for a group
+    const openDeleteGroupModal = (entity: string) => {
         if (!selectedClientId) return;
+        const groupResults = results.filter(r => r.entity === entity);
+        setDeleteModal({ isOpen: true, entity, count: groupResults.length });
+    };
+
+    const handleDeleteGroup = async () => {
+        if (!selectedClientId) return;
+        const { entity } = deleteModal;
 
         try {
-            const { error } = await supabase
+            // First get all record IDs for this vendor
+            const { data: records, error: fetchError } = await supabase
                 .from('ocr_results')
-                .delete()
+                .select('id')
                 .eq('client_id', selectedClientId)
-                .eq('vendor', entity);
+                .eq('vendor', entity)
+                .is('deleted_at', null);
 
-            if (error) {
-                console.error('Error deleting group:', error);
-                setError('Error al eliminar el grupo');
-            } else {
-                setResults(prev => prev.filter(r => r.entity !== entity));
+            if (fetchError) {
+                console.error('Error fetching group records:', fetchError);
+                setError('Error al obtener registros del grupo');
+                return;
             }
+
+            // Soft delete each record
+            if (records && records.length > 0) {
+                for (const record of records) {
+                    await supabase.rpc('soft_delete_record', {
+                        p_table_name: 'ocr_results',
+                        p_record_id: record.id,
+                        p_reason: `Eliminacion de grupo: ${entity}`
+                    });
+                }
+            }
+
+            setResults(prev => prev.filter(r => r.entity !== entity));
+
+            addToast({
+                type: 'success',
+                title: 'Registros eliminados',
+                description: `${records?.length || 0} documentos de "${entity}" movidos a la papelera`,
+                action: {
+                    label: 'Ver papelera',
+                    onClick: () => window.location.href = '/dashboard/papelera'
+                }
+            });
         } catch (err) {
             console.error('Error in handleDeleteGroup:', err);
             setError('Error al eliminar');
+            addToast({
+                type: 'error',
+                title: 'Error',
+                description: 'No se pudieron eliminar los registros'
+            });
         }
     };
 
@@ -792,7 +842,7 @@ export default function GastosPage() {
                                         key={idx}
                                         group={group}
                                         formatCurrency={formatCurrency}
-                                        onDelete={handleDeleteGroup}
+                                        onDelete={openDeleteGroupModal}
                                     />
                                 ))}
                             </div>
@@ -906,6 +956,18 @@ export default function GastosPage() {
                     </div>
                 </div>
             )}
+
+            {/* Delete Group Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={deleteModal.isOpen}
+                onClose={() => setDeleteModal({ isOpen: false, entity: '', count: 0 })}
+                onConfirm={handleDeleteGroup}
+                title="Eliminar Documentos"
+                description={`¿Estás seguro de que deseas eliminar todos los documentos de "${deleteModal.entity}"? Podrás restaurarlos desde la papelera durante los próximos 30 días.`}
+                itemName={deleteModal.entity}
+                itemCount={deleteModal.count}
+                isRecoverable={true}
+            />
         </div>
     );
 }

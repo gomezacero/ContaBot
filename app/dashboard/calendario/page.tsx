@@ -56,6 +56,14 @@ interface DBClient {
     alert_days: number[] | null;
     email_alert: boolean | null;
     whatsapp_alert: boolean | null;
+    // New 2026 taxes
+    has_carbon_tax: boolean | null;
+    has_beverage_tax: boolean | null;
+    has_fuel_tax: boolean | null;
+    has_plastic_tax: boolean | null;
+    requires_rub: boolean | null;
+    requires_transfer_pricing: boolean | null;
+    requires_country_report: boolean | null;
 }
 
 const AVAILABLE_ALERT_DAYS = [30, 15, 7, 3, 1];
@@ -106,7 +114,15 @@ export default function CalendarioPage() {
         emailEnabled: true,
         targetEmails: [] as string[],
         whatsappEnabled: false,
-        targetPhone: ''
+        targetPhone: '',
+        // New 2026 taxes
+        hasCarbonTax: false,
+        hasBeverageTax: false,
+        hasFuelTax: false,
+        hasPlasticTax: false,
+        requiresRUB: false,
+        requiresTransferPricing: false,
+        requiresCountryReport: false,
     });
     const [newEmail, setNewEmail] = useState('');
 
@@ -118,7 +134,7 @@ export default function CalendarioPage() {
             if (isAuthenticated) {
                 const { data, error } = await supabase
                     .from('clients')
-                    .select('id, name, nit, classification, tax_regime, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days, email_alert, whatsapp_alert')
+                    .select('id, name, nit, classification, tax_regime, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days, email_alert, whatsapp_alert, has_carbon_tax, has_beverage_tax, has_fuel_tax, has_plastic_tax, requires_rub, requires_transfer_pricing, requires_country_report')
                     .order('name');
 
                 if (error) throw error;
@@ -139,6 +155,13 @@ export default function CalendarioPage() {
                     alert_days: c.alert_days,
                     email_alert: c.email_alert,
                     whatsapp_alert: c.whatsapp_alert,
+                    has_carbon_tax: (c as any).has_carbon_tax || null,
+                    has_beverage_tax: (c as any).has_beverage_tax || null,
+                    has_fuel_tax: (c as any).has_fuel_tax || null,
+                    has_plastic_tax: (c as any).has_plastic_tax || null,
+                    requires_rub: (c as any).requires_rub || null,
+                    requires_transfer_pricing: (c as any).requires_transfer_pricing || null,
+                    requires_country_report: (c as any).requires_country_report || null,
                 }));
                 setClients(mappedClients);
             }
@@ -203,7 +226,14 @@ export default function CalendarioPage() {
             emailEnabled: true,
             targetEmails: [],
             whatsappEnabled: false,
-            targetPhone: ''
+            targetPhone: '',
+            hasCarbonTax: false,
+            hasBeverageTax: false,
+            hasFuelTax: false,
+            hasPlasticTax: false,
+            requiresRUB: false,
+            requiresTransferPricing: false,
+            requiresCountryReport: false,
         });
     };
 
@@ -220,7 +250,14 @@ export default function CalendarioPage() {
             emailEnabled: client.email_alert || false,
             targetEmails: [],
             whatsappEnabled: client.whatsapp_alert || false,
-            targetPhone: ''
+            targetPhone: '',
+            hasCarbonTax: client.has_carbon_tax || false,
+            hasBeverageTax: client.has_beverage_tax || false,
+            hasFuelTax: client.has_fuel_tax || false,
+            hasPlasticTax: client.has_plastic_tax || false,
+            requiresRUB: client.requires_rub || false,
+            requiresTransferPricing: client.requires_transfer_pricing || false,
+            requiresCountryReport: client.requires_country_report || false,
         });
     };
 
@@ -323,7 +360,12 @@ export default function CalendarioPage() {
         setProcessing(true);
         try {
             if (isAuthenticated) {
-                const { error } = await supabase.from('clients').delete().eq('id', deleteTarget.id);
+                // Use soft delete via RPC for safe deletion with audit trail
+                const { error } = await supabase.rpc('soft_delete_record', {
+                    p_table_name: 'clients',
+                    p_record_id: deleteTarget.id,
+                    p_reason: 'Usuario confirmo eliminacion desde calendario'
+                });
                 if (error) throw error;
             } else {
                 deleteLocalClient(deleteTarget.id);
@@ -353,6 +395,14 @@ export default function CalendarioPage() {
         hasGmf: client.has_gmf || false,
         requiresExogena: client.requires_exogena || false,
         hasPatrimonyTax: client.has_patrimony_tax || false,
+        // New 2026 taxes
+        hasCarbonTax: client.has_carbon_tax || false,
+        hasBeverageTax: client.has_beverage_tax || false,
+        hasFuelTax: client.has_fuel_tax || false,
+        hasPlasticTax: client.has_plastic_tax || false,
+        requiresRUB: client.requires_rub || false,
+        requiresTransferPricing: client.requires_transfer_pricing || false,
+        requiresCountryReport: client.requires_country_report || false,
     });
 
     const activeClient = useMemo(() =>
@@ -479,7 +529,7 @@ export default function CalendarioPage() {
                                 <CalendarDays className="w-8 h-8 text-blue-600" />
                                 Mis Calendarios Contables
                             </h2>
-                            <p className="text-gray-500 mt-1 font-medium">Gestión automatizada de vencimientos 2025.</p>
+                            <p className="text-gray-500 mt-1 font-medium">Gestión automatizada de vencimientos 2026.</p>
                         </div>
                         <button
                             onClick={() => { resetForm(); setView('add_client'); }}
@@ -700,6 +750,115 @@ export default function CalendarioPage() {
                                         })}
                                     </div>
                                 </div>
+
+                                {/* New 2026 Special Taxes */}
+                                <div className="space-y-4 md:col-span-2 pt-4 border-t border-gray-100">
+                                    <div className="flex items-center gap-2 text-emerald-600">
+                                        <Layers className="w-4 h-4" />
+                                        <h3 className="text-sm font-bold uppercase tracking-wider">Impuestos Especiales 2026</h3>
+                                    </div>
+                                    <p className="text-xs text-gray-500 -mt-2">Selecciona los impuestos adicionales que aplican a este contribuyente.</p>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {/* Carbon Tax */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.hasCarbonTax ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.hasCarbonTax}
+                                                onChange={e => setEditConfig({ ...editConfig, hasCarbonTax: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">Imp. Carbono</span>
+                                                <p className="text-[10px] text-gray-500">Bimestral</p>
+                                            </div>
+                                        </label>
+
+                                        {/* Beverage Tax */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.hasBeverageTax ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.hasBeverageTax}
+                                                onChange={e => setEditConfig({ ...editConfig, hasBeverageTax: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">Bebidas Ultraprocesadas</span>
+                                                <p className="text-[10px] text-gray-500">Bimestral</p>
+                                            </div>
+                                        </label>
+
+                                        {/* Fuel Tax */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.hasFuelTax ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.hasFuelTax}
+                                                onChange={e => setEditConfig({ ...editConfig, hasFuelTax: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">Gasolina / ACPM</span>
+                                                <p className="text-[10px] text-gray-500">Mensual</p>
+                                            </div>
+                                        </label>
+
+                                        {/* Plastic Tax */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.hasPlasticTax ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.hasPlasticTax}
+                                                onChange={e => setEditConfig({ ...editConfig, hasPlasticTax: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">Plasticos Uso Unico</span>
+                                                <p className="text-[10px] text-gray-500">Anual (Feb)</p>
+                                            </div>
+                                        </label>
+
+                                        {/* RUB */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.requiresRUB ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.requiresRUB}
+                                                onChange={e => setEditConfig({ ...editConfig, requiresRUB: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">RUB</span>
+                                                <p className="text-[10px] text-gray-500">Beneficiarios Finales</p>
+                                            </div>
+                                        </label>
+
+                                        {/* Transfer Pricing */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.requiresTransferPricing ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.requiresTransferPricing}
+                                                onChange={e => setEditConfig({ ...editConfig, requiresTransferPricing: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">Precios Transferencia</span>
+                                                <p className="text-[10px] text-gray-500">Anual (Sep)</p>
+                                            </div>
+                                        </label>
+
+                                        {/* Country Report */}
+                                        <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${editConfig.requiresCountryReport ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-100 hover:border-emerald-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={editConfig.requiresCountryReport}
+                                                onChange={e => setEditConfig({ ...editConfig, requiresCountryReport: e.target.checked })}
+                                                className="w-4 h-4 accent-emerald-600"
+                                            />
+                                            <div>
+                                                <span className="text-sm font-bold text-gray-900">Informe Pais por Pais</span>
+                                                <p className="text-[10px] text-gray-500">Anual (Dic)</p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Notification Channels */}
@@ -861,7 +1020,7 @@ export default function CalendarioPage() {
                             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[650px]">
                                 <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                                     <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                        <CalendarIcon className="w-5 h-5 text-gray-500" /> Cronograma Tributario 2025
+                                        <CalendarIcon className="w-5 h-5 text-gray-500" /> Cronograma Tributario 2026
                                     </h3>
                                 </div>
                                 <div className="overflow-y-auto flex-1">
@@ -889,11 +1048,22 @@ export default function CalendarioPage() {
                                                         </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-2 mb-1">
-                                                                <span className={`w-2 h-2 rounded-full ${evt.type === 'RENTA' ? 'bg-emerald-500' :
-                                                                        evt.type === 'IVA' ? 'bg-blue-500' :
-                                                                            evt.type === 'SIMPLE' ? 'bg-purple-500' :
-                                                                                evt.type === 'RETEFUENTE' ? 'bg-orange-500' : 'bg-gray-500'
-                                                                    }`}></span>
+                                                                <span className={`w-2 h-2 rounded-full ${
+                                                                    evt.type === 'RENTA' ? 'bg-emerald-500' :
+                                                                    evt.type === 'IVA' ? 'bg-blue-500' :
+                                                                    evt.type === 'SIMPLE' ? 'bg-purple-500' :
+                                                                    evt.type === 'RETEFUENTE' || evt.type === 'RETENCION' ? 'bg-orange-500' :
+                                                                    evt.type === 'PATRIMONIO' ? 'bg-pink-500' :
+                                                                    evt.type === 'EXOGENA' ? 'bg-cyan-500' :
+                                                                    evt.type === 'CARBONO' ? 'bg-lime-500' :
+                                                                    evt.type === 'BEBIDAS' ? 'bg-amber-500' :
+                                                                    evt.type === 'GASOLINA' ? 'bg-red-500' :
+                                                                    evt.type === 'PLASTICOS' ? 'bg-teal-500' :
+                                                                    evt.type === 'RUB' ? 'bg-indigo-500' :
+                                                                    evt.type === 'PRECIOS_TRANSFERENCIA' ? 'bg-violet-500' :
+                                                                    evt.type === 'INFORME_PAIS' ? 'bg-rose-500' :
+                                                                    'bg-gray-500'
+                                                                }`}></span>
                                                                 <p className="font-bold text-gray-900">{evt.title}</p>
                                                             </div>
                                                             <p className="text-xs text-gray-500 truncate max-w-xs">{evt.description}</p>

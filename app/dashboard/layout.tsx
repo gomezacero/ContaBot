@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { ToastProvider } from '@/components/ui/Toast';
 import {
     Bot,
     LayoutDashboard,
@@ -15,7 +16,8 @@ import {
     Menu,
     X,
     ChevronDown,
-    Sparkles
+    Sparkles,
+    Trash2
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -99,6 +101,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
 
     return (
+        <ToastProvider>
         <div className="min-h-screen bg-[#F9FAFB]">
             {/* Navigation Header */}
             <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-gray-100">
@@ -189,6 +192,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                                 <User className="w-4 h-4" />
                                                 Mi Perfil
                                             </Link>
+                                            <Link
+                                                href="/dashboard/papelera"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                Papelera
+                                            </Link>
                                             <button
                                                 onClick={handleLogout}
                                                 className="flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
@@ -240,5 +250,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 {children}
             </main>
         </div>
+        </ToastProvider>
     );
 }
