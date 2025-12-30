@@ -33,8 +33,11 @@ import {
     Star,
     MessageSquare,
     Send,
-    ThumbsUp
+    ThumbsUp,
+    HelpCircle // Added
 } from 'lucide-react';
+import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface DBEmployee {
     id: string;
@@ -89,7 +92,7 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         employerType: 'JURIDICA',
         companyName: emp.clients?.name || '',
         companyNit: emp.clients?.nit || '',
-        name: emp.name || 'Empleado',
+        name: emp.name ?? 'Empleado',
         documentNumber: emp.document_number || '',
         jobTitle: emp.job_title || '',
         contractType: (emp.contract_type as 'INDEFINIDO' | 'FIJO' | 'OBRA_LABOR') || 'INDEFINIDO',
@@ -134,18 +137,19 @@ const Section: React.FC<{ title: string; icon: React.ReactNode; isOpen: boolean;
             </div>
             {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
         </button>
-        {isOpen && <div className="p-5 border-t border-gray-100 animate-in slide-in-from-top-1">{children}</div>}
+        {isOpen && <div className="p-4 lg:p-5 border-t border-gray-100 animate-in slide-in-from-top-1">{children}</div>}
     </div>
 );
 
-const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date'; value: any; onChange: (val: any) => void }> = ({ label, type, value, onChange }) => (
+const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date'; value: any; onChange: (val: any) => void; placeholder?: string }> = ({ label, type, value, onChange, placeholder }) => (
     <div className="flex flex-col gap-1">
         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</label>
         <div className="relative">
             {type === 'money' && <span className="absolute left-3 top-2.5 text-gray-400 text-xs">$</span>}
             <input
                 type={type === 'money' ? 'text' : type}
-                value={type === 'money' ? Number(value).toLocaleString('es-CO') : value}
+                value={type === 'money' ? (value ? Number(value).toLocaleString('es-CO') : '') : (value ?? '')}
+                placeholder={placeholder}
                 onChange={e => {
                     const v = type === 'money' ? e.target.value.replace(/\D/g, '') : e.target.value;
                     onChange(type === 'number' || type === 'money' ? Number(v) : v);
@@ -157,9 +161,9 @@ const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date
 );
 
 const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
-    <label className="flex items-center justify-between cursor-pointer group">
-        <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900">{label}</span>
-        <div className="relative">
+    <label className="flex items-center justify-between gap-4 cursor-pointer group w-full">
+        <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 whitespace-nowrap">{label}</span>
+        <div className="relative flex-shrink-0">
             <input type="checkbox" className="sr-only" checked={checked} onChange={e => onChange(e.target.checked)} />
             <div className={`w-9 h-5 rounded-full shadow-inner transition-colors ${checked ? 'bg-purple-600' : 'bg-gray-300'}`}></div>
             <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
@@ -408,6 +412,8 @@ export default function NominaPage() {
     // Handle deleting employee
     const handleDeleteEmployee = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (!window.confirm('¿Estás seguro de eliminar este empleado? Esta acción no se puede deshacer.')) return;
+
         if (selectedClientId) {
             setSaving(true);
             try {
@@ -551,19 +557,28 @@ export default function NominaPage() {
                         <div
                             key={emp.id}
                             onClick={() => setActiveEmployeeId(emp.id)}
-                            className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all group relative border ${isActive
-                                ? 'bg-purple-50 border-purple-200 text-purple-800 font-medium'
-                                : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50'
+                            className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all group relative border select-none ${isActive
+                                ? 'bg-purple-50 border-purple-200 shadow-sm'
+                                : 'bg-transparent border-transparent hover:bg-gray-50'
                                 }`}
                         >
                             <UserCircle2 className="w-4 h-4" />
-                            <span className="text-xs truncate max-w-[80px]">{emp.name}</span>
-                            {isActive && employees.length > 1 && (
+                            <div className="flex flex-col min-w-0">
+                                <span className={`text-xs truncate max-w-[100px] font-medium ${isActive ? 'text-purple-900' : 'text-gray-600 group-hover:text-gray-900'}`}>{emp.name}</span>
+                                {isActive && <span className="h-0.5 w-full bg-purple-500 rounded-full mt-0.5 animate-in zoom-in"></span>}
+                            </div>
+
+                            {employees.length > 1 && (
                                 <button
                                     onClick={(e) => handleDeleteEmployee(emp.id, e)}
-                                    className="ml-1 p-0.5 text-red-400 hover:text-red-600 rounded bg-white"
+                                    className={`ml-1 p-1 rounded-md transition-all duration-200 
+                                        ${isActive
+                                            ? 'text-red-400 hover:text-red-600 hover:bg-red-50 opacity-100'
+                                            : 'text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
+                                        }`}
+                                    title="Eliminar empleado"
                                 >
-                                    <Trash2 className="w-3 h-3" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                             )}
                         </div>
@@ -571,16 +586,18 @@ export default function NominaPage() {
                 })}
                 <button
                     onClick={handleAddEmployee}
-                    className="ml-2 p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    className={`ml-2 p-2 rounded-lg transition-all ${employees.length === 0
+                        ? 'bg-purple-600 text-white shadow-lg animate-pulse ring-4 ring-purple-100'
+                        : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
                 >
                     <Plus className="w-5 h-5" />
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start max-w-[1800px] mx-auto">
 
                 {/* LEFT PANEL: FORM INPUTS (7 cols) */}
-                <div className="xl:col-span-7 space-y-4">
+                <div className="lg:col-span-7 xl:col-span-8 space-y-4">
                     {activeEmployee && (
                         <>
                             {/* I. DATOS GENERALES */}
@@ -588,7 +605,7 @@ export default function NominaPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <Input label="Inicio Periodo" type="date" value={activeEmployee.startDate} onChange={v => handleInputChange('startDate', v)} />
                                     <Input label="Fin Periodo" type="date" value={activeEmployee.endDate} onChange={v => handleInputChange('endDate', v)} />
-                                    <Input label="Nombre Empleado" type="text" value={activeEmployee.name} onChange={v => handleInputChange('name', v)} />
+                                    <Input label="Nombre Empleado" type="text" value={activeEmployee.name} onChange={v => handleInputChange('name', v)} placeholder="" />
                                     <Input label="Salario Básico" type="money" value={activeEmployee.baseSalary} onChange={v => handleInputChange('baseSalary', v)} />
                                     <div className="col-span-1">
                                         <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tipo Contrato</label>
@@ -602,8 +619,11 @@ export default function NominaPage() {
                                             <option value="OBRA_LABOR">Obra o Labor</option>
                                         </select>
                                     </div>
-                                    <div className="flex items-center pt-6">
-                                        <Toggle label="Aplica Aux. Transporte" checked={activeEmployee.includeTransportAid} onChange={v => handleInputChange('includeTransportAid', v)} />
+                                    <div className="flex items-center pt-6 gap-3">
+                                        <div className="flex-1 max-w-[200px]">
+                                            <Toggle label="Aplica Aux. Transporte" checked={activeEmployee.includeTransportAid} onChange={v => handleInputChange('includeTransportAid', v)} />
+                                        </div>
+                                        <Tooltip content="Subsidio obligatorio para quienes ganan hasta 2 SMMLV ($162.000 aprox)." />
                                     </div>
                                 </div>
                             </Section>
@@ -626,7 +646,12 @@ export default function NominaPage() {
                                         </select>
                                     </div>
                                     <div className="flex flex-col justify-center gap-2 pt-4">
-                                        <Toggle label="Exento Parafiscales (Ley 1607)" checked={activeEmployee.isExempt} onChange={v => handleInputChange('isExempt', v)} />
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1 max-w-[220px]">
+                                                <Toggle label="Exento Parafiscales (Ley 1607)" checked={activeEmployee.isExempt} onChange={v => handleInputChange('isExempt', v)} />
+                                            </div>
+                                            <Tooltip content="Exonera de aportes a Salud (8.5%) y Parafiscales (SENA/ICBF) si el empleado gana menos de 10 SMMLV." />
+                                        </div>
                                     </div>
                                 </div>
                             </Section>
@@ -755,7 +780,7 @@ export default function NominaPage() {
                 </div>
 
                 {/* RIGHT PANEL: RESULTS DASHBOARD (5 cols) */}
-                <div className="xl:col-span-5 space-y-6 xl:sticky xl:top-28">
+                <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-24">
 
                     {/* TABS SWITCHER */}
                     <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 flex">
@@ -784,16 +809,22 @@ export default function NominaPage() {
                                         <DollarSign className="w-32 h-32" />
                                     </div>
                                     <p className="text-purple-200 text-xs font-bold uppercase tracking-widest mb-1">Neto a Pagar</p>
-                                    <h2 className="text-4xl font-bold tracking-tight mb-4">{formatCurrency(result.monthly.netPay)}</h2>
+                                    <h2 className="text-4xl font-bold tracking-tight mb-4">
+                                        <AnimatedCounter value={result.monthly.netPay} formatter={formatCurrency} />
+                                    </h2>
 
                                     <div className="grid grid-cols-2 gap-4 border-t border-purple-700/50 pt-4">
                                         <div>
                                             <p className="text-xs text-purple-300">Total Devengado</p>
-                                            <p className="font-semibold">{formatCurrency(result.monthly.salaryData.totalAccrued)}</p>
+                                            <p className="font-semibold">
+                                                <AnimatedCounter value={result.monthly.salaryData.totalAccrued} formatter={formatCurrency} />
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-xs text-purple-300">Total Deducciones</p>
-                                            <p className="font-semibold">{formatCurrency(result.monthly.employeeDeductions.totalDeductions)}</p>
+                                            <p className="font-semibold">
+                                                <AnimatedCounter value={result.monthly.employeeDeductions.totalDeductions} formatter={formatCurrency} />
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -823,7 +854,9 @@ export default function NominaPage() {
                                             </div>
                                             <div className="pt-2 text-right">
                                                 <span className="text-xs text-gray-500 mr-2">Costo Total Nómina:</span>
-                                                <span className="font-bold text-purple-700">{formatCurrency(result.monthly.totals.grandTotalCost)}</span>
+                                                <span className="font-bold text-purple-700">
+                                                    <AnimatedCounter value={result.monthly.totals.grandTotalCost} formatter={formatCurrency} />
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
