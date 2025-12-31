@@ -161,6 +161,7 @@ export default function GastosPage() {
                 .from('ocr_results')
                 .select('*')
                 .eq('client_id', selectedClientId)
+                .is('deleted_at', null)  // Filter out soft-deleted records
                 .order('created_at', { ascending: false });
 
             if (error) {
