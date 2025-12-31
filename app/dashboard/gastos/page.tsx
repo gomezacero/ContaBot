@@ -189,6 +189,8 @@ export default function GastosPage() {
                     aiu: record.aiu || undefined,
                     iva_rate: record.iva_rate || undefined,
                     tax_inc_rate: record.tax_inc_rate || undefined,
+                    // Validation persistence
+                    validation: record.validation_result || undefined,
                 }));
                 setResults(loadedResults);
             } else {
@@ -424,7 +426,10 @@ export default function GastosPage() {
                                 currency: result.currency || 'COP',
                                 aiu: result.aiu || null,
                                 iva_rate: result.iva_rate || null,
-                                tax_inc_rate: result.tax_inc_rate || null
+                                tax_inc_rate: result.tax_inc_rate || null,
+                                // Validation persistence
+                                validation_result: result.validation || null,
+                                validation_passed: result.validation?.isValid ?? null
                             });
                             savedThisSession++;
                         } catch (saveErr) {
@@ -540,56 +545,32 @@ export default function GastosPage() {
     const exportToExcel = () => {
         if (results.length === 0) return;
 
-        const headers = ['Cuenta PUC', 'Descripción', 'NIT Tercero', 'Nombre Tercero', 'Documento', 'Fecha', 'Débito', 'Crédito', 'Confianza', 'Archivo'];
-        const rows: string[][] = [];
+        // Import the Excel export service dynamically to avoid SSR issues
+        import('@/lib/services/excel-export-service').then(({ generateAccountingExcel }) => {
+            const clientName = clients.find(c => c.id === selectedClientId)?.name || 'General';
 
-        results.forEach(result => {
-            result.items.forEach(item => {
-                const pucMatch = item.category?.match(/\((\d+)\)/);
-                const pucCode = pucMatch ? pucMatch[1] : '529595';
-
-                rows.push([
-                    pucCode,
-                    item.description,
-                    result.nit || 'S/N',
-                    result.entity,
-                    result.invoiceNumber,
-                    result.date,
-                    item.total.toString(),
-                    '0',
-                    `${Math.round((item.confidence || 0.8) * 100)}%`,
-                    result.fileName,
-                ]);
+            const blob = generateAccountingExcel({
+                clientName,
+                results,
+                includeItems: true,
+                includeTaxSummary: true
             });
 
-            if (result.items.length > 0) {
-                rows.push([
-                    '220505',
-                    `Factura ${result.invoiceNumber || 'S/N'} - ${result.entity}`,
-                    result.nit || 'S/N',
-                    result.entity,
-                    result.invoiceNumber,
-                    '0',
-                    result.total.toString(),
-                    `${Math.round((result.confidence || 0) * 100)}%`,
-                    result.fileName,
-                ]);
-            }
+            // Download the file
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `asiento_contable_${clientName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }).catch(err => {
+            console.error('Error generating Excel:', err);
+            addToast({
+                type: 'error',
+                title: 'Error',
+                description: 'No se pudo generar el archivo Excel'
+            });
         });
-
-        const csvContent = [
-            headers.join(';'),
-            ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(';'))
-        ].join('\n');
-
-        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const clientName = clients.find(c => c.id === selectedClientId)?.name || 'General';
-        link.download = `asiento_${clientName}_${new Date().toISOString().split('T')[0]}.csv`;
-        link.click();
-        URL.revokeObjectURL(url);
     };
 
     const formatCurrency = (value: number) => {

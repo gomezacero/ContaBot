@@ -68,6 +68,38 @@ EXTRAE EXACTAMENTE ESTOS DATOS:
     - Si el total parece muy bajo (< $1,000 COP para una compra normal), es error de interpretacion
     - REGLA COMBUSTIBLE: precio/galon debe ser $10,000-$20,000 COP, total compra $30,000-$500,000 COP
     - VALIDACION: subtotal + impuestos - retenciones debe aproximarse al total
+11. **IVA INCLUIDO (RECIBOS RETAIL - SUPERMERCADOS, DROGUERIAS)**:
+    - CRITICO: Si SUBTOTAL = VALOR TOTAL (o muy cercanos, diferencia < 1%), el IVA YA ESTA INCLUIDO en el precio
+    - Supermercados colombianos (Exito, Alkosto, Carulla, D1, Ara, Olimpica, Jumbo) muestran precios con IVA incluido
+    - La seccion "DISCRIMINACION TARIFAS IMPUESTOS" es INFORMATIVA, muestra cuanto del precio ya pagado es IVA
+    - En este caso:
+      * subtotal = valor total pagado (precio con IVA incluido)
+      * iva = 0 (ya esta incluido en el precio, NO sumar de nuevo)
+      * iva_rate = 0.19 (solo para referencia)
+    - DETECCION: Si ves "IVA INCLUIDO", "IVA INC", o si SUBTOTAL ≈ TOTAL, NO sumes el IVA
+    - EJEMPLO: Recibo Exito con SUBTOTAL=20,380 y TOTAL=20,380 y desglose IVA=3,254 → iva debe ser 0, NO 3,254
+12. **CAFETERIAS, RESTAURANTES Y BARES (IMPOCONSUMO 8%)**:
+    - Negocios como SOMOS MASA, Juan Valdez, OMA, Crepes & Waffles, Starbucks, etc.
+    - Tienen IMPOCONSUMO del 8% sobre productos preparados
+    - ESTRUCTURA TIPICA DEL RECIBO:
+      * "Total Productos" o "Subtotal Items" = suma de precios de items (puede incluir impoconsumo)
+      * "Subtotal" o "Base" = valor ANTES de impoconsumo (BASE GRAVABLE)
+      * "Impoconsumo" o "INC 8%" = impuesto calculado sobre la base
+      * "Propina" o "Servicio Voluntario" = propina (usualmente 10%)
+      * "TOTAL" = subtotal + impoconsumo + propina
+    - CRITICO: Usa el valor marcado como "Subtotal" o "Base" para el campo subtotal
+    - tax_inc = valor del impoconsumo mostrado
+    - tax_inc_rate = 0.08 (8%)
+    - tip = valor de propina/servicio voluntario
+    - VALIDACION: subtotal + tax_inc + tip = TOTAL (aproximadamente)
+    - EJEMPLO: SOMOS MASA con Subtotal=$148,056, Impoconsumo=$11,844, Propina=$14,806, TOTAL=$174,706
+      → subtotal=148056, tax_inc=11844, tip=14806, total=174706
+13. **DEDUPLICACION - UNA SOLA FACTURA POR DOCUMENTO**:
+    - IMPORTANTE: Cada documento/imagen es UNA SOLA factura, NO multiples
+    - Si ves informacion repetida o similar, es la MISMA factura, NO duplicarla
+    - Devuelve UN SOLO objeto JSON por documento, NO un array con duplicados
+    - Si el recibo tiene multiples paginas/secciones, consolidar en UNA sola factura
+    - NUNCA dupliques items, totales o facturas completas
 
 IMPORTANTE: Responde UNICAMENTE con un objeto JSON valido.
 
@@ -161,6 +193,26 @@ FORMATO MONEDA COP (IMPORTANTE):
 - "14.057" = $14,057 COP (catorce mil)
 - Puntos/comas son separadores de MILES
 - Si total < $1,000 para compra normal, es error de interpretacion
+
+IVA INCLUIDO (SUPERMERCADOS, RETAIL):
+- CRITICO: Si SUBTOTAL = TOTAL (diferencia < 1%), el IVA ya esta incluido en el precio
+- Supermercados (Exito, Alkosto, Carulla, D1, Ara, Olimpica) = precios con IVA incluido
+- "DISCRIMINACION TARIFAS" es informativa, NO sumar ese IVA al total
+- Si SUBTOTAL ≈ TOTAL: iva = 0 (ya incluido)
+
+CAFETERIAS, RESTAURANTES Y BARES (IMPOCONSUMO 8%):
+- SOMOS MASA, Juan Valdez, OMA, Crepes & Waffles, Starbucks = Impoconsumo 8%
+- ESTRUCTURA: "Subtotal/Base" + "Impoconsumo" + "Propina" = "TOTAL"
+- subtotal = valor de "Subtotal" o "Base" (ANTES de impoconsumo)
+- tax_inc = valor del impoconsumo
+- tip = propina/servicio voluntario
+- VALIDACION: subtotal + tax_inc + tip ≈ TOTAL
+- EJEMPLO: Subtotal=$148,056 + Impoconsumo=$11,844 + Propina=$14,806 = TOTAL=$174,706
+
+DEDUPLICACION:
+- Cada documento es UNA SOLA factura
+- NO dupliques facturas, items ni totales
+- Devuelve UN objeto por documento, NO arrays con duplicados
 
 Responde UNICAMENTE con un ARRAY JSON. Estructura por factura:
 {
