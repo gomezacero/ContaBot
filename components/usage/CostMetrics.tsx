@@ -47,7 +47,7 @@ export function CostMetrics() {
     };
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 h-full">
             <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-5 h-5 text-indigo-600" />
                 <span className="font-bold text-gray-700 text-sm">Métricas de Consumo AI</span>

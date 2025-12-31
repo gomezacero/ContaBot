@@ -365,6 +365,40 @@ export default function GastosPage() {
                     let savedThisSession = 0;
                     for (const result of data.results) {
                         try {
+                            // Check for existing invoice to prevent duplicates
+                            // Uses multi-criteria matching for robustness
+                            let existing = null;
+
+                            if (result.invoiceNumber) {
+                                // Primary: Match by invoice_number + nit (allows same invoice# from different vendors)
+                                const { data } = await supabase
+                                    .from('ocr_results')
+                                    .select('id')
+                                    .eq('client_id', selectedClientId)
+                                    .eq('invoice_number', result.invoiceNumber)
+                                    .eq('nit', result.nit || '')
+                                    .is('deleted_at', null)
+                                    .maybeSingle();
+                                existing = data;
+                            } else {
+                                // Fallback: Match by filename + vendor + date (for receipts without invoice numbers)
+                                const { data } = await supabase
+                                    .from('ocr_results')
+                                    .select('id')
+                                    .eq('client_id', selectedClientId)
+                                    .eq('filename', result.fileName)
+                                    .eq('vendor', result.entity || '')
+                                    .eq('invoice_date', result.date || '')
+                                    .is('deleted_at', null)
+                                    .maybeSingle();
+                                existing = data;
+                            }
+
+                            if (existing) {
+                                console.log(`Skipping duplicate: ${result.invoiceNumber || result.fileName} from ${result.entity}`);
+                                continue;
+                            }
+
                             await supabase.from('ocr_results').insert({
                                 user_id: user.id,
                                 client_id: selectedClientId,
@@ -633,7 +667,7 @@ export default function GastosPage() {
 
             {/* USAGE INDICATOR - Para usuarios autenticados */}
             {isAuthenticated && (
-                <div className="max-w-md space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
                     <UsageIndicator />
                     <CostMetrics />
                 </div>
