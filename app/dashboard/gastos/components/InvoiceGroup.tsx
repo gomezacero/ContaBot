@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, ShoppingBag, Calendar, Hash, Trash2 } from 'lucide-react';
-import { OCRItem } from '../types';
+import { ChevronDown, FileText, ShoppingBag, Hash, Trash2, DollarSign } from 'lucide-react';
+import { OCRItem, ValidationResult } from '../types';
+import { ValidationBadge } from './ValidationBadge';
+import { ValidationDetails } from './ValidationDetails';
 
 interface GroupedInvoiceData {
     nit: string;
@@ -11,14 +13,23 @@ interface GroupedInvoiceData {
     iva: number;
     tax_inc: number;
     tip: number;
+    // AIU (Colombian construction/service invoicing)
+    aiu?: {
+        administracion: number;
+        imprevistos: number;
+        utilidad: number;
+        base_gravable: number;
+    };
     retentions: {
         reteFuente: number;
         reteIca: number;
         reteIva: number;
     };
     currency: string;
-    items: (OCRItem & { fileName: string })[];
+    items: (OCRItem & { fileName: string; hasValidationError?: boolean })[];
     invoiceCount: number;
+    // Validation result for the first/primary invoice
+    validation?: ValidationResult;
 }
 
 interface InvoiceGroupProps {
@@ -34,6 +45,12 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
     const avgConfidence = group.items.reduce((acc, item) => acc + (item.confidence || 0), 0) / group.items.length || 0;
     const isLowConfidence = avgConfidence < 0.7;
 
+    // Check if any items have discounts (to conditionally show discount column)
+    const hasDiscounts = group.items.some(item => (item.discount && item.discount > 0) || (item.discountPercentage && item.discountPercentage > 0));
+
+    // Check if any items have non-default unit of measure
+    const hasNonUnitItems = group.items.some(item => item.unitOfMeasure && item.unitOfMeasure !== 'Und');
+
     return (
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-md">
             {/* Header / Summary Card */}
@@ -48,13 +65,19 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
 
                     <div className="flex flex-col">
                         <h4 className="font-black text-[#002D44] text-lg leading-tight">{group.entity}</h4>
-                        <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md flex items-center gap-1">
                                 <Hash className="w-3 h-3" /> NIT: {group.nit}
                             </span>
                             <span className="text-[10px] font-bold text-[#1AB1B1] bg-teal-50 px-2 py-0.5 rounded-md">
                                 {group.invoiceCount} Facturas
                             </span>
+                            {group.currency === 'USD' && (
+                                <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <DollarSign className="w-3 h-3" /> USD
+                                </span>
+                            )}
+                            {group.validation && <ValidationBadge validation={group.validation} />}
                         </div>
                     </div>
                 </div>
@@ -97,64 +120,123 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                             <thead className="bg-[#002D44]/5 text-[10px] font-black text-[#002D44] uppercase tracking-[0.2em]">
                                 <tr>
                                     <th className="px-8 py-4 sticky left-0 z-10 bg-slate-50 md:bg-transparent">Item / Concepto</th>
-                                    <th className="px-4 py-4 text-center">Cant.</th>
+                                    <th className="px-4 py-4 text-center">{hasNonUnitItems ? 'Cant. / Unid.' : 'Cant.'}</th>
                                     <th className="px-6 py-4 text-right">Unitario</th>
+                                    {hasDiscounts && <th className="px-4 py-4 text-right text-red-500">Descuento</th>}
                                     <th className="px-8 py-4 text-right">Total</th>
                                     <th className="px-6 py-4 text-center">Archivo Origen</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-sm">
-                                {group.items.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-teal-50/20 transition-colors group">
-                                        <td className="px-8 py-4 text-gray-700 font-bold">
-                                            <div className="flex flex-col">
-                                                <span>{item.description}</span>
-                                                <span className="text-[9px] text-[#1AB1B1] font-black uppercase tracking-wider mt-0.5">{item.category || 'General'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 text-center font-mono text-gray-500">{item.quantity}</td>
-                                        <td className="px-6 py-4 text-right font-mono text-gray-500">{formatCurrency(item.unitPrice)}</td>
-                                        <td className="px-8 py-4 text-right font-black text-[#002D44]">{formatCurrency(item.total)}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-lg border border-gray-100 shrink-0">
-                                                <FileText className="w-3 h-3 text-gray-400 group-hover:text-[#1AB1B1]" />
-                                                <span className="text-[10px] font-bold text-gray-500 truncate max-w-[100px]">{item.fileName}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {group.items.map((item, idx) => {
+                                    // Calculate display discount
+                                    const discountValue = item.discount || 0;
+                                    const hasItemDiscount = discountValue > 0 || (item.discountPercentage && item.discountPercentage > 0);
+
+                                    return (
+                                        <tr key={idx} className="hover:bg-teal-50/20 transition-colors group">
+                                            <td className="px-8 py-4 text-gray-700 font-bold">
+                                                <div className="flex flex-col">
+                                                    <span>{item.description}</span>
+                                                    <span className="text-[9px] text-[#1AB1B1] font-black uppercase tracking-wider mt-0.5">{item.category || 'General'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-center font-mono text-gray-500">
+                                                <span>{item.quantity}</span>
+                                                {item.unitOfMeasure && item.unitOfMeasure !== 'Und' && (
+                                                    <span className="ml-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-1 py-0.5 rounded">
+                                                        {item.unitOfMeasure}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono text-gray-500">{formatCurrency(item.unitPrice)}</td>
+                                            {hasDiscounts && (
+                                                <td className="px-4 py-4 text-right font-mono">
+                                                    {hasItemDiscount ? (
+                                                        <span className="text-red-500">
+                                                            -{formatCurrency(discountValue)}
+                                                            {item.discountPercentage && item.discountPercentage > 0 && (
+                                                                <span className="text-[10px] ml-1">({Math.round(item.discountPercentage * 100)}%)</span>
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300">-</span>
+                                                    )}
+                                                </td>
+                                            )}
+                                            <td className="px-8 py-4 text-right font-black text-[#002D44]">{formatCurrency(item.total)}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-lg border border-gray-100 shrink-0">
+                                                    <FileText className="w-3 h-3 text-gray-400 group-hover:text-[#1AB1B1]" />
+                                                    <span className="text-[10px] font-bold text-gray-500 truncate max-w-[100px]">{item.fileName}</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                             {/* Tax Summary Footer */}
                             <tfoot className="bg-gray-50/80 border-t border-gray-200">
                                 <tr>
-                                    <td colSpan={3} className="px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Subtotal</td>
+                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Subtotal</td>
                                     <td className="px-8 py-3 text-right font-mono text-sm text-gray-600">{formatCurrency(group.subtotal)}</td>
                                     <td></td>
                                 </tr>
+                                {/* AIU Section - Colombian construction/service invoicing */}
+                                {group.aiu && (group.aiu.administracion > 0 || group.aiu.imprevistos > 0 || group.aiu.utilidad > 0) && (
+                                    <>
+                                        {group.aiu.administracion > 0 && (
+                                            <tr>
+                                                <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">+ Administración</td>
+                                                <td className="px-8 py-1 text-right font-mono text-sm text-blue-600">{formatCurrency(group.aiu.administracion)}</td>
+                                                <td></td>
+                                            </tr>
+                                        )}
+                                        {group.aiu.imprevistos > 0 && (
+                                            <tr>
+                                                <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">+ Imprevistos</td>
+                                                <td className="px-8 py-1 text-right font-mono text-sm text-blue-600">{formatCurrency(group.aiu.imprevistos)}</td>
+                                                <td></td>
+                                            </tr>
+                                        )}
+                                        {group.aiu.utilidad > 0 && (
+                                            <tr>
+                                                <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">+ Utilidad</td>
+                                                <td className="px-8 py-1 text-right font-mono text-sm text-blue-600">{formatCurrency(group.aiu.utilidad)}</td>
+                                                <td></td>
+                                            </tr>
+                                        )}
+                                        <tr className="border-t border-blue-200">
+                                            <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-2 text-right text-xs font-black text-blue-800 uppercase tracking-wider">Base Gravable (AIU)</td>
+                                            <td className="px-8 py-2 text-right font-mono text-sm font-bold text-blue-800">{formatCurrency(group.aiu.base_gravable)}</td>
+                                            <td></td>
+                                        </tr>
+                                    </>
+                                )}
                                 {group.iva > 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">IVA (19%)</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">IVA (19%)</td>
                                         <td className="px-8 py-1 text-right font-mono text-sm text-gray-600">{formatCurrency(group.iva)}</td>
                                         <td></td>
                                     </tr>
                                 )}
                                 {group.tax_inc > 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Impoconsumo</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Impoconsumo</td>
                                         <td className="px-8 py-1 text-right font-mono text-sm text-gray-600">{formatCurrency(group.tax_inc)}</td>
                                         <td></td>
                                     </tr>
                                 )}
                                 {group.tip > 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-[#1AB1B1] uppercase tracking-wider">Propina / Servicio</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-[#1AB1B1] uppercase tracking-wider">Propina / Servicio</td>
                                         <td className="px-8 py-1 text-right font-mono text-sm text-[#1AB1B1]">{formatCurrency(group.tip)}</td>
                                         <td></td>
                                     </tr>
                                 )}
                                 {(group.retentions.reteFuente > 0 || group.retentions.reteIca > 0 || group.retentions.reteIva > 0) && (
                                     <tr>
-                                        <td colSpan={3} className="px-8 py-1 text-right text-xs font-bold text-red-400 uppercase tracking-wider">Menos Retenciones</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-red-400 uppercase tracking-wider">Menos Retenciones</td>
                                         <td className="px-8 py-1 text-right font-mono text-sm text-red-500">
                                             - {formatCurrency(group.retentions.reteFuente + group.retentions.reteIca + group.retentions.reteIva)}
                                         </td>
@@ -162,15 +244,29 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                     </tr>
                                 )}
                                 <tr className="border-t border-gray-200">
-                                    <td colSpan={3} className="px-8 py-4 text-right text-sm font-black text-[#002D44] uppercase tracking-wider">Total a Pagar</td>
+                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-4 text-right text-sm font-black text-[#002D44] uppercase tracking-wider">Total a Pagar</td>
                                     <td className="px-8 py-4 text-right font-black text-lg text-[#002D44]">{formatCurrency(group.total)}</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
+                    {/* Validation Details Panel */}
+                    {group.validation && (
+                        <div className="px-8 py-2">
+                            <ValidationDetails validation={group.validation} />
+                        </div>
+                    )}
+
                     {/* Optional Footer for the group */}
-                    <div className="bg-gray-50 px-8 py-3 border-t border-gray-100 flex justify-end">
+                    <div className="bg-gray-50 px-8 py-3 border-t border-gray-100 flex justify-between items-center">
+                        <p className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
+                            {group.validation && (
+                                <span className="text-gray-500">
+                                    Confianza: {Math.round((group.validation.overallConfidence || 0) * 100)}%
+                                </span>
+                            )}
+                        </p>
                         <p className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
                             {isLowConfidence && <span className="text-orange-500 flex items-center gap-1">⚠️ Revisar Confianza</span>}
                         </p>

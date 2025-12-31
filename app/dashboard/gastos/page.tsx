@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
-import { OCRItem, OCRResult } from './types';
+import { OCRItem, OCRResult, ValidationResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
 import { USAGE_LIMITS, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
@@ -40,8 +40,16 @@ import { InvoiceGroup } from './components/InvoiceGroup';
 import { CostMetrics } from '@/components/usage/CostMetrics';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import { useToast } from '@/components/ui/Toast';
+import { DollarSign, RefreshCw } from 'lucide-react';
 
 // Interfaces removed as they are now imported from ./types
+
+// TRM (Tasa Representativa del Mercado) for USD to COP conversion
+interface TRMData {
+    rate: number;
+    date: string;
+    source: 'api' | 'cache' | 'fallback';
+}
 
 interface DBClient {
     id: string;
@@ -88,6 +96,10 @@ export default function GastosPage() {
     });
     const { addToast } = useToast();
 
+    // TRM state for USD to COP conversion
+    const [trm, setTrm] = useState<TRMData | null>(null);
+    const [loadingTrm, setLoadingTrm] = useState(false);
+
     // Load clients
     const loadClients = useCallback(async () => {
         try {
@@ -110,6 +122,32 @@ export default function GastosPage() {
     useEffect(() => {
         loadClients();
     }, [loadClients]);
+
+    // Fetch TRM on mount (for USD to COP conversion)
+    const fetchTRM = useCallback(async () => {
+        setLoadingTrm(true);
+        try {
+            const response = await fetch('/api/trm');
+            const data = await response.json();
+            if (data.rate) {
+                setTrm({
+                    rate: data.rate,
+                    date: data.date,
+                    source: data.source
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching TRM:', error);
+            // Use fallback rate
+            setTrm({ rate: 4350, date: new Date().toISOString().split('T')[0], source: 'fallback' });
+        } finally {
+            setLoadingTrm(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchTRM();
+    }, [fetchTRM]);
 
     // Load saved OCR results for the selected client
     const loadSavedResults = useCallback(async () => {
@@ -145,6 +183,11 @@ export default function GastosPage() {
                     total: record.total || 0,
                     items: record.items || [],
                     confidence: record.confidence || 0.5,
+                    // New OCR feature fields
+                    currency: record.currency || 'COP',
+                    aiu: record.aiu || undefined,
+                    iva_rate: record.iva_rate || undefined,
+                    tax_inc_rate: record.tax_inc_rate || undefined,
                 }));
                 setResults(loadedResults);
             } else {
@@ -341,7 +384,12 @@ export default function GastosPage() {
                                 confidence: result.confidence || 0,
                                 tokens_input: result.tokens_input || 0,
                                 tokens_output: result.tokens_output || 0,
-                                cost_estimated: result.cost_estimated || 0
+                                cost_estimated: result.cost_estimated || 0,
+                                // New OCR feature fields
+                                currency: result.currency || 'COP',
+                                aiu: result.aiu || null,
+                                iva_rate: result.iva_rate || null,
+                                tax_inc_rate: result.tax_inc_rate || null
                             });
                             savedThisSession++;
                         } catch (saveErr) {
@@ -513,6 +561,19 @@ export default function GastosPage() {
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
     };
 
+    const formatUSD = (value: number) => {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(value);
+    };
+
+    // Convert amount to COP based on currency
+    const convertToCOP = (amount: number, currency?: string): number => {
+        if (!currency || currency === 'COP') return amount;
+        if (currency === 'USD' && trm) {
+            return Math.round(amount * trm.rate);
+        }
+        return amount; // Unknown currency, return as-is
+    };
+
     const getConfidenceColor = (confidence: number) => {
         if (confidence >= 0.9) return 'text-green-600 bg-green-50';
         if (confidence >= 0.7) return 'text-yellow-600 bg-yellow-50';
@@ -520,7 +581,22 @@ export default function GastosPage() {
     };
 
     const selectedClient = clients.find(c => c.id === selectedClientId);
-    const totalAmount = results.reduce((sum, r) => sum + r.total, 0);
+
+    // Calculate totals with currency conversion
+    const { totalAmountCOP, totalUSD, hasUSDInvoices } = results.reduce(
+        (acc, r) => {
+            if (r.currency === 'USD') {
+                acc.totalUSD += r.total;
+                acc.totalAmountCOP += convertToCOP(r.total, 'USD');
+                acc.hasUSDInvoices = true;
+            } else {
+                acc.totalAmountCOP += r.total;
+            }
+            return acc;
+        },
+        { totalAmountCOP: 0, totalUSD: 0, hasUSDInvoices: false }
+    );
+
     const totalItems = results.reduce((sum, r) => sum + r.items.length, 0);
     const avgConfidence = results.length > 0
         ? results.reduce((sum, r) => sum + (r.confidence || 0), 0) / results.length
@@ -778,7 +854,18 @@ export default function GastosPage() {
                                     </button>
                                     <div className="flex items-center gap-4 bg-gray-50 px-6 py-2 rounded-2xl border border-gray-100">
                                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Acumulado:</span>
-                                        <span className="font-black text-[#002D44] text-lg">{formatCurrency(totalAmount)}</span>
+                                        <div className="flex flex-col items-end">
+                                            <span className="font-black text-[#002D44] text-lg">{formatCurrency(totalAmountCOP)}</span>
+                                            {hasUSDInvoices && trm && (
+                                                <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                                                    <DollarSign className="w-3 h-3" />
+                                                    {formatUSD(totalUSD)} × TRM {trm.rate.toLocaleString('es-CO')}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {loadingTrm && (
+                                            <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -798,6 +885,8 @@ export default function GastosPage() {
                                                 iva: 0,
                                                 tax_inc: 0,
                                                 tip: 0,
+                                                // AIU (Colombian construction/service invoicing)
+                                                aiu: undefined as { administracion: number; imprevistos: number; utilidad: number; base_gravable: number } | undefined,
                                                 retentions: {
                                                     reteFuente: 0,
                                                     reteIca: 0,
@@ -805,7 +894,8 @@ export default function GastosPage() {
                                                 },
                                                 currency: result.currency || 'COP',
                                                 items: [] as (OCRItem & { fileName: string })[],
-                                                invoiceCount: 0
+                                                invoiceCount: 0,
+                                                validation: result.validation // Store first invoice's validation
                                             });
                                         }
                                         const entry = map.get(key)!;
@@ -821,6 +911,17 @@ export default function GastosPage() {
                                             entry.retentions.reteIva += result.retentions.reteIva || 0;
                                         }
 
+                                        // Aggregate AIU (Colombian construction/service invoicing)
+                                        if (result.aiu && (result.aiu.administracion > 0 || result.aiu.imprevistos > 0 || result.aiu.utilidad > 0)) {
+                                            if (!entry.aiu) {
+                                                entry.aiu = { administracion: 0, imprevistos: 0, utilidad: 0, base_gravable: 0 };
+                                            }
+                                            entry.aiu.administracion += result.aiu.administracion || 0;
+                                            entry.aiu.imprevistos += result.aiu.imprevistos || 0;
+                                            entry.aiu.utilidad += result.aiu.utilidad || 0;
+                                            entry.aiu.base_gravable += result.aiu.base_gravable || 0;
+                                        }
+
                                         entry.invoiceCount += 1;
                                         entry.items.push(...result.items.map(item => ({ ...item, fileName: result.fileName })));
                                         return map;
@@ -832,10 +933,12 @@ export default function GastosPage() {
                                         iva: number,
                                         tax_inc: number,
                                         tip: number,
+                                        aiu?: { administracion: number; imprevistos: number; utilidad: number; base_gravable: number },
                                         retentions: { reteFuente: number, reteIca: number, reteIva: number },
                                         currency: string,
                                         items: (OCRItem & { fileName: string })[],
-                                        invoiceCount: number
+                                        invoiceCount: number,
+                                        validation?: ValidationResult
                                     }>())
                                 ).map(([key, group], idx) => (
                                     <InvoiceGroup
@@ -923,7 +1026,7 @@ export default function GastosPage() {
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6">
                             <p className="text-sm text-amber-700 flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4" />
-                                Esto eliminará {formatCurrency(totalAmount)} en registros
+                                Esto eliminará {formatCurrency(totalAmountCOP)} en registros
                             </p>
                         </div>
 

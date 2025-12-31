@@ -12,6 +12,7 @@ import {
     incrementUsage,
     getUserMembershipType,
 } from '@/lib/services/usage-service';
+import { validateOCRResult } from '@/lib/services/ocr-validation-service';
 
 // Configuración para permitir archivos más grandes
 export const runtime = 'nodejs';
@@ -19,55 +20,84 @@ export const maxDuration = 60;
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-const EXTRACTION_PROMPT = `Actúa como un experto contable y auditor de facturación. Tu misión es extraer información con precisión MILIMÉTRICA de este documento (factura POS, electrónica o recibo).
+const EXTRACTION_PROMPT = `Actua como un experto contable y auditor de facturacion. Tu mision es extraer informacion con precision MILIMETRICA de este documento (factura POS, electronica o recibo).
 
-REGLA DE ORO: Si la imagen es borrosa o difícil de leer, usa tu razonamiento lógico para deducir números basados en sumas y contextos (ej: Precio x Cantidad = Total).
+REGLA DE ORO: Si la imagen es borrosa o dificil de leer, usa tu razonamiento logico para deducir numeros basados en sumas y contextos (ej: Precio x Cantidad = Total).
 
 EXTRAE EXACTAMENTE ESTOS DATOS:
 1.  **PROVEEDOR**: Nombre legal completo (Busca "S.A.S", "Limitada", etc).
-2.  **IDENTIFICACIÓN**: NIT o RUT (Ej: 900.432.416-9).
-3.  **FACTURA**: Número de consecutivo/factura.
-4.  **FECHA**: Fecha de emisión.
+2.  **IDENTIFICACION**: NIT o RUT (Ej: 900.432.416-9).
+3.  **FACTURA**: Numero de consecutivo/factura.
+4.  **FECHA**: Fecha de emision.
 5.  **MONEDA**: Detecta si es COP, USD, etc.
-6.  **DESGLOSE TRIBUTARIO (CRÍTICO)**:
+6.  **DESGLOSE TRIBUTARIO (CRITICO)**:
     -   Busca secciones de "INFORMACION TRIBUTARIA", "DESGLOSE" o porcentajes al final.
-    -   **IMPOCONSUMO (INC)**: Busca explícitamente "IPO", "IMPOCONSUMO", "INC", "CONSUMO". **IMPORTANTE: Si dice IMPOCONSUMO, el valor va en 'tax_inc', NO en 'iva'.**
-    -   **IVA**: Impuesto al valor agregado. Solo asigna aquí si dice explícitamente "IVA".
+    -   **IMPOCONSUMO (INC)**: Busca explicitamente "IPO", "IMPOCONSUMO", "INC", "CONSUMO". **IMPORTANTE: Si dice IMPOCONSUMO, el valor va en 'tax_inc', NO en 'iva'.**
+    -   **IVA**: Impuesto al valor agregado. Solo asigna aqui si dice explicitamente "IVA".
     -   **PROPINA**: Busca "Servicio Voluntario", "Tip", "Propina".
-7.  **ITEMS**: Extrae los items si es legible.
+    -   **TASAS/PORCENTAJES**: Extrae el porcentaje de cada impuesto cuando este visible (ej: "IVA 19%", "Inc 8%", "ReteFte 2.5%")
+7.  **ITEMS** (EXTRACCION CRITICA para facturas con tablas):
+    - Si la tabla esta desorganizada, usa RAZONAMIENTO LOGICO:
+      * 3 numeros por linea = (Cantidad, Precio, Total)
+      * 4 numeros por linea = (Cantidad, Precio, Descuento, Total)
+      * Sin cantidad explicita = asumir cantidad = 1
+    - **UNIDADES**: Detecta "Und", "Kg", "Lt", "Gln", "Hrs", "Svc", "Caja", "Paq", "Mt", "M2", "M3"
+    - **DESCUENTOS**: Busca "Desc", "Dscto", "Rebaja", "-" cerca del precio o total
+    - VERIFICA: total = (quantity * unitPrice) - discount
+8.  **AIU** (FACTURAS DE CONSTRUCCION/SERVICIOS PROFESIONALES):
+    - Busca "Administración", "Admin", "A.I.U", "AIU"
+    - Busca "Imprevistos", "Contingencia"
+    - Busca "Utilidad", "Profit", "Margen"
+    - CRITICO: Si detectas AIU, el IVA se calcula sobre (Subtotal + A + I + U), NO solo sobre el subtotal
+    - Extrae los valores y porcentajes de cada componente
+    - base_gravable = subtotal + administracion + imprevistos + utilidad
+9.  **ESTACIONES DE SERVICIO / GASOLINERAS (EDS)**:
+    - CRITICO: Busca "ESTACION DE SERVICIO", "EDS", "GASOLINERA", "SERVICENTRO" en el encabezado
+    - El PROVEEDOR/EMISOR es la estacion de servicio, NO el cliente
+    - Si ves "CLIENTE:", "NIT CLIENTE:", "NIT / CC:" despues de un nombre, esos datos son del COMPRADOR, no del vendedor
+    - El NIT del EMISOR esta arriba, cerca del nombre de la estacion
+    - Productos tipicos: "CORRIENTE", "EXTRA", "DIESEL", "ACPM", "GAS"
+    - Precios combustible Colombia 2025: $14,000-$18,000 COP/Galon (NUNCA $14 COP)
+    - Unidad de medida: "Gln" (galones)
+    - IVA combustible: generalmente 0% o exento (tarifa I = 0%)
+10. **FORMATO MONEDA COLOMBIANA (COP) - MUY IMPORTANTE**:
+    - Los pesos colombianos NO usan decimales para centavos
+    - "70.285" o "70,285" = SETENTA MIL DOSCIENTOS OCHENTA Y CINCO pesos ($70,285)
+    - "14.057" = CATORCE MIL CINCUENTA Y SIETE pesos ($14,057)
+    - Los puntos y comas son separadores de MILES, no decimales
+    - Si el total parece muy bajo (< $1,000 COP para una compra normal), es error de interpretacion
+    - REGLA COMBUSTIBLE: precio/galon debe ser $10,000-$20,000 COP, total compra $30,000-$500,000 COP
+    - VALIDACION: subtotal + impuestos - retenciones debe aproximarse al total
 
-ESTRUCTURA DE RESPUESTA (JSON ÚNICAMENTE):
-{
-  "entity": "Nombre del Establecimiento",
-  "nit": "NIT o Documento",
-  "date": "YYYY-MM-DD",
-  "invoiceNumber": "Número detectado",
-  "currency": "COP",
-  "subtotal": 0 (Base antes de impuestos),
-  "iva": 0 (Solo si es IVA),
-  "tax_inc": 0 (Valor del Impoconsumo/INC),
-  "tip": 0 (Propina),
-  "total": 0 (Total a pagar),
-  "retentions": {
-      "reteFuente": 0,
-      "reteIca": 0,
-
-IMPORTANTE: Responde ÚNICAMENTE con un objeto JSON válido.
+IMPORTANTE: Responde UNICAMENTE con un objeto JSON valido.
 
 Estructura JSON requerida:
 {
-  "entity": "Razón Social Emisor",
+  "entity": "Razon Social Emisor",
   "nit": "NIT Emisor",
   "date": "YYYY-MM-DD",
-  "invoiceNumber": "Prefijo + Número",
-  "currency": "COP" | "USD" | "EUR",
+  "invoiceNumber": "Prefijo + Numero",
+  "currency": "COP",
   "subtotal": 0,
   "iva": 0,
+  "iva_rate": 0.19,
   "tax_inc": 0,
+  "tax_inc_rate": 0.08,
   "tip": 0,
+  "aiu": {
+      "administracion": 0,
+      "administracion_rate": 0,
+      "imprevistos": 0,
+      "imprevistos_rate": 0,
+      "utilidad": 0,
+      "utilidad_rate": 0,
+      "base_gravable": 0
+  },
   "retentions": {
       "reteFuente": 0,
+      "reteFuente_rate": 0,
       "reteIca": 0,
+      "reteIca_rate": 0,
       "reteIva": 0
   },
   "total": 0,
@@ -75,39 +105,115 @@ Estructura JSON requerida:
     {
       "description": "Nombre producto/servicio",
       "quantity": 1,
+      "unitOfMeasure": "Und",
       "unitPrice": 0,
+      "discount": 0,
+      "discountPercentage": 0,
       "total": 0,
-      "category": "Categoría + Código PUC",
+      "category": "Categoria + Codigo PUC",
       "confidence": 0.95
     }
   ],
   "confidence": 0.95
 }
+
+NOTAS:
+- iva_rate, tax_inc_rate, reteFuente_rate, reteIca_rate: son las tasas como decimal (0.19 = 19%, 0.08 = 8%)
+- Si no puedes determinar la tasa, usa 0
+- unitOfMeasure: Unidad de medida detectada (default "Und" si no es explicito)
+- discount: Descuento absoluto en COP (ej: 5000 = $5,000 de descuento)
+- discountPercentage: Descuento como decimal (0.10 = 10%). Si hay %, calcula discount = unitPrice * quantity * discountPercentage
+- AIU: Solo incluir si detectas estructura AIU (construccion/servicios). Omitir si no hay AIU.
+- AIU.base_gravable = subtotal + administracion + imprevistos + utilidad
+- Si hay AIU, el IVA debe calcularse sobre base_gravable, no sobre subtotal
+- Verifica internamente: total_item = (quantity * unitPrice) - discount
+- Verifica internamente que la suma de items = subtotal antes de responder
+- Si detectas inconsistencias matematicas, ajusta confidence a < 0.7
 `;
 
 const TEXT_EXTRACTION_PROMPT = `Analiza el texto y extrae facturas/gastos en JSON.
 
-OBJETIVO: Agrupar por proveedor, extraer NITs, DETALLES TRIBUTARIOS y PROPINAS.
+OBJETIVO: Agrupar por proveedor, extraer NITs, DETALLES TRIBUTARIOS, PROPINAS, TASAS de impuestos y AIU.
 
 TEXTO A ANALIZAR:
 {TEXT_CONTENT}
 
-Responde ÚNICAMENTE con un ARRAY JSON. Estructura por factura:
+EXTRACCION DE ITEMS:
+- Sin cantidad explicita = asumir cantidad = 1
+- Detecta UNIDADES: "Und", "Kg", "Lt", "Gln", "Hrs", "Svc", "Caja", "Paq"
+- Detecta DESCUENTOS: "Desc", "Dscto", "-XX%"
+- VERIFICA: total = (quantity * unitPrice) - discount
+
+AIU (FACTURAS CONSTRUCCION/SERVICIOS):
+- Busca "Administración", "Imprevistos", "Utilidad", "A.I.U"
+- Si hay AIU: base_gravable = subtotal + A + I + U
+
+ESTACIONES DE SERVICIO (EDS/GASOLINERAS):
+- CRITICO: "ESTACION DE SERVICIO", "EDS", "GASOLINERA" = nombre del PROVEEDOR
+- "CLIENTE:", "NIT CLIENTE:" = datos del COMPRADOR (NO del vendedor)
+- Productos: "CORRIENTE", "EXTRA", "DIESEL", "ACPM"
+- Precios combustible: $14,000-$18,000 COP/Galon (nunca $14 COP)
+- Unidad: "Gln", IVA: generalmente 0%
+
+FORMATO MONEDA COP (IMPORTANTE):
+- Pesos colombianos NO tienen decimales
+- "70.285" = $70,285 COP (setenta mil)
+- "14.057" = $14,057 COP (catorce mil)
+- Puntos/comas son separadores de MILES
+- Si total < $1,000 para compra normal, es error de interpretacion
+
+Responde UNICAMENTE con un ARRAY JSON. Estructura por factura:
 {
   "entity": "Nombre Empresa",
   "nit": "NIT",
   "date": "YYYY-MM-DD",
-  "invoiceNumber": "N° Factura",
+  "invoiceNumber": "N Factura",
   "currency": "COP",
   "subtotal": 0,
   "iva": 0,
+  "iva_rate": 0.19,
   "tax_inc": 0,
+  "tax_inc_rate": 0.08,
   "tip": 0,
-  "retentions": { "reteFuente": 0, "reteIca": 0, "reteIva": 0 },
+  "aiu": {
+    "administracion": 0,
+    "administracion_rate": 0,
+    "imprevistos": 0,
+    "imprevistos_rate": 0,
+    "utilidad": 0,
+    "utilidad_rate": 0,
+    "base_gravable": 0
+  },
+  "retentions": {
+    "reteFuente": 0,
+    "reteFuente_rate": 0,
+    "reteIca": 0,
+    "reteIca_rate": 0,
+    "reteIva": 0
+  },
   "total": 0,
-  "items": [...],
+  "items": [
+    {
+      "description": "Nombre producto/servicio",
+      "quantity": 1,
+      "unitOfMeasure": "Und",
+      "unitPrice": 0,
+      "discount": 0,
+      "discountPercentage": 0,
+      "total": 0,
+      "category": "Categoria",
+      "confidence": 0.9
+    }
+  ],
   "confidence": 0.9
 }
+
+NOTAS:
+- Las tasas (iva_rate, tax_inc_rate, etc.) son decimales: 0.19 = 19%
+- unitOfMeasure: "Und" por defecto si no se detecta otra unidad
+- discount: Descuento absoluto en COP. Si hay %, calcula: unitPrice * quantity * discountPercentage
+- AIU: Solo incluir si detectas estructura AIU. Omitir si no hay.
+- Verifica que (quantity x unitPrice) - discount = total por item
 `;
 
 // Direct REST API call to Gemini
@@ -239,27 +345,59 @@ export async function POST(request: NextRequest) {
                 }
 
                 items.forEach((item: OCRResult, idx: number) => {
-                    results.push({
+                    // Build the OCR result
+                    const ocrResult: OCRResult = {
                         fileName: `Texto pegado (${idx + 1})`,
                         entity: item.entity || 'Desconocido',
                         nit: item.nit || '',
                         date: item.date || new Date().toISOString().split('T')[0],
                         invoiceNumber: item.invoiceNumber || '',
+                        currency: item.currency || 'COP',
                         subtotal: item.subtotal || 0,
                         iva: item.iva || 0,
+                        iva_rate: item.iva_rate,
                         tax_inc: item.tax_inc || 0,
+                        tax_inc_rate: item.tax_inc_rate,
                         tip: item.tip || 0,
-                        retentions: item.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
+                        // AIU (only include if present with non-zero values)
+                        aiu: item.aiu && (item.aiu.administracion > 0 || item.aiu.imprevistos > 0 || item.aiu.utilidad > 0) ? {
+                            administracion: item.aiu.administracion || 0,
+                            administracion_rate: item.aiu.administracion_rate,
+                            imprevistos: item.aiu.imprevistos || 0,
+                            imprevistos_rate: item.aiu.imprevistos_rate,
+                            utilidad: item.aiu.utilidad || 0,
+                            utilidad_rate: item.aiu.utilidad_rate,
+                            base_gravable: item.aiu.base_gravable || ((item.subtotal || 0) + (item.aiu.administracion || 0) + (item.aiu.imprevistos || 0) + (item.aiu.utilidad || 0)),
+                        } : undefined,
+                        retentions: {
+                            reteFuente: item.retentions?.reteFuente || 0,
+                            reteFuente_rate: item.retentions?.reteFuente_rate,
+                            reteIca: item.retentions?.reteIca || 0,
+                            reteIca_rate: item.retentions?.reteIca_rate,
+                            reteIva: item.retentions?.reteIva || 0,
+                        },
                         total: item.total || 0,
                         items: (item.items || []).map((i: OCRItem) => ({
-                            ...i,
+                            description: i.description || '',
+                            quantity: i.quantity || 1,
+                            unitOfMeasure: i.unitOfMeasure || 'Und',
+                            unitPrice: i.unitPrice || 0,
+                            discount: i.discount || 0,
+                            discountPercentage: i.discountPercentage || 0,
+                            total: i.total || 0,
+                            category: i.category || '',
                             confidence: i.confidence || 0.8
                         })),
                         confidence: item.confidence || 0.7,
-                        tokens_input: idx === 0 ? tokensInput : 0, // Attribute cost to first item or split? Let's just put it on first
+                        tokens_input: idx === 0 ? tokensInput : 0,
                         tokens_output: idx === 0 ? tokensOutput : 0,
                         cost_estimated: idx === 0 ? costEstimated : 0
-                    });
+                    };
+
+                    // Run calculation validation
+                    ocrResult.validation = validateOCRResult(ocrResult);
+
+                    results.push(ocrResult);
                 });
             } catch {
                 return NextResponse.json(
@@ -423,27 +561,59 @@ export async function POST(request: NextRequest) {
                     costEstimated = costInput + costOutput;
                 }
 
-                results.push({
+                // Build the OCR result
+                const ocrResult: OCRResult = {
                     fileName: file.name,
                     entity: parsed.entity || 'Desconocido',
                     nit: parsed.nit || '',
                     date: parsed.date || new Date().toISOString().split('T')[0],
                     invoiceNumber: parsed.invoiceNumber || '',
+                    currency: parsed.currency || 'COP',
                     subtotal: parsed.subtotal || 0,
                     iva: parsed.iva || 0,
+                    iva_rate: parsed.iva_rate,
                     tax_inc: parsed.tax_inc || 0,
+                    tax_inc_rate: parsed.tax_inc_rate,
                     tip: parsed.tip || 0,
-                    retentions: parsed.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
+                    // AIU (only include if present with non-zero values)
+                    aiu: parsed.aiu && (parsed.aiu.administracion > 0 || parsed.aiu.imprevistos > 0 || parsed.aiu.utilidad > 0) ? {
+                        administracion: parsed.aiu.administracion || 0,
+                        administracion_rate: parsed.aiu.administracion_rate,
+                        imprevistos: parsed.aiu.imprevistos || 0,
+                        imprevistos_rate: parsed.aiu.imprevistos_rate,
+                        utilidad: parsed.aiu.utilidad || 0,
+                        utilidad_rate: parsed.aiu.utilidad_rate,
+                        base_gravable: parsed.aiu.base_gravable || ((parsed.subtotal || 0) + (parsed.aiu.administracion || 0) + (parsed.aiu.imprevistos || 0) + (parsed.aiu.utilidad || 0)),
+                    } : undefined,
+                    retentions: {
+                        reteFuente: parsed.retentions?.reteFuente || 0,
+                        reteFuente_rate: parsed.retentions?.reteFuente_rate,
+                        reteIca: parsed.retentions?.reteIca || 0,
+                        reteIca_rate: parsed.retentions?.reteIca_rate,
+                        reteIva: parsed.retentions?.reteIva || 0,
+                    },
                     total: parsed.total || 0,
                     items: (parsed.items || []).map((i: OCRItem) => ({
-                        ...i,
+                        description: i.description || '',
+                        quantity: i.quantity || 1,
+                        unitOfMeasure: i.unitOfMeasure || 'Und',
+                        unitPrice: i.unitPrice || 0,
+                        discount: i.discount || 0,
+                        discountPercentage: i.discountPercentage || 0,
+                        total: i.total || 0,
+                        category: i.category || '',
                         confidence: i.confidence || 0.8
                     })),
                     confidence: parsed.confidence || 0.5,
                     tokens_input: tokensInput,
                     tokens_output: tokensOutput,
                     cost_estimated: costEstimated
-                });
+                };
+
+                // Run calculation validation
+                ocrResult.validation = validateOCRResult(ocrResult);
+
+                results.push(ocrResult);
                 filesProcessedCount++;
             } catch (fileError) {
                 const errorMessage = fileError instanceof Error ? fileError.message : 'Unknown error';
