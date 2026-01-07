@@ -5,12 +5,20 @@ import { createClient } from '@supabase/supabase-js';
 // Add to vercel.json: { "crons": [{ "path": "/api/cron/cleanup-deleted", "schedule": "0 3 * * *" }] }
 
 export async function GET(request: Request) {
-    // Verify cron secret for security
+    // SEGURIDAD: CRON_SECRET es OBLIGATORIO
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    // In production, verify the cron secret
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+        console.error('CRON_SECRET not configured - endpoint disabled for security');
+        return NextResponse.json(
+            { error: 'Server configuration error' },
+            { status: 500 }
+        );
+    }
+
+    if (authHeader !== `Bearer ${cronSecret}`) {
+        console.warn('Unauthorized cron cleanup attempt');
         return NextResponse.json(
             { error: 'Unauthorized' },
             { status: 401 }
