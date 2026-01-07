@@ -53,6 +53,11 @@ export interface PayrollInput {
     anoBase?: 2024 | 2025 | 2026;
     smmlvOverride?: number;
     auxTransporteOverride?: number;
+    // Persistencia de anticipos y deducciones personalizadas
+    advancesData?: {
+        anticipos?: AnticiposPrestaciones;
+        deduccionesPersonalizadas?: DeduccionPersonalizada[];
+    };
 }
 
 export interface PayrollFinancials {
