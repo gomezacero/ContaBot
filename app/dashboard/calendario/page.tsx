@@ -56,6 +56,7 @@ interface DBClient {
     alert_days: number[] | null;
     email_alert: boolean | null;
     whatsapp_alert: boolean | null;
+    target_emails: string[] | null;
     // New 2026 taxes
     has_carbon_tax: boolean | null;
     has_beverage_tax: boolean | null;
@@ -134,7 +135,7 @@ export default function CalendarioPage() {
             if (isAuthenticated) {
                 const { data, error } = await supabase
                     .from('clients')
-                    .select('id, name, nit, classification, tax_regime, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days, email_alert, whatsapp_alert, has_carbon_tax, has_beverage_tax, has_fuel_tax, has_plastic_tax, requires_rub, requires_transfer_pricing, requires_country_report')
+                    .select('id, name, nit, classification, tax_regime, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax, alert_days, email_alert, whatsapp_alert, target_emails, has_carbon_tax, has_beverage_tax, has_fuel_tax, has_plastic_tax, requires_rub, requires_transfer_pricing, requires_country_report')
                     .order('name');
 
                 if (error) throw error;
@@ -155,6 +156,7 @@ export default function CalendarioPage() {
                     alert_days: c.alert_days,
                     email_alert: c.email_alert,
                     whatsapp_alert: c.whatsapp_alert,
+                    target_emails: (c as any).target_emails || null,
                     has_carbon_tax: (c as any).has_carbon_tax || null,
                     has_beverage_tax: (c as any).has_beverage_tax || null,
                     has_fuel_tax: (c as any).has_fuel_tax || null,
@@ -248,7 +250,7 @@ export default function CalendarioPage() {
             ivaPeriodicity: client.iva_periodicity || 'BIMESTRAL',
             alertDays: client.alert_days || [15, 7, 1],
             emailEnabled: client.email_alert || false,
-            targetEmails: [],
+            targetEmails: client.target_emails || [],
             whatsappEnabled: client.whatsapp_alert || false,
             targetPhone: '',
             hasCarbonTax: client.has_carbon_tax || false,
@@ -289,7 +291,16 @@ export default function CalendarioPage() {
                             is_retention_agent: editConfig.taxRegime !== 'SIMPLE',
                             alert_days: editConfig.alertDays,
                             email_alert: editConfig.emailEnabled,
-                            whatsapp_alert: editConfig.whatsappEnabled
+                            target_emails: editConfig.targetEmails,
+                            whatsapp_alert: editConfig.whatsappEnabled,
+                            // New 2026 taxes
+                            has_carbon_tax: editConfig.hasCarbonTax,
+                            has_beverage_tax: editConfig.hasBeverageTax,
+                            has_fuel_tax: editConfig.hasFuelTax,
+                            has_plastic_tax: editConfig.hasPlasticTax,
+                            requires_rub: editConfig.requiresRUB,
+                            requires_transfer_pricing: editConfig.requiresTransferPricing,
+                            requires_country_report: editConfig.requiresCountryReport,
                         })
                         .eq('id', editConfig.id);
 
@@ -311,7 +322,16 @@ export default function CalendarioPage() {
                             has_patrimony_tax: false,
                             alert_days: editConfig.alertDays,
                             email_alert: editConfig.emailEnabled,
-                            whatsapp_alert: editConfig.whatsappEnabled
+                            target_emails: editConfig.targetEmails,
+                            whatsapp_alert: editConfig.whatsappEnabled,
+                            // New 2026 taxes
+                            has_carbon_tax: editConfig.hasCarbonTax,
+                            has_beverage_tax: editConfig.hasBeverageTax,
+                            has_fuel_tax: editConfig.hasFuelTax,
+                            has_plastic_tax: editConfig.hasPlasticTax,
+                            requires_rub: editConfig.requiresRUB,
+                            requires_transfer_pricing: editConfig.requiresTransferPricing,
+                            requires_country_report: editConfig.requiresCountryReport,
                         })
                         .select()
                         .single();
