@@ -49,6 +49,10 @@ export interface PayrollInput {
     nonSalaryBonuses?: number;
     loans?: number;
     otherDeductions?: number;
+    // Override de parámetros base (opcional) - para liquidaciones con años anteriores
+    anoBase?: 2024 | 2025 | 2026;
+    smmlvOverride?: number;
+    auxTransporteOverride?: number;
 }
 
 export interface PayrollFinancials {
@@ -249,22 +253,94 @@ export type TerminationReason =
     | 'MUTUO_ACUERDO'
     | 'FIN_CONTRATO';
 
+// Tipo de anticipo de prima: por semestre o monto directo
+export type TipoPrimaAnticipada = 'SEMESTRE' | 'MONTO';
+
+// Anticipo de prima con opción semestre o monto directo
+export interface PrimaAnticipada {
+    tipo: TipoPrimaAnticipada;
+    semestreJunioPagado: boolean;    // Semestre Ene-Jun (prima de junio)
+    semestreDiciembrePagado: boolean; // Semestre Jul-Dic (prima de diciembre)
+    montoPagado: number;              // Monto directo si tipo='MONTO'
+}
+
+// Colección de anticipos de prestaciones sociales
+export interface AnticiposPrestaciones {
+    prima: PrimaAnticipada;
+    vacacionesPagadas: number;         // Monto de vacaciones ya pagadas
+    cesantiasParciales: number;        // Retiro parcial de cesantías
+    interesesCesantiasPagados: number; // Intereses de cesantías ya pagados
+}
+
+// Deducción personalizada (máximo 5)
+export interface DeduccionPersonalizada {
+    id: string;
+    nombre: string;
+    valor: number;
+}
+
+// Input completo de anticipos para liquidación
+export interface LiquidationAdvancesInput {
+    anticipos: AnticiposPrestaciones;
+    deduccionesPersonalizadas: DeduccionPersonalizada[];
+}
+
+// Valores por defecto para anticipos
+export const DEFAULT_ANTICIPOS: AnticiposPrestaciones = {
+    prima: {
+        tipo: 'MONTO',
+        semestreJunioPagado: false,
+        semestreDiciembrePagado: false,
+        montoPagado: 0
+    },
+    vacacionesPagadas: 0,
+    cesantiasParciales: 0,
+    interesesCesantiasPagados: 0
+};
+
 export interface LiquidationDeductions {
     loans: number;
     retefuente: number;
     voluntaryContributions: number;
     other: number;
+    // Desglose de anticipos de prestaciones
+    anticiposPrestaciones: {
+        prima: number;
+        vacaciones: number;
+        cesantias: number;
+        interesesCesantias: number;
+    };
+    // Deducciones personalizadas (máx 5)
+    deduccionesPersonalizadas: DeduccionPersonalizada[];
     total: number;
 }
 
 export interface LiquidationResult {
     daysWorked: number;
     baseLiquidation: number;
-    cesantias: number;
+
+    // Prestaciones con desglose Bruto/Anticipo/Neto
+    cesantias: number;               // Valor bruto calculado
+    cesantiasAnticipadas: number;    // Anticipo ya pagado
+    cesantiasNetas: number;          // Neto = bruto - anticipo
+
     interesesCesantias: number;
+    interesesCesantiasAnticipados: number;
+    interesesCesantiasNetos: number;
+
     prima: number;
+    primaAnticipada: number;
+    primaNeta: number;
+
     vacaciones: number;
-    totalPrestaciones: number;
+    vacacionesAnticipadas: number;
+    vacacionesNetas: number;
+
+    // Totales
+    totalPrestacionesBrutas: number;  // Suma de todas las prestaciones brutas
+    totalAnticipos: number;           // Suma de todos los anticipos
+    totalPrestaciones: number;        // Netas = brutas - anticipos
+
     deductions: LiquidationDeductions;
     netToPay: number;
 }

@@ -5,6 +5,16 @@ export const SMMLV_2026 = 1750905;
 export const AUX_TRANSPORTE_2026 = 249095;
 export const UVT_2026 = 49799; // Art. 1.2.1 Resolución 000227 DIAN (2025)
 
+// Valores históricos SMMLV y Auxilio de Transporte por año
+// Útil para liquidaciones de empleados que iniciaron en años anteriores
+export const PARAMETROS_NOMINA = {
+    2024: { smmlv: 1300000, auxTransporte: 162000 },
+    2025: { smmlv: 1423500, auxTransporte: 200000 },
+    2026: { smmlv: 1750905, auxTransporte: 249095 }
+} as const;
+
+export type AnoBase = keyof typeof PARAMETROS_NOMINA;
+
 // Regulatory References
 export const DIAN_RESOLUTION_REF = "Resolución 000227 del 23 SEP 2025";
 

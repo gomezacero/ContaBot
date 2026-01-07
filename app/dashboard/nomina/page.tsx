@@ -1,10 +1,20 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { PayrollInput, RiskLevel, LiquidationResult } from '@/types/payroll';
+import {
+    PayrollInput,
+    RiskLevel,
+    LiquidationResult,
+    AnticiposPrestaciones,
+    DeduccionPersonalizada,
+    LiquidationAdvancesInput,
+    DEFAULT_ANTICIPOS,
+    PrimaAnticipada,
+    TipoPrimaAnticipada
+} from '@/types/payroll';
 import { calculatePayroll, formatCurrency, createDefaultEmployee, calculateLiquidation } from '@/lib/calculations';
 import { generatePayrollPDF, generateLiquidationPDF } from '@/lib/pdf-generator';
-import { SMMLV_2026 } from '@/lib/constants';
+import { SMMLV_2026, PARAMETROS_NOMINA, AnoBase } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import {
     Plus,
@@ -34,7 +44,10 @@ import {
     MessageSquare,
     Send,
     ThumbsUp,
-    HelpCircle // Added
+    HelpCircle, // Added
+    Settings,
+    MinusCircle,
+    ListMinus
 } from 'lucide-react';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -55,6 +68,10 @@ interface DBEmployee {
     start_date: string | null;
     end_date: string | null;
     deductions_config: Record<string, unknown>;
+    // Nuevos campos para override de parámetros base
+    ano_base: number | null;
+    smmlv_override: number | null;
+    aux_transporte_override: number | null;
     clients?: {
         id: string;
         name: string;
@@ -123,7 +140,11 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         salaryBonuses: 0,
         nonSalaryBonuses: 0,
         loans: 0,
-        otherDeductions: 0
+        otherDeductions: 0,
+        // Override de parámetros base
+        anoBase: (emp.ano_base as 2024 | 2025 | 2026) || 2026,
+        smmlvOverride: emp.smmlv_override || undefined,
+        auxTransporteOverride: emp.aux_transporte_override || undefined
     };
 }
 
@@ -199,6 +220,15 @@ export default function NominaPage() {
     const [activeSection, setActiveSection] = useState<string | null>('section1');
     const [activeTab, setActiveTab] = useState<'nomina' | 'liquidacion'>('nomina');
 
+    // Estados para override de parámetros base (SMMLV y Auxilio)
+    const [anoBase, setAnoBase] = useState<AnoBase>(2026);
+    const [smmlvOverride, setSmmlvOverride] = useState<number>(PARAMETROS_NOMINA[2026].smmlv);
+    const [auxOverride, setAuxOverride] = useState<number>(PARAMETROS_NOMINA[2026].auxTransporte);
+
+    // Estados para anticipos de prestaciones (liquidación)
+    const [anticipos, setAnticipos] = useState<AnticiposPrestaciones>({ ...DEFAULT_ANTICIPOS });
+    const [deduccionesPersonalizadas, setDeduccionesPersonalizadas] = useState<DeduccionPersonalizada[]>([]);
+
     // Preview and Feedback states
     const [showPreviewModal, setShowPreviewModal] = useState<'nomina' | 'liquidacion' | null>(null);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -222,21 +252,85 @@ export default function NominaPage() {
 
     const activeEmployee = employees.find(e => e.id === activeEmployeeId) || employees[0];
 
-    // Memoized Result Calculation
-    const result = useMemo(() => activeEmployee ? calculatePayroll(activeEmployee) : null, [activeEmployee]);
+    // Empleado activo con los overrides aplicados
+    const activeEmployeeWithOverrides = useMemo(() => {
+        if (!activeEmployee) return null;
+        return {
+            ...activeEmployee,
+            smmlvOverride,
+            auxTransporteOverride: auxOverride,
+            anoBase
+        };
+    }, [activeEmployee, smmlvOverride, auxOverride, anoBase]);
 
-    // Memoized Liquidation Calculation
+    // Memoized Result Calculation
+    const result = useMemo(() => activeEmployeeWithOverrides ? calculatePayroll(activeEmployeeWithOverrides) : null, [activeEmployeeWithOverrides]);
+
+    // Memoized Liquidation Calculation (incluye anticipos)
     const liquidationResult = useMemo(() => {
-        if (activeEmployee && result) {
-            return calculateLiquidation(activeEmployee, result);
+        if (activeEmployeeWithOverrides && result) {
+            const advancesInput: LiquidationAdvancesInput = {
+                anticipos,
+                deduccionesPersonalizadas
+            };
+            return calculateLiquidation(activeEmployeeWithOverrides, result, advancesInput);
         }
         return null;
-    }, [activeEmployee, result]);
+    }, [activeEmployeeWithOverrides, result, anticipos, deduccionesPersonalizadas]);
+
+    // Helper: Actualizar campo de prima anticipada
+    const updatePrima = (field: keyof PrimaAnticipada, value: TipoPrimaAnticipada | boolean | number) => {
+        setAnticipos(prev => ({
+            ...prev,
+            prima: { ...prev.prima, [field]: value }
+        }));
+    };
+
+    // Helper: Agregar deducción personalizada (máx 5)
+    const addDeduccionPersonalizada = () => {
+        if (deduccionesPersonalizadas.length >= 5) return;
+        setDeduccionesPersonalizadas(prev => [...prev, {
+            id: crypto.randomUUID(),
+            nombre: '',
+            valor: 0
+        }]);
+    };
+
+    // Helper: Eliminar deducción personalizada
+    const removeDeduccion = (id: string) => {
+        setDeduccionesPersonalizadas(prev => prev.filter(d => d.id !== id));
+    };
+
+    // Helper: Actualizar deducción personalizada
+    const updateDeduccion = (id: string, field: 'nombre' | 'valor', value: string | number) => {
+        setDeduccionesPersonalizadas(prev => prev.map(d =>
+            d.id === id ? { ...d, [field]: value } : d
+        ));
+    };
+
+    // Helper: Resetear anticipos cuando cambia el empleado
+    const resetAnticipos = () => {
+        setAnticipos({ ...DEFAULT_ANTICIPOS });
+        setDeduccionesPersonalizadas([]);
+    };
 
     // Toggle Section Helper
     const toggleSection = (section: string) => {
         setActiveSection(activeSection === section ? null : section);
     };
+
+    // Sincronizar estados de override cuando cambia el empleado activo
+    useEffect(() => {
+        if (activeEmployee) {
+            const year = (activeEmployee.anoBase as AnoBase) || 2026;
+            setAnoBase(year);
+            // Si el empleado tiene valores guardados, usarlos; sino usar los del año
+            setSmmlvOverride(activeEmployee.smmlvOverride || PARAMETROS_NOMINA[year].smmlv);
+            setAuxOverride(activeEmployee.auxTransporteOverride || PARAMETROS_NOMINA[year].auxTransporte);
+            // Resetear anticipos al cambiar de empleado (cada liquidación es independiente)
+            resetAnticipos();
+        }
+    }, [activeEmployee?.id]); // Solo cuando cambia el ID del empleado
 
     // Load clients on mount
     useEffect(() => {
@@ -368,6 +462,11 @@ export default function NominaPage() {
 
         setSaving(true);
         try {
+            // Determinar si los valores son custom o son los defaults del año
+            const defaultParams = PARAMETROS_NOMINA[anoBase];
+            const smmlvToSave = smmlvOverride !== defaultParams.smmlv ? smmlvOverride : null;
+            const auxToSave = auxOverride !== defaultParams.auxTransporte ? auxOverride : null;
+
             const { error } = await supabase
                 .from('employees')
                 .update({
@@ -379,11 +478,23 @@ export default function NominaPage() {
                     is_exempt: activeEmployee.isExempt,
                     start_date: activeEmployee.startDate,
                     end_date: activeEmployee.endDate,
-                    deductions_config: activeEmployee.deductionsParameters as unknown as Record<string, unknown>
+                    deductions_config: activeEmployee.deductionsParameters as unknown as Record<string, unknown>,
+                    // Parámetros base de cálculo
+                    ano_base: anoBase,
+                    smmlv_override: smmlvToSave,
+                    aux_transporte_override: auxToSave
                 })
                 .eq('id', activeEmployeeId);
 
             if (error) throw error;
+
+            // Actualizar también el estado local del empleado en dbEmployees
+            setDbEmployees(prev => prev.map(emp =>
+                emp.id === activeEmployeeId
+                    ? { ...emp, ano_base: anoBase, smmlv_override: smmlvToSave, aux_transporte_override: auxToSave }
+                    : emp
+            ));
+
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         } catch {
@@ -414,6 +525,50 @@ export default function NominaPage() {
             setTimeout(() => setSaved(false), 2000);
         } catch {
             setError('Error guardando nómina');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    // Save liquidation record with advances (anticipos)
+    const handleSaveLiquidation = async () => {
+        if (!selectedClientId || !activeEmployee || !liquidationResult) return;
+        setSaving(true);
+        try {
+            // Prepare advances data to save
+            const advancesData: LiquidationAdvancesInput = {
+                anticipos,
+                deduccionesPersonalizadas
+            };
+
+            const { error } = await supabase
+                .from('liquidation_records')
+                .insert({
+                    employee_id: activeEmployeeId,
+                    hire_date: activeEmployee.startDate,
+                    termination_date: activeEmployee.endDate,
+                    days_worked: liquidationResult.daysWorked,
+                    calculation_data: liquidationResult,
+                    net_pay: liquidationResult.netToPay,
+                    advances_data: advancesData,
+                });
+
+            if (error) throw error;
+            setSaved(true);
+            addToast({
+                type: 'success',
+                title: 'Liquidación guardada',
+                description: 'La liquidación ha sido guardada en el histórico'
+            });
+            setTimeout(() => setSaved(false), 2000);
+        } catch (err) {
+            console.error('Error guardando liquidación:', err);
+            setError('Error guardando liquidación');
+            addToast({
+                type: 'error',
+                title: 'Error',
+                description: 'No se pudo guardar la liquidación'
+            });
         } finally {
             setSaving(false);
         }
@@ -665,6 +820,84 @@ export default function NominaPage() {
                                     </div>
                                 </div>
                             </Section>
+
+                            {/* PARÁMETROS BASE DE CÁLCULO */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Settings className="w-4 h-4 text-blue-600" />
+                                    <h3 className="text-sm font-semibold text-blue-800">Parámetros Base de Cálculo</h3>
+                                    <Tooltip content="Para liquidaciones de empleados que iniciaron en años anteriores, seleccione el año base correspondiente. Los valores de SMMLV y Auxilio se ajustarán automáticamente." />
+                                </div>
+                                <p className="text-xs text-blue-600 mb-3">
+                                    Útil para liquidar empleados con la base salarial de años anteriores (regla de los últimos 6 meses).
+                                </p>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    {/* Selector de Año */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">Año Base</label>
+                                        <select
+                                            className="w-full bg-white border border-blue-200 rounded-lg py-2 px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                            value={anoBase}
+                                            onChange={(e) => {
+                                                const year = Number(e.target.value) as AnoBase;
+                                                setAnoBase(year);
+                                                const params = PARAMETROS_NOMINA[year];
+                                                setSmmlvOverride(params.smmlv);
+                                                setAuxOverride(params.auxTransporte);
+                                            }}
+                                        >
+                                            <option value={2024}>2024</option>
+                                            <option value={2025}>2025</option>
+                                            <option value={2026}>2026 (Actual)</option>
+                                        </select>
+                                    </div>
+
+                                    {/* SMMLV Editable */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">SMMLV</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-gray-400 text-xs">$</span>
+                                            <input
+                                                type="text"
+                                                value={smmlvOverride.toLocaleString('es-CO')}
+                                                onChange={(e) => {
+                                                    const v = e.target.value.replace(/\D/g, '');
+                                                    setSmmlvOverride(Number(v) || 0);
+                                                }}
+                                                className="w-full bg-white border border-blue-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Auxilio Transporte Editable */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">Aux. Transporte</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-gray-400 text-xs">$</span>
+                                            <input
+                                                type="text"
+                                                value={auxOverride.toLocaleString('es-CO')}
+                                                onChange={(e) => {
+                                                    const v = e.target.value.replace(/\D/g, '');
+                                                    setAuxOverride(Number(v) || 0);
+                                                }}
+                                                className="w-full bg-white border border-blue-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Indicador visual del año seleccionado */}
+                                {anoBase !== 2026 && (
+                                    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg mt-2">
+                                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                                        <span className="text-xs text-amber-700">
+                                            Usando valores del año <strong>{anoBase}</strong>. Los cálculos de nómina y liquidación usarán estos parámetros.
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* II. SEGURIDAD SOCIAL */}
                             <Section title="II. Seguridad Social y Configuración" icon={<UserCog className="w-4 h-4" />} isOpen={activeSection === 'section2'} onToggle={() => toggleSection('section2')}>
@@ -986,34 +1219,72 @@ export default function NominaPage() {
                                                 <span className="text-amber-800 font-bold">{liquidationResult.daysWorked} días</span>
                                             </div>
 
-                                            {/* Prestaciones Grid */}
-                                            <div className="grid grid-cols-3 gap-3">
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Cesantías + Int.</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.cesantias + liquidationResult.interesesCesantias)}</p>
-                                                    <p className="text-[9px] text-gray-400 mt-1">
-                                                        Ces: {formatCurrency(liquidationResult.cesantias)}
-                                                    </p>
-                                                    <p className="text-[9px] text-gray-400">
-                                                        Int: {formatCurrency(liquidationResult.interesesCesantias)}
-                                                    </p>
+                                            {/* Prestaciones Grid con desglose Bruto/Anticipo/Neto */}
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                                {/* Cesantías */}
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Cesantías</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.cesantiasNetas)}</p>
+                                                    {liquidationResult.cesantiasAnticipadas > 0 && (
+                                                        <div className="text-[9px] text-amber-600 mt-1">
+                                                            <p>Bruto: {formatCurrency(liquidationResult.cesantias)}</p>
+                                                            <p>Anticipo: -{formatCurrency(liquidationResult.cesantiasAnticipadas)}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                                                {/* Intereses Cesantías */}
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Int. Cesantías</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.interesesCesantiasNetos)}</p>
+                                                    {liquidationResult.interesesCesantiasAnticipados > 0 && (
+                                                        <div className="text-[9px] text-amber-600 mt-1">
+                                                            <p>Bruto: {formatCurrency(liquidationResult.interesesCesantias)}</p>
+                                                            <p>Anticipo: -{formatCurrency(liquidationResult.interesesCesantiasAnticipados)}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* Prima */}
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                                                     <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Prima Servicios</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.prima)}</p>
-                                                    <p className="text-[9px] text-gray-400 mt-1">Proporcional</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.primaNeta)}</p>
+                                                    {liquidationResult.primaAnticipada > 0 && (
+                                                        <div className="text-[9px] text-amber-600 mt-1">
+                                                            <p>Bruto: {formatCurrency(liquidationResult.prima)}</p>
+                                                            <p>Anticipo: -{formatCurrency(liquidationResult.primaAnticipada)}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                                                {/* Vacaciones */}
+                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                                                     <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Vacaciones</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.vacaciones)}</p>
-                                                    <p className="text-[9px] text-gray-400 mt-1">Proporcional</p>
+                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.vacacionesNetas)}</p>
+                                                    {liquidationResult.vacacionesAnticipadas > 0 && (
+                                                        <div className="text-[9px] text-amber-600 mt-1">
+                                                            <p>Bruto: {formatCurrency(liquidationResult.vacaciones)}</p>
+                                                            <p>Anticipo: -{formatCurrency(liquidationResult.vacacionesAnticipadas)}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
-                                            {/* Total Prestaciones */}
-                                            <div className="flex justify-between items-center py-2 border-t border-gray-100">
-                                                <span className="text-sm text-gray-600">Total Prestaciones Sociales</span>
-                                                <span className="font-bold text-gray-900">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
+                                            {/* Total Prestaciones con desglose si hay anticipos */}
+                                            <div className="border-t border-gray-100 pt-2 space-y-1">
+                                                {liquidationResult.totalAnticipos > 0 && (
+                                                    <>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-gray-500">Total Bruto</span>
+                                                            <span className="text-gray-600">{formatCurrency(liquidationResult.totalPrestacionesBrutas)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center text-sm">
+                                                            <span className="text-amber-600">Total Anticipos</span>
+                                                            <span className="text-amber-600 font-medium">-{formatCurrency(liquidationResult.totalAnticipos)}</span>
+                                                        </div>
+                                                    </>
+                                                )}
+                                                <div className="flex justify-between items-center py-1">
+                                                    <span className="text-sm font-medium text-gray-700">Total Prestaciones Netas</span>
+                                                    <span className="font-bold text-gray-900">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
+                                                </div>
                                             </div>
 
                                             {/* Deducciones (si hay) */}
@@ -1045,6 +1316,13 @@ export default function NominaPage() {
                                                                 <span className="font-medium text-red-700">-{formatCurrency(liquidationResult.deductions.other)}</span>
                                                             </div>
                                                         )}
+                                                        {/* Deducciones personalizadas */}
+                                                        {liquidationResult.deductions.deduccionesPersonalizadas?.map(d => (
+                                                            <div key={d.id} className="flex justify-between">
+                                                                <span className="text-red-600">{d.nombre || 'Sin nombre'}</span>
+                                                                <span className="font-medium text-red-700">-{formatCurrency(d.valor)}</span>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             )}
@@ -1054,6 +1332,168 @@ export default function NominaPage() {
                                                 <p><strong>Base Liquidación:</strong> {formatCurrency(liquidationResult.baseLiquidation)}</p>
                                                 <p><strong>Período:</strong> {activeEmployee.startDate} a {activeEmployee.endDate}</p>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    {/* SECCIÓN: Anticipos de Prestaciones Pagadas */}
+                                    <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-4">
+                                        <h4 className="text-sm font-bold text-amber-700 mb-4 flex items-center gap-2">
+                                            <MinusCircle className="w-4 h-4" />
+                                            Anticipos de Prestaciones Pagadas
+                                        </h4>
+
+                                        {/* Prima Anticipada */}
+                                        <div className="space-y-3 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <label className="text-xs text-gray-600 w-28 font-medium">Prima:</label>
+                                                <select
+                                                    value={anticipos.prima.tipo}
+                                                    onChange={(e) => updatePrima('tipo', e.target.value as TipoPrimaAnticipada)}
+                                                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                                >
+                                                    <option value="MONTO">Monto directo</option>
+                                                    <option value="SEMESTRE">Por semestre</option>
+                                                </select>
+                                            </div>
+
+                                            {anticipos.prima.tipo === 'SEMESTRE' ? (
+                                                <div className="flex gap-4 ml-32">
+                                                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={anticipos.prima.semestreJunioPagado}
+                                                            onChange={(e) => updatePrima('semestreJunioPagado', e.target.checked)}
+                                                            className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                                        />
+                                                        <span className="text-gray-600">Junio (Ene-Jun)</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={anticipos.prima.semestreDiciembrePagado}
+                                                            onChange={(e) => updatePrima('semestreDiciembrePagado', e.target.checked)}
+                                                            className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                                        />
+                                                        <span className="text-gray-600">Diciembre (Jul-Dic)</span>
+                                                    </label>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2 ml-32">
+                                                    <span className="text-gray-400 text-xs">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.prima.montoPagado ? anticipos.prima.montoPagado.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => updatePrima('montoPagado', Number(e.target.value.replace(/\D/g, '')))}
+                                                        className="w-36 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Otros anticipos */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                            <div>
+                                                <label className="text-xs text-gray-600 block mb-1 font-medium">Vacaciones pagadas</label>
+                                                <div className="flex items-center">
+                                                    <span className="text-gray-400 text-xs mr-1">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.vacacionesPagadas ? anticipos.vacacionesPagadas.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => setAnticipos(prev => ({
+                                                            ...prev,
+                                                            vacacionesPagadas: Number(e.target.value.replace(/\D/g, ''))
+                                                        }))}
+                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-600 block mb-1 font-medium">Cesantías parciales</label>
+                                                <div className="flex items-center">
+                                                    <span className="text-gray-400 text-xs mr-1">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.cesantiasParciales ? anticipos.cesantiasParciales.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => setAnticipos(prev => ({
+                                                            ...prev,
+                                                            cesantiasParciales: Number(e.target.value.replace(/\D/g, ''))
+                                                        }))}
+                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-600 block mb-1 font-medium">Intereses cesantías</label>
+                                                <div className="flex items-center">
+                                                    <span className="text-gray-400 text-xs mr-1">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.interesesCesantiasPagados ? anticipos.interesesCesantiasPagados.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => setAnticipos(prev => ({
+                                                            ...prev,
+                                                            interesesCesantiasPagados: Number(e.target.value.replace(/\D/g, ''))
+                                                        }))}
+                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Deducciones Personalizadas */}
+                                        <div className="border-t border-gray-100 pt-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                                    <ListMinus className="w-4 h-4 text-red-600" />
+                                                    Otras Deducciones ({deduccionesPersonalizadas.length}/5)
+                                                </h5>
+                                                <button
+                                                    onClick={addDeduccionPersonalizada}
+                                                    disabled={deduccionesPersonalizadas.length >= 5}
+                                                    className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                                >
+                                                    + Agregar
+                                                </button>
+                                            </div>
+
+                                            {deduccionesPersonalizadas.length === 0 ? (
+                                                <p className="text-xs text-gray-400 text-center py-3 bg-gray-50 rounded-lg">
+                                                    Sin deducciones adicionales. Presione "+ Agregar" para añadir.
+                                                </p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {deduccionesPersonalizadas.map(d => (
+                                                        <div key={d.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Concepto (ej: Embargo judicial)"
+                                                                value={d.nombre}
+                                                                onChange={(e) => updateDeduccion(d.id, 'nombre', e.target.value)}
+                                                                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                                                            />
+                                                            <div className="flex items-center">
+                                                                <span className="text-gray-400 text-xs mr-1">$</span>
+                                                                <input
+                                                                    type="text"
+                                                                    value={d.valor ? d.valor.toLocaleString('es-CO') : ''}
+                                                                    onChange={(e) => updateDeduccion(d.id, 'valor', Number(e.target.value.replace(/\D/g, '')))}
+                                                                    className="w-28 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                onClick={() => removeDeduccion(d.id)}
+                                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1087,6 +1527,18 @@ export default function NominaPage() {
                                                 Descargar PDF
                                             </button>
                                         </div>
+
+                                        {/* Guardar liquidación en histórico */}
+                                        {selectedClientId && (
+                                            <button
+                                                onClick={handleSaveLiquidation}
+                                                disabled={saving}
+                                                className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md disabled:opacity-50"
+                                            >
+                                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                                Guardar Liquidación
+                                            </button>
+                                        )}
                                     </div>
                                 </>
                             ) : (
