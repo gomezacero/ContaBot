@@ -47,7 +47,11 @@ import {
     HelpCircle, // Added
     Settings,
     MinusCircle,
-    ListMinus
+    ListMinus,
+    Gift,
+    Palmtree,
+    PiggyBank,
+    Percent
 } from 'lucide-react';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -68,10 +72,15 @@ interface DBEmployee {
     start_date: string | null;
     end_date: string | null;
     deductions_config: Record<string, unknown>;
-    // Nuevos campos para override de parámetros base
+    // Campos para override de parámetros base
     ano_base: number | null;
     smmlv_override: number | null;
     aux_transporte_override: number | null;
+    // Persistencia de anticipos y deducciones personalizadas
+    advances_data: {
+        anticipos?: AnticiposPrestaciones;
+        deduccionesPersonalizadas?: DeduccionPersonalizada[];
+    } | null;
     clients?: {
         id: string;
         name: string;
@@ -144,7 +153,9 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
         // Override de parámetros base
         anoBase: (emp.ano_base as 2024 | 2025 | 2026) || 2026,
         smmlvOverride: emp.smmlv_override || undefined,
-        auxTransporteOverride: emp.aux_transporte_override || undefined
+        auxTransporteOverride: emp.aux_transporte_override || undefined,
+        // Anticipos y deducciones personalizadas guardados
+        advancesData: emp.advances_data || undefined
     };
 }
 
@@ -217,7 +228,7 @@ export default function NominaPage() {
     const [newClientName, setNewClientName] = useState('');
     const [newClientNit, setNewClientNit] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [activeSection, setActiveSection] = useState<string | null>('section1');
+    const [openSections, setOpenSections] = useState<Set<string>>(new Set(['section1']));
     const [activeTab, setActiveTab] = useState<'nomina' | 'liquidacion'>('nomina');
 
     // Estados para override de parámetros base (SMMLV y Auxilio)
@@ -314,9 +325,17 @@ export default function NominaPage() {
         setDeduccionesPersonalizadas([]);
     };
 
-    // Toggle Section Helper
+    // Toggle Section Helper (permite múltiples secciones abiertas)
     const toggleSection = (section: string) => {
-        setActiveSection(activeSection === section ? null : section);
+        setOpenSections(prev => {
+            const next = new Set(prev);
+            if (next.has(section)) {
+                next.delete(section);
+            } else {
+                next.add(section);
+            }
+            return next;
+        });
     };
 
     // Sincronizar estados de override cuando cambia el empleado activo
@@ -327,8 +346,24 @@ export default function NominaPage() {
             // Si el empleado tiene valores guardados, usarlos; sino usar los del año
             setSmmlvOverride(activeEmployee.smmlvOverride || PARAMETROS_NOMINA[year].smmlv);
             setAuxOverride(activeEmployee.auxTransporteOverride || PARAMETROS_NOMINA[year].auxTransporte);
-            // Resetear anticipos al cambiar de empleado (cada liquidación es independiente)
-            resetAnticipos();
+
+            // Cargar anticipos guardados del empleado (si existen)
+            if (activeEmployee.advancesData) {
+                const saved = activeEmployee.advancesData;
+                if (saved.anticipos) {
+                    setAnticipos(saved.anticipos);
+                } else {
+                    setAnticipos({ ...DEFAULT_ANTICIPOS });
+                }
+                if (saved.deduccionesPersonalizadas && saved.deduccionesPersonalizadas.length > 0) {
+                    setDeduccionesPersonalizadas(saved.deduccionesPersonalizadas);
+                } else {
+                    setDeduccionesPersonalizadas([]);
+                }
+            } else {
+                // Solo resetea si no hay datos guardados
+                resetAnticipos();
+            }
         }
     }, [activeEmployee?.id]); // Solo cuando cambia el ID del empleado
 
@@ -467,6 +502,12 @@ export default function NominaPage() {
             const smmlvToSave = smmlvOverride !== defaultParams.smmlv ? smmlvOverride : null;
             const auxToSave = auxOverride !== defaultParams.auxTransporte ? auxOverride : null;
 
+            // Preparar datos de anticipos para guardar
+            const advancesDataToSave = {
+                anticipos,
+                deduccionesPersonalizadas
+            };
+
             const { error } = await supabase
                 .from('employees')
                 .update({
@@ -482,7 +523,9 @@ export default function NominaPage() {
                     // Parámetros base de cálculo
                     ano_base: anoBase,
                     smmlv_override: smmlvToSave,
-                    aux_transporte_override: auxToSave
+                    aux_transporte_override: auxToSave,
+                    // Anticipos y deducciones personalizadas
+                    advances_data: advancesDataToSave
                 })
                 .eq('id', activeEmployeeId);
 
@@ -491,7 +534,13 @@ export default function NominaPage() {
             // Actualizar también el estado local del empleado en dbEmployees
             setDbEmployees(prev => prev.map(emp =>
                 emp.id === activeEmployeeId
-                    ? { ...emp, ano_base: anoBase, smmlv_override: smmlvToSave, aux_transporte_override: auxToSave }
+                    ? {
+                        ...emp,
+                        ano_base: anoBase,
+                        smmlv_override: smmlvToSave,
+                        aux_transporte_override: auxToSave,
+                        advances_data: advancesDataToSave
+                    }
                     : emp
             ));
 
@@ -742,59 +791,97 @@ export default function NominaPage() {
                 </div>
             )}
 
-            {/* Employee Horizontal List */}
-            <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-100 flex items-center overflow-x-auto no-scrollbar">
-                {employees.map((emp) => {
-                    const isActive = emp.id === activeEmployeeId;
-                    return (
-                        <div
-                            key={emp.id}
-                            onClick={() => setActiveEmployeeId(emp.id)}
-                            className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all group relative border select-none ${isActive
-                                ? 'bg-purple-50 border-purple-200 shadow-sm'
-                                : 'bg-transparent border-transparent hover:bg-gray-50'
-                                }`}
-                        >
-                            <UserCircle2 className="w-4 h-4" />
-                            <div className="flex flex-col min-w-0">
-                                <span className={`text-xs truncate max-w-[100px] font-medium ${isActive ? 'text-purple-900' : 'text-gray-600 group-hover:text-gray-900'}`}>{emp.name}</span>
-                                {isActive && <span className="h-0.5 w-full bg-purple-500 rounded-full mt-0.5 animate-in zoom-in"></span>}
-                            </div>
+            {/* Employee Horizontal List + Tab Switcher */}
+            <div className="bg-white p-1.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                {/* Employee Tabs - Left Side */}
+                <div className="flex items-center overflow-x-auto no-scrollbar flex-1 pl-2">
+                    {employees.map((emp) => {
+                        const isActive = emp.id === activeEmployeeId;
+                        return (
+                            <div
+                                key={emp.id}
+                                onClick={() => setActiveEmployeeId(emp.id)}
+                                className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all group relative border select-none ${isActive
+                                    ? 'bg-purple-50 border-purple-200 shadow-sm'
+                                    : 'bg-transparent border-transparent hover:bg-gray-50'
+                                    }`}
+                            >
+                                <UserCircle2 className="w-4 h-4" />
+                                <div className="flex flex-col min-w-0">
+                                    <span className={`text-xs truncate max-w-[100px] font-medium ${isActive ? 'text-purple-900' : 'text-gray-600 group-hover:text-gray-900'}`}>{emp.name}</span>
+                                    {isActive && <span className="h-0.5 w-full bg-purple-500 rounded-full mt-0.5 animate-in zoom-in"></span>}
+                                </div>
 
-                            {employees.length > 1 && (
-                                <button
-                                    onClick={(e) => openDeleteModal(emp.id, emp.name, e)}
-                                    className={`ml-1 p-1 rounded-md transition-all duration-200
-                                        ${isActive
-                                            ? 'text-red-400 hover:text-red-600 hover:bg-red-50 opacity-100'
-                                            : 'text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
-                                        }`}
-                                    title="Eliminar empleado"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                            )}
-                        </div>
-                    );
-                })}
-                <button
-                    onClick={handleAddEmployee}
-                    className={`ml-2 p-2 rounded-lg transition-all ${employees.length === 0
-                        ? 'bg-purple-600 text-white shadow-lg animate-pulse ring-4 ring-purple-100'
-                        : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
-                >
-                    <Plus className="w-5 h-5" />
-                </button>
+                                {employees.length > 1 && (
+                                    <button
+                                        onClick={(e) => openDeleteModal(emp.id, emp.name, e)}
+                                        className={`ml-1 p-1 rounded-md transition-all duration-200
+                                            ${isActive
+                                                ? 'text-red-400 hover:text-red-600 hover:bg-red-50 opacity-100'
+                                                : 'text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
+                                            }`}
+                                        title="Eliminar empleado"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                    <button
+                        onClick={handleAddEmployee}
+                        className={`ml-2 p-2 rounded-lg transition-all ${employees.length === 0
+                            ? 'bg-purple-600 text-white shadow-lg animate-pulse ring-4 ring-purple-100'
+                            : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                    >
+                        <Plus className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Tab Switcher - Right Side (mismo ancho que panel derecho: 1/3 - gap) */}
+                <div className="hidden lg:flex items-center gap-1 ml-4 flex-shrink-0 bg-gray-50 p-1.5 rounded-xl w-[calc(33.333%-24px)]">
+                    <button
+                        onClick={() => setActiveTab('nomina')}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <DollarSign className="w-4 h-4" />
+                        Nómina
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('liquidacion')}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <Wallet className="w-4 h-4" />
+                        Liquidación
+                    </button>
+                </div>
+                {/* Tab Switcher - Mobile */}
+                <div className="flex lg:hidden items-center gap-1 ml-4 flex-shrink-0 bg-gray-50 p-1 rounded-xl">
+                    <button
+                        onClick={() => setActiveTab('nomina')}
+                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <DollarSign className="w-4 h-4" />
+                        Nómina
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('liquidacion')}
+                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        <Wallet className="w-4 h-4" />
+                        Liquidación
+                    </button>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start max-w-[1800px] mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1800px] mx-auto lg:h-[calc(100vh-180px)]">
 
-                {/* LEFT PANEL: FORM INPUTS (7 cols) */}
-                <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+                {/* LEFT PANEL: FORM INPUTS (2/3) - Scroll independiente */}
+                <div className="lg:col-span-2 lg:h-full lg:overflow-y-auto lg:pr-3 space-y-4 scrollbar-thin">
                     {activeEmployee && (
                         <>
                             {/* I. DATOS GENERALES */}
-                            <Section title="I. Datos Generales y Periodo" icon={<Calendar className="w-4 h-4" />} isOpen={activeSection === 'section1'} onToggle={() => toggleSection('section1')}>
+                            <Section title="I. Datos Generales y Periodo" icon={<Calendar className="w-4 h-4" />} isOpen={openSections.has('section1')} onToggle={() => toggleSection('section1')}>
                                 <div className="grid grid-cols-2 gap-4">
                                     <Input label="Inicio Periodo" type="date" value={activeEmployee.startDate} onChange={v => handleInputChange('startDate', v)} />
                                     <Input label="Fin Periodo" type="date" value={activeEmployee.endDate} onChange={v => handleInputChange('endDate', v)} />
@@ -900,7 +987,7 @@ export default function NominaPage() {
                             </div>
 
                             {/* II. SEGURIDAD SOCIAL */}
-                            <Section title="II. Seguridad Social y Configuración" icon={<UserCog className="w-4 h-4" />} isOpen={activeSection === 'section2'} onToggle={() => toggleSection('section2')}>
+                            <Section title="II. Seguridad Social y Configuración" icon={<UserCog className="w-4 h-4" />} isOpen={openSections.has('section2')} onToggle={() => toggleSection('section2')}>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="col-span-1">
                                         <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Riesgo ARL</label>
@@ -928,7 +1015,7 @@ export default function NominaPage() {
                             </Section>
 
                             {/* III. HORAS EXTRAS */}
-                            <Section title="III. Horas Extras y Variables" icon={<DollarSign className="w-4 h-4" />} isOpen={activeSection === 'section3'} onToggle={() => toggleSection('section3')}>
+                            <Section title="III. Horas Extras y Variables" icon={<DollarSign className="w-4 h-4" />} isOpen={openSections.has('section3')} onToggle={() => toggleSection('section3')}>
                                 <div className="grid grid-cols-3 gap-3">
                                     <Input label="H.E. Diurna (1.25)" type="number" value={activeEmployee.hedHours} onChange={v => handleInputChange('hedHours', v)} />
                                     <Input label="H.E. Nocturna (1.75)" type="number" value={activeEmployee.henHours} onChange={v => handleInputChange('henHours', v)} />
@@ -942,14 +1029,14 @@ export default function NominaPage() {
                             </Section>
 
                             {/* IV. NO SALARIAL */}
-                            <Section title="IV. Pagos No Salariales" icon={<Briefcase className="w-4 h-4" />} isOpen={activeSection === 'section4'} onToggle={() => toggleSection('section4')}>
+                            <Section title="IV. Pagos No Salariales" icon={<Briefcase className="w-4 h-4" />} isOpen={openSections.has('section4')} onToggle={() => toggleSection('section4')}>
                                 <div className="grid grid-cols-2 gap-4">
                                     <Input label="Bonos No Salariales" type="money" value={activeEmployee.nonSalaryBonuses} onChange={v => handleInputChange('nonSalaryBonuses', v)} />
                                 </div>
                             </Section>
 
                             {/* V. DEDUCCIONES */}
-                            <Section title="V. Deducciones y Retenciones" icon={<TrendingDown className="w-4 h-4" />} isOpen={activeSection === 'section5'} onToggle={() => toggleSection('section5')}>
+                            <Section title="V. Deducciones y Retenciones" icon={<TrendingDown className="w-4 h-4" />} isOpen={openSections.has('section5')} onToggle={() => toggleSection('section5')}>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <Input label="Préstamos Empresa" type="money" value={activeEmployee.loans} onChange={v => handleInputChange('loans', v)} />
@@ -1033,6 +1120,249 @@ export default function NominaPage() {
                                 </div>
                             </Section>
 
+                            {/* VI. ANTICIPOS DE PRESTACIONES */}
+                            <Section
+                                title="VI. Anticipos de Prestaciones"
+                                icon={<MinusCircle className="w-4 h-4" />}
+                                isOpen={openSections.has('section6')}
+                                onToggle={() => toggleSection('section6')}
+                            >
+                                    <div className="space-y-5">
+                                        {/* Header con descripción y badge total */}
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-xs text-gray-500">Montos ya pagados que se descontarán de la liquidación</p>
+                                            {(anticipos.prima.montoPagado > 0 || anticipos.vacacionesPagadas > 0 ||
+                                              anticipos.cesantiasParciales > 0 || anticipos.interesesCesantiasPagados > 0) && (
+                                                <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">
+                                                    Total: {formatCurrency(
+                                                        anticipos.prima.montoPagado + anticipos.vacacionesPagadas +
+                                                        anticipos.cesantiasParciales + anticipos.interesesCesantiasPagados
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Card Prima de Servicios */}
+                                        <div className="bg-gradient-to-r from-pink-50 to-amber-50 rounded-xl p-4 border border-pink-200/60">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-9 h-9 bg-pink-100 rounded-lg flex items-center justify-center">
+                                                    <Gift className="w-4 h-4 text-pink-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-sm font-semibold text-gray-700">Prima de Servicios</label>
+                                                    <p className="text-xs text-gray-400">Pagada por semestre o monto directo</p>
+                                                </div>
+                                                <select
+                                                    value={anticipos.prima.tipo}
+                                                    onChange={(e) => updatePrima('tipo', e.target.value as TipoPrimaAnticipada)}
+                                                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                                >
+                                                    <option value="MONTO">Monto directo</option>
+                                                    <option value="SEMESTRE">Por semestre</option>
+                                                </select>
+                                            </div>
+
+                                            {anticipos.prima.tipo === 'SEMESTRE' ? (
+                                                <div className="flex gap-3 ml-12">
+                                                    {/* Checkbox Junio */}
+                                                    <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer border-2 transition-all ${
+                                                        anticipos.prima.semestreJunioPagado
+                                                            ? 'bg-pink-100 border-pink-400'
+                                                            : 'bg-white border-gray-200 hover:border-pink-300'
+                                                    }`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={anticipos.prima.semestreJunioPagado}
+                                                            onChange={(e) => updatePrima('semestreJunioPagado', e.target.checked)}
+                                                            className="w-4 h-4 text-pink-600 rounded focus:ring-pink-500"
+                                                        />
+                                                        <div>
+                                                            <span className="text-sm font-medium text-gray-700">Junio</span>
+                                                            <p className="text-xs text-gray-400">Ene-Jun</p>
+                                                        </div>
+                                                    </label>
+                                                    {/* Checkbox Diciembre */}
+                                                    <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer border-2 transition-all ${
+                                                        anticipos.prima.semestreDiciembrePagado
+                                                            ? 'bg-pink-100 border-pink-400'
+                                                            : 'bg-white border-gray-200 hover:border-pink-300'
+                                                    }`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={anticipos.prima.semestreDiciembrePagado}
+                                                            onChange={(e) => updatePrima('semestreDiciembrePagado', e.target.checked)}
+                                                            className="w-4 h-4 text-pink-600 rounded focus:ring-pink-500"
+                                                        />
+                                                        <div>
+                                                            <span className="text-sm font-medium text-gray-700">Diciembre</span>
+                                                            <p className="text-xs text-gray-400">Jul-Dic</p>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            ) : (
+                                                <div className="ml-12">
+                                                    <div className="relative w-48">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                                                        <input
+                                                            type="text"
+                                                            value={anticipos.prima.montoPagado ? anticipos.prima.montoPagado.toLocaleString('es-CO') : ''}
+                                                            onChange={(e) => updatePrima('montoPagado', Number(e.target.value.replace(/\D/g, '')))}
+                                                            className="w-full pl-7 pr-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Grid 3 columnas: Vacaciones, Cesantías, Int. Cesantías */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {/* Vacaciones Card */}
+                                            <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-cyan-300 transition-colors">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center">
+                                                        <Palmtree className="w-4 h-4 text-cyan-600" />
+                                                    </div>
+                                                    <label className="text-sm font-semibold text-gray-700">Vacaciones</label>
+                                                </div>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.vacacionesPagadas ? anticipos.vacacionesPagadas.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => setAnticipos(prev => ({
+                                                            ...prev,
+                                                            vacacionesPagadas: Number(e.target.value.replace(/\D/g, ''))
+                                                        }))}
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:bg-white transition-colors"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Cesantías Card */}
+                                            <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-emerald-300 transition-colors">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                                        <PiggyBank className="w-4 h-4 text-emerald-600" />
+                                                    </div>
+                                                    <label className="text-sm font-semibold text-gray-700">Cesantias</label>
+                                                </div>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.cesantiasParciales ? anticipos.cesantiasParciales.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => setAnticipos(prev => ({
+                                                            ...prev,
+                                                            cesantiasParciales: Number(e.target.value.replace(/\D/g, ''))
+                                                        }))}
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-colors"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Int. Cesantías Card */}
+                                            <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-violet-300 transition-colors">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
+                                                        <Percent className="w-4 h-4 text-violet-600" />
+                                                    </div>
+                                                    <label className="text-sm font-semibold text-gray-700">Int. Cesantias</label>
+                                                </div>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                    <input
+                                                        type="text"
+                                                        value={anticipos.interesesCesantiasPagados ? anticipos.interesesCesantiasPagados.toLocaleString('es-CO') : ''}
+                                                        onChange={(e) => setAnticipos(prev => ({
+                                                            ...prev,
+                                                            interesesCesantiasPagados: Number(e.target.value.replace(/\D/g, ''))
+                                                        }))}
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-colors"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                            </Section>
+
+                            {/* VII. OTRAS DEDUCCIONES */}
+                            <Section
+                                title="VII. Otras Deducciones"
+                                icon={<ListMinus className="w-4 h-4" />}
+                                isOpen={openSections.has('section7')}
+                                onToggle={() => toggleSection('section7')}
+                            >
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-xs text-gray-500">Embargos, prestamos adicionales, etc. (maximo 5)</p>
+                                            <button
+                                                onClick={addDeduccionPersonalizada}
+                                                disabled={deduccionesPersonalizadas.length >= 5}
+                                                className="flex items-center gap-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-700 px-3 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                Agregar
+                                            </button>
+                                        </div>
+
+                                        {deduccionesPersonalizadas.length === 0 ? (
+                                            <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                                <ListMinus className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                                                <p className="text-sm text-gray-400">Sin deducciones adicionales</p>
+                                                <p className="text-xs text-gray-300 mt-1">Haz clic en &quot;Agregar&quot; para crear una deduccion</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {deduccionesPersonalizadas.map((d, index) => (
+                                                    <div key={d.id} className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 p-3 rounded-xl transition-colors group">
+                                                        <span className="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center text-xs font-bold text-red-600 flex-shrink-0">
+                                                            {index + 1}
+                                                        </span>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Concepto (ej: Embargo judicial)"
+                                                            value={d.nombre}
+                                                            onChange={(e) => updateDeduccion(d.id, 'nombre', e.target.value)}
+                                                            className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none"
+                                                        />
+                                                        <div className="relative w-36 flex-shrink-0">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                            <input
+                                                                type="number"
+                                                                value={d.valor || ''}
+                                                                onChange={(e) => updateDeduccion(d.id, 'valor', Number(e.target.value) || 0)}
+                                                                className="w-full pl-7 pr-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            onClick={() => removeDeduccion(d.id)}
+                                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                                                            title="Eliminar deduccion"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+
+                                                {/* Total de deducciones personalizadas */}
+                                                <div className="flex justify-end pt-2 border-t border-gray-200">
+                                                    <div className="text-sm">
+                                                        <span className="text-gray-500 mr-2">Total deducciones:</span>
+                                                        <span className="font-bold text-red-600">
+                                                            {formatCurrency(deduccionesPersonalizadas.reduce((sum, d) => sum + (d.valor || 0), 0))}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                            </Section>
+
                             {/* Save Actions */}
                             {selectedClientId && (
                                 <div className="flex gap-3">
@@ -1050,26 +1380,8 @@ export default function NominaPage() {
                     )}
                 </div>
 
-                {/* RIGHT PANEL: RESULTS DASHBOARD (5 cols) */}
-                <div className="lg:col-span-5 xl:col-span-4 space-y-6 lg:sticky lg:top-24">
-
-                    {/* TABS SWITCHER */}
-                    <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 flex">
-                        <button
-                            onClick={() => setActiveTab('nomina')}
-                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-purple-100 text-purple-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <DollarSign className="w-4 h-4" />
-                            Nómina
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('liquidacion')}
-                            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-amber-100 text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <Wallet className="w-4 h-4" />
-                            Liquidación
-                        </button>
-                    </div>
+                {/* RIGHT PANEL: RESULTS DASHBOARD (1/3) - Scroll independiente */}
+                <div className="lg:col-span-1 lg:h-full lg:overflow-y-auto lg:pl-3 space-y-6 scrollbar-thin">
 
                     {/* PAYROLL CONTENT (TAB: NOMINA) */}
                     {activeTab === 'nomina' && result && (
@@ -1209,81 +1521,76 @@ export default function NominaPage() {
                                             </p>
                                         </div>
 
-                                        <div className="p-6 space-y-4">
-                                            {/* Días Trabajados */}
-                                            <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-amber-700">
-                                                    <Calendar className="w-4 h-4" />
-                                                    <span className="text-xs font-medium">Días Trabajados (Sistema 360)</span>
+                                        <div className="p-5 space-y-4">
+                                            {/* Indicadores: Días Trabajados + Base Liquidación */}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-center">
+                                                    <div className="flex items-center justify-center gap-1 text-amber-600 mb-1">
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                        <span className="text-[10px] font-medium uppercase">Días Trabajados</span>
+                                                    </div>
+                                                    <p className="text-xl font-bold text-amber-800">{liquidationResult.daysWorked}</p>
                                                 </div>
-                                                <span className="text-amber-800 font-bold">{liquidationResult.daysWorked} días</span>
-                                            </div>
-
-                                            {/* Prestaciones Grid con desglose Bruto/Anticipo/Neto */}
-                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                                {/* Cesantías */}
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Cesantías</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.cesantiasNetas)}</p>
-                                                    {liquidationResult.cesantiasAnticipadas > 0 && (
-                                                        <div className="text-[9px] text-amber-600 mt-1">
-                                                            <p>Bruto: {formatCurrency(liquidationResult.cesantias)}</p>
-                                                            <p>Anticipo: -{formatCurrency(liquidationResult.cesantiasAnticipadas)}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* Intereses Cesantías */}
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Int. Cesantías</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.interesesCesantiasNetos)}</p>
-                                                    {liquidationResult.interesesCesantiasAnticipados > 0 && (
-                                                        <div className="text-[9px] text-amber-600 mt-1">
-                                                            <p>Bruto: {formatCurrency(liquidationResult.interesesCesantias)}</p>
-                                                            <p>Anticipo: -{formatCurrency(liquidationResult.interesesCesantiasAnticipados)}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* Prima */}
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Prima Servicios</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.primaNeta)}</p>
-                                                    {liquidationResult.primaAnticipada > 0 && (
-                                                        <div className="text-[9px] text-amber-600 mt-1">
-                                                            <p>Bruto: {formatCurrency(liquidationResult.prima)}</p>
-                                                            <p>Anticipo: -{formatCurrency(liquidationResult.primaAnticipada)}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* Vacaciones */}
-                                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                                                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold mb-1">Vacaciones</p>
-                                                    <p className="text-sm font-bold text-gray-800">{formatCurrency(liquidationResult.vacacionesNetas)}</p>
-                                                    {liquidationResult.vacacionesAnticipadas > 0 && (
-                                                        <div className="text-[9px] text-amber-600 mt-1">
-                                                            <p>Bruto: {formatCurrency(liquidationResult.vacaciones)}</p>
-                                                            <p>Anticipo: -{formatCurrency(liquidationResult.vacacionesAnticipadas)}</p>
-                                                        </div>
-                                                    )}
+                                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-center">
+                                                    <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
+                                                        <DollarSign className="w-3.5 h-3.5" />
+                                                        <span className="text-[10px] font-medium uppercase">Base Liquidación</span>
+                                                    </div>
+                                                    <p className="text-base font-bold text-gray-800">{formatCurrency(liquidationResult.baseLiquidation)}</p>
                                                 </div>
                                             </div>
 
-                                            {/* Total Prestaciones con desglose si hay anticipos */}
-                                            <div className="border-t border-gray-100 pt-2 space-y-1">
-                                                {liquidationResult.totalAnticipos > 0 && (
-                                                    <>
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-gray-500">Total Bruto</span>
-                                                            <span className="text-gray-600">{formatCurrency(liquidationResult.totalPrestacionesBrutas)}</span>
+                                            {/* Detalle de Liquidación - Formato filas */}
+                                            <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                                                <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold px-4 py-2 bg-gray-100 border-b border-gray-200">
+                                                    Detalle de Liquidación
+                                                </p>
+                                                <div className="divide-y divide-gray-100">
+                                                    {/* Cesantías */}
+                                                    <div className="flex justify-between items-center px-4 py-3">
+                                                        <span className="text-sm text-gray-600">Cesantías</span>
+                                                        <div className="text-right">
+                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.cesantiasNetas)}</span>
+                                                            {liquidationResult.cesantiasAnticipadas > 0 && (
+                                                                <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.cesantiasAnticipadas)}</p>
+                                                            )}
                                                         </div>
-                                                        <div className="flex justify-between items-center text-sm">
-                                                            <span className="text-amber-600">Total Anticipos</span>
-                                                            <span className="text-amber-600 font-medium">-{formatCurrency(liquidationResult.totalAnticipos)}</span>
+                                                    </div>
+                                                    {/* Intereses Cesantías */}
+                                                    <div className="flex justify-between items-center px-4 py-3">
+                                                        <span className="text-sm text-gray-600">Int. Cesantías</span>
+                                                        <div className="text-right">
+                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.interesesCesantiasNetos)}</span>
+                                                            {liquidationResult.interesesCesantiasAnticipados > 0 && (
+                                                                <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.interesesCesantiasAnticipados)}</p>
+                                                            )}
                                                         </div>
-                                                    </>
-                                                )}
-                                                <div className="flex justify-between items-center py-1">
-                                                    <span className="text-sm font-medium text-gray-700">Total Prestaciones Netas</span>
-                                                    <span className="font-bold text-gray-900">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
+                                                    </div>
+                                                    {/* Prima Servicios */}
+                                                    <div className="flex justify-between items-center px-4 py-3">
+                                                        <span className="text-sm text-gray-600">Prima Servicios</span>
+                                                        <div className="text-right">
+                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.primaNeta)}</span>
+                                                            {liquidationResult.primaAnticipada > 0 && (
+                                                                <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.primaAnticipada)}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {/* Vacaciones */}
+                                                    <div className="flex justify-between items-center px-4 py-3">
+                                                        <span className="text-sm text-gray-600">Vacaciones</span>
+                                                        <div className="text-right">
+                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.vacacionesNetas)}</span>
+                                                            {liquidationResult.vacacionesAnticipadas > 0 && (
+                                                                <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.vacacionesAnticipadas)}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {/* Total */}
+                                                    <div className="flex justify-between items-center px-4 py-3 bg-amber-50">
+                                                        <span className="text-sm font-bold text-gray-700">Total Neto</span>
+                                                        <span className="text-sm font-bold text-amber-700">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -1327,175 +1634,96 @@ export default function NominaPage() {
                                                 </div>
                                             )}
 
-                                            {/* Base Info */}
-                                            <div className="text-xs text-gray-500 space-y-1 pt-2 border-t border-gray-100">
-                                                <p><strong>Base Liquidación:</strong> {formatCurrency(liquidationResult.baseLiquidation)}</p>
-                                                <p><strong>Período:</strong> {activeEmployee.startDate} a {activeEmployee.endDate}</p>
-                                            </div>
+                                            {/* Período */}
+                                            <p className="text-xs text-gray-400 text-center pt-2 border-t border-gray-100">
+                                                Período: {activeEmployee.startDate} a {activeEmployee.endDate}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN: Anticipos de Prestaciones Pagadas */}
-                                    <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-4">
-                                        <h4 className="text-sm font-bold text-amber-700 mb-4 flex items-center gap-2">
-                                            <MinusCircle className="w-4 h-4" />
-                                            Anticipos de Prestaciones Pagadas
-                                        </h4>
-
-                                        {/* Prima Anticipada */}
-                                        <div className="space-y-3 mb-4">
+                                    {/* SECCIÓN: Deducciones Aplicadas (Read-Only Display) */}
+                                    {((anticipos.prima.montoPagado > 0 || anticipos.vacacionesPagadas > 0 ||
+                                      anticipos.cesantiasParciales > 0 || anticipos.interesesCesantiasPagados > 0) ||
+                                      deduccionesPersonalizadas.length > 0) && (
+                                        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl shadow-sm border border-red-200/60 p-5 space-y-4">
                                             <div className="flex items-center gap-3">
-                                                <label className="text-xs text-gray-600 w-28 font-medium">Prima:</label>
-                                                <select
-                                                    value={anticipos.prima.tipo}
-                                                    onChange={(e) => updatePrima('tipo', e.target.value as TipoPrimaAnticipada)}
-                                                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                                                >
-                                                    <option value="MONTO">Monto directo</option>
-                                                    <option value="SEMESTRE">Por semestre</option>
-                                                </select>
+                                                <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center">
+                                                    <MinusCircle className="w-5 h-5 text-red-600" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-gray-800">Deducciones Aplicadas</h4>
+                                                    <p className="text-xs text-gray-500">Montos que se descontaran del total</p>
+                                                </div>
                                             </div>
 
-                                            {anticipos.prima.tipo === 'SEMESTRE' ? (
-                                                <div className="flex gap-4 ml-32">
-                                                    <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={anticipos.prima.semestreJunioPagado}
-                                                            onChange={(e) => updatePrima('semestreJunioPagado', e.target.checked)}
-                                                            className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                                                        />
-                                                        <span className="text-gray-600">Junio (Ene-Jun)</span>
-                                                    </label>
-                                                    <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={anticipos.prima.semestreDiciembrePagado}
-                                                            onChange={(e) => updatePrima('semestreDiciembrePagado', e.target.checked)}
-                                                            className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                                                        />
-                                                        <span className="text-gray-600">Diciembre (Jul-Dic)</span>
-                                                    </label>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2 ml-32">
-                                                    <span className="text-gray-400 text-xs">$</span>
-                                                    <input
-                                                        type="text"
-                                                        value={anticipos.prima.montoPagado ? anticipos.prima.montoPagado.toLocaleString('es-CO') : ''}
-                                                        onChange={(e) => updatePrima('montoPagado', Number(e.target.value.replace(/\D/g, '')))}
-                                                        className="w-36 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
+                                            <div className="space-y-2">
+                                                {/* Anticipos de Prestaciones */}
+                                                {anticipos.prima.montoPagado > 0 && (
+                                                    <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
+                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                            <Gift className="w-4 h-4 text-pink-500" />
+                                                            Prima Anticipada
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-red-600">-{formatCurrency(anticipos.prima.montoPagado)}</span>
+                                                    </div>
+                                                )}
+                                                {anticipos.vacacionesPagadas > 0 && (
+                                                    <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
+                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                            <Palmtree className="w-4 h-4 text-cyan-500" />
+                                                            Vacaciones Pagadas
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-red-600">-{formatCurrency(anticipos.vacacionesPagadas)}</span>
+                                                    </div>
+                                                )}
+                                                {anticipos.cesantiasParciales > 0 && (
+                                                    <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
+                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                            <PiggyBank className="w-4 h-4 text-emerald-500" />
+                                                            Cesantias Parciales
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-red-600">-{formatCurrency(anticipos.cesantiasParciales)}</span>
+                                                    </div>
+                                                )}
+                                                {anticipos.interesesCesantiasPagados > 0 && (
+                                                    <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
+                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                            <Percent className="w-4 h-4 text-violet-500" />
+                                                            Int. Cesantias Pagados
+                                                        </span>
+                                                        <span className="text-sm font-semibold text-red-600">-{formatCurrency(anticipos.interesesCesantiasPagados)}</span>
+                                                    </div>
+                                                )}
 
-                                        {/* Otros anticipos */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                                            <div>
-                                                <label className="text-xs text-gray-600 block mb-1 font-medium">Vacaciones pagadas</label>
-                                                <div className="flex items-center">
-                                                    <span className="text-gray-400 text-xs mr-1">$</span>
-                                                    <input
-                                                        type="text"
-                                                        value={anticipos.vacacionesPagadas ? anticipos.vacacionesPagadas.toLocaleString('es-CO') : ''}
-                                                        onChange={(e) => setAnticipos(prev => ({
-                                                            ...prev,
-                                                            vacacionesPagadas: Number(e.target.value.replace(/\D/g, ''))
-                                                        }))}
-                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-600 block mb-1 font-medium">Cesantías parciales</label>
-                                                <div className="flex items-center">
-                                                    <span className="text-gray-400 text-xs mr-1">$</span>
-                                                    <input
-                                                        type="text"
-                                                        value={anticipos.cesantiasParciales ? anticipos.cesantiasParciales.toLocaleString('es-CO') : ''}
-                                                        onChange={(e) => setAnticipos(prev => ({
-                                                            ...prev,
-                                                            cesantiasParciales: Number(e.target.value.replace(/\D/g, ''))
-                                                        }))}
-                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-600 block mb-1 font-medium">Intereses cesantías</label>
-                                                <div className="flex items-center">
-                                                    <span className="text-gray-400 text-xs mr-1">$</span>
-                                                    <input
-                                                        type="text"
-                                                        value={anticipos.interesesCesantiasPagados ? anticipos.interesesCesantiasPagados.toLocaleString('es-CO') : ''}
-                                                        onChange={(e) => setAnticipos(prev => ({
-                                                            ...prev,
-                                                            interesesCesantiasPagados: Number(e.target.value.replace(/\D/g, ''))
-                                                        }))}
-                                                        className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Deducciones Personalizadas */}
-                                        <div className="border-t border-gray-100 pt-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                                    <ListMinus className="w-4 h-4 text-red-600" />
-                                                    Otras Deducciones ({deduccionesPersonalizadas.length}/5)
-                                                </h5>
-                                                <button
-                                                    onClick={addDeduccionPersonalizada}
-                                                    disabled={deduccionesPersonalizadas.length >= 5}
-                                                    className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                                                >
-                                                    + Agregar
-                                                </button>
-                                            </div>
-
-                                            {deduccionesPersonalizadas.length === 0 ? (
-                                                <p className="text-xs text-gray-400 text-center py-3 bg-gray-50 rounded-lg">
-                                                    Sin deducciones adicionales. Presione "+ Agregar" para añadir.
-                                                </p>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    {deduccionesPersonalizadas.map(d => (
-                                                        <div key={d.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg">
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Concepto (ej: Embargo judicial)"
-                                                                value={d.nombre}
-                                                                onChange={(e) => updateDeduccion(d.id, 'nombre', e.target.value)}
-                                                                className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                                                            />
-                                                            <div className="flex items-center">
-                                                                <span className="text-gray-400 text-xs mr-1">$</span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={d.valor ? d.valor.toLocaleString('es-CO') : ''}
-                                                                    onChange={(e) => updateDeduccion(d.id, 'valor', Number(e.target.value.replace(/\D/g, '')))}
-                                                                    className="w-28 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                                                                    placeholder="0"
-                                                                />
-                                                            </div>
-                                                            <button
-                                                                onClick={() => removeDeduccion(d.id)}
-                                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
+                                                {/* Deducciones Personalizadas */}
+                                                {deduccionesPersonalizadas.map((d) => (
+                                                    d.valor > 0 && (
+                                                        <div key={d.id} className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
+                                                            <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                                <ListMinus className="w-4 h-4 text-red-500" />
+                                                                {d.nombre || 'Deduccion'}
+                                                            </span>
+                                                            <span className="text-sm font-semibold text-red-600">-{formatCurrency(d.valor)}</span>
                                                         </div>
-                                                    ))}
+                                                    )
+                                                ))}
+
+                                                {/* Total */}
+                                                <div className="flex justify-between items-center py-3 px-3 bg-red-100 rounded-lg mt-2 border border-red-200">
+                                                    <span className="text-sm font-bold text-red-700">Total Deducciones</span>
+                                                    <span className="text-sm font-bold text-red-700">
+                                                        -{formatCurrency(
+                                                            anticipos.prima.montoPagado +
+                                                            anticipos.vacacionesPagadas +
+                                                            anticipos.cesantiasParciales +
+                                                            anticipos.interesesCesantiasPagados +
+                                                            deduccionesPersonalizadas.reduce((sum, d) => sum + (d.valor || 0), 0)
+                                                        )}
+                                                    </span>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Liquidación Actions */}
                                     <div className="bg-white rounded-xl p-4 border border-amber-200 space-y-3 shadow-sm">
