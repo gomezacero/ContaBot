@@ -12,11 +12,19 @@ const supabase = createClient(
 export async function GET(request: Request) {
     console.log('Starting Tax Calendar Cron Job...');
 
-    // Verificar CRON_SECRET para seguridad (opcional pero recomendado)
+    // SEGURIDAD: CRON_SECRET es OBLIGATORIO
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+        console.error('CRON_SECRET not configured - endpoint disabled for security');
+        return NextResponse.json(
+            { error: 'Server configuration error' },
+            { status: 500 }
+        );
+    }
+
+    if (authHeader !== `Bearer ${cronSecret}`) {
         console.warn('Unauthorized cron job attempt');
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

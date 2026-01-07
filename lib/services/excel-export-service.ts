@@ -2,9 +2,11 @@
  * Excel Export Service for Accounting Entries
  * Generates professional .xlsx files with Colombian PUC format
  * With proper debit/credit balancing and colored formatting
+ *
+ * Using ExcelJS for secure XLSX generation (no prototype pollution vulnerabilities)
  */
 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import type { OCRResult } from '@/app/dashboard/gastos/types';
 
 interface ExcelExportOptions {
@@ -44,7 +46,7 @@ const ACCOUNT_NAMES: Record<string, string> = {
     '519595': 'Propinas y Servicios',
 };
 
-// Color definitions (ARGB format for xlsx)
+// Color definitions (ARGB format for ExcelJS)
 const COLORS = {
     HEADER_BG: '002D44',      // Dark blue header
     HEADER_TEXT: 'FFFFFF',    // White text
@@ -52,120 +54,43 @@ const COLORS = {
     CREDIT_BG: 'FFEBEE',      // Light red for credits
     TOTAL_BG: 'FFF3E0',       // Light orange for totals
     ALERT_BG: 'FFCDD2',       // Red for alerts/warnings
+    TEAL_HEADER: '1AB1B1',    // Teal for items sheet
 };
-
-/**
- * Apply cell styles to a worksheet
- */
-function applyStyles(worksheet: XLSX.WorkSheet, rows: (string | number)[][], headerRowIndex: number = 0): void {
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-
-    for (let R = range.s.r; R <= range.e.r; R++) {
-        for (let C = range.s.c; C <= range.e.c; C++) {
-            const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-            const cell = worksheet[cellRef];
-            if (!cell) continue;
-
-            // Initialize style object
-            if (!cell.s) cell.s = {};
-
-            // Header row styling
-            if (R === headerRowIndex) {
-                cell.s = {
-                    fill: { fgColor: { rgb: COLORS.HEADER_BG } },
-                    font: { bold: true, color: { rgb: COLORS.HEADER_TEXT } },
-                    alignment: { horizontal: 'center', vertical: 'center' }
-                };
-            }
-
-            // Data rows - check for debit/credit columns (columns 7 and 8 are Débito and Crédito)
-            if (R > headerRowIndex) {
-                const rowData = rows[R];
-                if (rowData) {
-                    // Débito column (index 7)
-                    if (C === 7 && typeof rowData[7] === 'number' && rowData[7] > 0) {
-                        cell.s = {
-                            fill: { fgColor: { rgb: COLORS.DEBIT_BG } },
-                            font: { bold: true },
-                            numFmt: '"$"#,##0'
-                        };
-                    }
-                    // Crédito column (index 8)
-                    if (C === 8 && typeof rowData[8] === 'number' && rowData[8] > 0) {
-                        cell.s = {
-                            fill: { fgColor: { rgb: COLORS.CREDIT_BG } },
-                            font: { bold: true },
-                            numFmt: '"$"#,##0'
-                        };
-                    }
-                    // TOTALES row
-                    if (rowData[1] === 'TOTALES') {
-                        cell.s = {
-                            fill: { fgColor: { rgb: COLORS.TOTAL_BG } },
-                            font: { bold: true, sz: 12 }
-                        };
-                    }
-                    // DESCUADRE row
-                    if (typeof rowData[1] === 'string' && rowData[1].includes('DESCUADRE')) {
-                        cell.s = {
-                            fill: { fgColor: { rgb: COLORS.ALERT_BG } },
-                            font: { bold: true, color: { rgb: 'C62828' } }
-                        };
-                    }
-                }
-            }
-
-            // Number formatting for currency columns
-            if (typeof cell.v === 'number' && C >= 7 && C <= 16) {
-                cell.z = '"$"#,##0';
-            }
-            // Percentage formatting for Tasa IVA and Confianza
-            if (typeof cell.v === 'number' && (C === 11 || C === 18)) {
-                cell.z = '0.00%';
-            }
-        }
-    }
-}
 
 /**
  * Generates a professional Excel workbook with accounting entries
  */
-export function generateAccountingExcel(options: ExcelExportOptions): Blob {
+export async function generateAccountingExcel(options: ExcelExportOptions): Promise<Blob> {
     const { results, includeItems = true, includeTaxSummary = true } = options;
 
-    const workbook = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Contabio';
+    workbook.created = new Date();
 
     // Sheet 1: Asiento Contable (Accounting Entries)
-    const { sheet: accountingSheet, rows: accountingRows } = createAccountingSheet(results);
-    XLSX.utils.book_append_sheet(workbook, accountingSheet, 'Asiento Contable');
+    createAccountingSheet(workbook, results);
 
     // Sheet 2: Detalle Items (Item Details)
     if (includeItems) {
-        const { sheet: itemsSheet } = createItemsSheet(results);
-        XLSX.utils.book_append_sheet(workbook, itemsSheet, 'Detalle Items');
+        createItemsSheet(workbook, results);
     }
 
     // Sheet 3: Resumen Impuestos (Tax Summary)
     if (includeTaxSummary) {
-        const { sheet: taxSheet } = createTaxSummarySheet(results);
-        XLSX.utils.book_append_sheet(workbook, taxSheet, 'Resumen Impuestos');
+        createTaxSummarySheet(workbook, results);
     }
 
     // Convert to blob
-    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
-    return new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const buffer = await workbook.xlsx.writeBuffer();
+    return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
 /**
  * Creates the main accounting entries sheet with CORRECT debit/credit logic
- *
- * ACCOUNTING EQUATION:
- * DÉBITOS = Gastos + IVA Descontable + Impoconsumo + Propina
- * CRÉDITOS = Proveedores (neto a pagar) + Retenciones
- *
- * Where: Neto a Pagar = Total de factura (which already has retentions deducted)
  */
-function createAccountingSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; rows: (string | number)[][] } {
+function createAccountingSheet(workbook: ExcelJS.Workbook, results: OCRResult[]): void {
+    const worksheet = workbook.addWorksheet('Asiento Contable');
+
     const headers = [
         'Cuenta PUC',
         'Descripción',
@@ -188,7 +113,18 @@ function createAccountingSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; r
         'Confianza'
     ];
 
-    const rows: (string | number)[][] = [headers];
+    // Add header row
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: COLORS.HEADER_BG }
+        };
+        cell.font = { bold: true, color: { argb: COLORS.HEADER_TEXT } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
     let totalDebito = 0;
     let totalCredito = 0;
 
@@ -205,7 +141,6 @@ function createAccountingSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; r
         const reteFuente = result.retentions?.reteFuente || 0;
         const reteIca = result.retentions?.reteIca || 0;
         const reteIva = result.retentions?.reteIva || 0;
-        const totalRetenciones = reteFuente + reteIca + reteIva;
 
         // Extract tax values
         const iva = result.iva || 0;
@@ -213,41 +148,65 @@ function createAccountingSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; r
         const propina = result.tip || 0;
         const tasaIva = result.iva_rate || (iva > 0 ? 0.19 : 0);
 
-        // Calculate base gravable (considering AIU if present)
+        // Calculate base gravable
         let baseGravable = result.subtotal || 0;
         if (result.aiu) {
             baseGravable = result.aiu.base_gravable ||
                 (result.subtotal + (result.aiu.administracion || 0) + (result.aiu.imprevistos || 0) + (result.aiu.utilidad || 0));
         }
 
-        // IMPORTANT: result.total is already the NET amount payable (retentions already deducted)
-        // Formula: Total = Subtotal + IVA + Impoconsumo + Propina - Retenciones
         const netoAPagar = result.total;
 
-        // Helper function to create a row
-        const createRow = (cuenta: string, descripcion: string, debito: number, credito: number) => [
-            cuenta,
-            descripcion,
-            nit,
-            tercero,
-            documento,
-            fecha,
-            moneda,
-            debito,
-            credito,
-            baseGravable,
-            iva,
-            tasaIva,
-            impoconsumo,
-            reteFuente,
-            reteIva,
-            reteIca,
-            netoAPagar,
-            archivo,
-            confianza
-        ];
+        // Helper function to add a row
+        const addEntryRow = (cuenta: string, descripcion: string, debito: number, credito: number) => {
+            const row = worksheet.addRow([
+                cuenta,
+                descripcion,
+                nit,
+                tercero,
+                documento,
+                fecha,
+                moneda,
+                debito || '',
+                credito || '',
+                baseGravable,
+                iva,
+                tasaIva,
+                impoconsumo,
+                reteFuente,
+                reteIva,
+                reteIca,
+                netoAPagar,
+                archivo,
+                confianza
+            ]);
 
-        // === DEBIT ENTRIES (what we received/consumed) ===
+            // Style debit cell
+            if (debito > 0) {
+                row.getCell(8).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: COLORS.DEBIT_BG }
+                };
+                row.getCell(8).font = { bold: true };
+                row.getCell(8).numFmt = '"$"#,##0';
+            }
+
+            // Style credit cell
+            if (credito > 0) {
+                row.getCell(9).fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: COLORS.CREDIT_BG }
+                };
+                row.getCell(9).font = { bold: true };
+                row.getCell(9).numFmt = '"$"#,##0';
+            }
+
+            return row;
+        };
+
+        // === DEBIT ENTRIES ===
 
         // 1. Expense entries from items (group by category)
         const categoryTotals = new Map<string, number>();
@@ -271,198 +230,167 @@ function createAccountingSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; r
         for (const [pucCode, amount] of categoryTotals) {
             if (amount > 0) {
                 const descripcion = ACCOUNT_NAMES[pucCode] || 'Gastos';
-                rows.push(createRow(pucCode, descripcion, amount, 0));
+                addEntryRow(pucCode, descripcion, amount, 0);
                 totalDebito += amount;
             }
         }
 
-        // 2. IVA Descontable (DEBIT) - tax credit
+        // 2. IVA Descontable (DEBIT)
         if (iva > 0) {
-            rows.push(createRow(
+            addEntryRow(
                 PUC_ACCOUNTS.IVA_DESCONTABLE,
                 ACCOUNT_NAMES[PUC_ACCOUNTS.IVA_DESCONTABLE],
                 iva,
                 0
-            ));
+            );
             totalDebito += iva;
         }
 
-        // 3. Impoconsumo (DEBIT) - it's a non-deductible expense
+        // 3. Impoconsumo (DEBIT)
         if (impoconsumo > 0) {
-            rows.push(createRow(
+            addEntryRow(
                 PUC_ACCOUNTS.IMPOCONSUMO,
                 ACCOUNT_NAMES[PUC_ACCOUNTS.IMPOCONSUMO],
                 impoconsumo,
                 0
-            ));
+            );
             totalDebito += impoconsumo;
         }
 
-        // 4. Propina/Service (DEBIT) - it's an expense
+        // 4. Propina (DEBIT)
         if (propina > 0) {
-            rows.push(createRow(
+            addEntryRow(
                 PUC_ACCOUNTS.PROPINAS,
                 ACCOUNT_NAMES[PUC_ACCOUNTS.PROPINAS],
                 propina,
                 0
-            ));
+            );
             totalDebito += propina;
         }
 
-        // === CREDIT ENTRIES (our obligations) ===
+        // === CREDIT ENTRIES ===
 
-        // 5. Proveedores (CREDIT) - what we owe to the vendor (net of retentions)
-        rows.push(createRow(
+        // 5. Proveedores (CREDIT)
+        addEntryRow(
             PUC_ACCOUNTS.PROVEEDORES,
             ACCOUNT_NAMES[PUC_ACCOUNTS.PROVEEDORES],
             0,
             netoAPagar
-        ));
+        );
         totalCredito += netoAPagar;
 
-        // 6. ReteFuente (CREDIT) - obligation to DIAN
+        // 6. ReteFuente (CREDIT)
         if (reteFuente > 0) {
-            rows.push(createRow(
+            addEntryRow(
                 PUC_ACCOUNTS.RETEFUENTE,
                 ACCOUNT_NAMES[PUC_ACCOUNTS.RETEFUENTE],
                 0,
                 reteFuente
-            ));
+            );
             totalCredito += reteFuente;
         }
 
-        // 7. ReteICA (CREDIT) - obligation to municipality
+        // 7. ReteICA (CREDIT)
         if (reteIca > 0) {
-            rows.push(createRow(
+            addEntryRow(
                 PUC_ACCOUNTS.RETEICA,
                 ACCOUNT_NAMES[PUC_ACCOUNTS.RETEICA],
                 0,
                 reteIca
-            ));
+            );
             totalCredito += reteIca;
         }
 
         // 8. ReteIVA (CREDIT)
         if (reteIva > 0) {
-            rows.push(createRow(
+            addEntryRow(
                 PUC_ACCOUNTS.RETEIVA,
                 ACCOUNT_NAMES[PUC_ACCOUNTS.RETEIVA],
                 0,
                 reteIva
-            ));
+            );
             totalCredito += reteIva;
         }
 
-        // Add empty row between invoices for readability
-        rows.push(Array(headers.length).fill(''));
+        // Add empty row between invoices
+        worksheet.addRow([]);
     }
 
     // Add totals row
-    rows.push([
+    const totalsRow = worksheet.addRow([
         '',
         'TOTALES',
-        '',
-        '',
-        '',
-        '',
-        '',
+        '', '', '', '', '',
         totalDebito,
         totalCredito,
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        ''
+        '', '', '', '', '', '', '', '', '', ''
     ]);
+    totalsRow.eachCell((cell) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: COLORS.TOTAL_BG }
+        };
+        cell.font = { bold: true, size: 12 };
+    });
+    totalsRow.getCell(8).numFmt = '"$"#,##0';
+    totalsRow.getCell(9).numFmt = '"$"#,##0';
 
-    // Verify balance and add warning if unbalanced
+    // Verify balance
     const difference = Math.round(totalDebito - totalCredito);
     if (Math.abs(difference) > 1) {
-        rows.push([
+        const alertRow = worksheet.addRow([
             '',
             `⚠️ DESCUADRE: $${difference.toLocaleString('es-CO')} - Verificar datos de factura`,
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            ''
+            '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
         ]);
+        alertRow.eachCell((cell) => {
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: COLORS.ALERT_BG }
+            };
+            cell.font = { bold: true, color: { argb: 'C62828' } };
+        });
     } else {
-        rows.push([
+        const balancedRow = worksheet.addRow([
             '',
             '✓ CUADRADO - Débitos = Créditos',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            ''
+            '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
         ]);
+        balancedRow.getCell(2).font = { bold: true, color: { argb: '2E7D32' } };
     }
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-
     // Set column widths
-    worksheet['!cols'] = [
-        { wch: 12 },  // Cuenta PUC
-        { wch: 35 },  // Descripción
-        { wch: 15 },  // NIT
-        { wch: 30 },  // Nombre Tercero
-        { wch: 15 },  // Documento
-        { wch: 12 },  // Fecha
-        { wch: 8 },   // Moneda
-        { wch: 18 },  // Débito
-        { wch: 18 },  // Crédito
-        { wch: 15 },  // Base Gravable
-        { wch: 12 },  // IVA
-        { wch: 10 },  // Tasa IVA
-        { wch: 12 },  // Impoconsumo
-        { wch: 12 },  // ReteFuente
-        { wch: 12 },  // ReteIVA
-        { wch: 12 },  // ReteICA
-        { wch: 15 },  // Neto a Pagar
-        { wch: 25 },  // Archivo
-        { wch: 10 },  // Confianza
+    worksheet.columns = [
+        { width: 12 },  // Cuenta PUC
+        { width: 35 },  // Descripción
+        { width: 15 },  // NIT
+        { width: 30 },  // Nombre Tercero
+        { width: 15 },  // Documento
+        { width: 12 },  // Fecha
+        { width: 8 },   // Moneda
+        { width: 18 },  // Débito
+        { width: 18 },  // Crédito
+        { width: 15 },  // Base Gravable
+        { width: 12 },  // IVA
+        { width: 10 },  // Tasa IVA
+        { width: 12 },  // Impoconsumo
+        { width: 12 },  // ReteFuente
+        { width: 12 },  // ReteIVA
+        { width: 12 },  // ReteICA
+        { width: 15 },  // Neto a Pagar
+        { width: 25 },  // Archivo
+        { width: 10 },  // Confianza
     ];
-
-    // Apply styles
-    applyStyles(worksheet, rows, 0);
-
-    return { sheet: worksheet, rows };
 }
 
 /**
- * Creates the detailed items sheet with colors
+ * Creates the detailed items sheet
  */
-function createItemsSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; rows: (string | number)[][] } {
+function createItemsSheet(workbook: ExcelJS.Workbook, results: OCRResult[]): void {
+    const worksheet = workbook.addWorksheet('Detalle Items');
+
     const headers = [
         'Proveedor',
         'NIT',
@@ -478,11 +406,21 @@ function createItemsSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; rows: 
         'Archivo'
     ];
 
-    const rows: (string | number)[][] = [headers];
+    // Add header row
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: COLORS.TEAL_HEADER }
+        };
+        cell.font = { bold: true, color: { argb: COLORS.HEADER_TEXT } };
+        cell.alignment = { horizontal: 'center' };
+    });
 
     for (const result of results) {
         for (const item of result.items) {
-            rows.push([
+            const row = worksheet.addRow([
                 result.entity || 'Desconocido',
                 result.nit || 'S/N',
                 result.invoiceNumber || 'S/N',
@@ -496,51 +434,43 @@ function createItemsSheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; rows: 
                 item.category || '',
                 result.fileName || ''
             ]);
+
+            // Format currency columns
+            row.getCell(8).numFmt = '"$"#,##0';
+            row.getCell(9).numFmt = '"$"#,##0';
+            row.getCell(10).numFmt = '"$"#,##0';
         }
     }
 
     // Add totals
     const totalItems = results.reduce((sum, r) => sum + r.items.reduce((s, i) => s + (i.total || 0), 0), 0);
-    rows.push(['', '', '', '', 'TOTAL', '', '', '', '', totalItems, '', '']);
+    const totalsRow = worksheet.addRow(['', '', '', '', 'TOTAL', '', '', '', '', totalItems, '', '']);
+    totalsRow.font = { bold: true };
+    totalsRow.getCell(10).numFmt = '"$"#,##0';
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-
-    worksheet['!cols'] = [
-        { wch: 30 },  // Proveedor
-        { wch: 15 },  // NIT
-        { wch: 15 },  // Factura
-        { wch: 12 },  // Fecha
-        { wch: 40 },  // Descripción
-        { wch: 10 },  // Cantidad
-        { wch: 8 },   // Unidad
-        { wch: 18 },  // Precio Unitario
-        { wch: 12 },  // Descuento
-        { wch: 18 },  // Total
-        { wch: 25 },  // Categoría PUC
-        { wch: 25 },  // Archivo
+    // Set column widths
+    worksheet.columns = [
+        { width: 30 },  // Proveedor
+        { width: 15 },  // NIT
+        { width: 15 },  // Factura
+        { width: 12 },  // Fecha
+        { width: 40 },  // Descripción
+        { width: 10 },  // Cantidad
+        { width: 8 },   // Unidad
+        { width: 18 },  // Precio Unitario
+        { width: 12 },  // Descuento
+        { width: 18 },  // Total
+        { width: 25 },  // Categoría PUC
+        { width: 25 },  // Archivo
     ];
-
-    // Apply header styles
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    for (let C = range.s.c; C <= range.e.c; C++) {
-        const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
-        const cell = worksheet[cellRef];
-        if (cell) {
-            cell.s = {
-                fill: { fgColor: { rgb: '1AB1B1' } }, // Teal header
-                font: { bold: true, color: { rgb: 'FFFFFF' } },
-                alignment: { horizontal: 'center' }
-            };
-        }
-    }
-
-    return { sheet: worksheet, rows };
 }
 
 /**
- * Creates the tax summary sheet with colors
+ * Creates the tax summary sheet
  */
-function createTaxSummarySheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; rows: (string | number)[][] } {
+function createTaxSummarySheet(workbook: ExcelJS.Workbook, results: OCRResult[]): void {
+    const worksheet = workbook.addWorksheet('Resumen Impuestos');
+
     // Aggregate tax data
     let totalSubtotal = 0;
     let totalIva = 0;
@@ -571,65 +501,104 @@ function createTaxSummarySheet(results: OCRResult[]): { sheet: XLSX.WorkSheet; r
 
     const totalRetenciones = totalReteFuente + totalReteIca + totalReteIva;
 
-    const rows: (string | number)[][] = [
-        ['RESUMEN DE IMPUESTOS Y RETENCIONES', '', ''],
-        ['', '', ''],
-        ['Concepto', 'Base / Tasa', 'Valor'],
-        ['', '', ''],
-        ['Subtotal (Base Gravable)', '', totalSubtotal],
-        ['', '', ''],
-    ];
+    // Title
+    const titleRow = worksheet.addRow(['RESUMEN DE IMPUESTOS Y RETENCIONES', '', '']);
+    titleRow.font = { bold: true, size: 14, color: { argb: '002D44' } };
+    worksheet.mergeCells('A1:C1');
+
+    worksheet.addRow([]);
+
+    const headerRow = worksheet.addRow(['Concepto', 'Base / Tasa', 'Valor']);
+    headerRow.font = { bold: true };
+
+    worksheet.addRow([]);
+
+    const subtotalRow = worksheet.addRow(['Subtotal (Base Gravable)', '', totalSubtotal]);
+    subtotalRow.getCell(3).numFmt = '"$"#,##0';
+
+    worksheet.addRow([]);
 
     // AIU if present
     if (totalAiu.administracion > 0 || totalAiu.imprevistos > 0 || totalAiu.utilidad > 0) {
-        rows.push(['AIU - Administración', '', totalAiu.administracion]);
-        rows.push(['AIU - Imprevistos', '', totalAiu.imprevistos]);
-        rows.push(['AIU - Utilidad', '', totalAiu.utilidad]);
-        rows.push(['', '', '']);
+        const aiuRows = [
+            worksheet.addRow(['AIU - Administración', '', totalAiu.administracion]),
+            worksheet.addRow(['AIU - Imprevistos', '', totalAiu.imprevistos]),
+            worksheet.addRow(['AIU - Utilidad', '', totalAiu.utilidad])
+        ];
+        aiuRows.forEach(row => { row.getCell(3).numFmt = '"$"#,##0'; });
+        worksheet.addRow([]);
     }
 
-    // Taxes (green section)
-    rows.push(['IMPUESTOS (DÉBITOS)', '', '']);
-    rows.push(['IVA Descontable', '19%', totalIva]);
+    // Taxes section
+    const taxHeader = worksheet.addRow(['IMPUESTOS (DÉBITOS)', '', '']);
+    taxHeader.font = { bold: true };
+    taxHeader.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: COLORS.DEBIT_BG }
+    };
+
+    const ivaRow = worksheet.addRow(['IVA Descontable', '19%', totalIva]);
+    ivaRow.getCell(3).numFmt = '"$"#,##0';
+
     if (totalImpoconsumo > 0) {
-        rows.push(['Impoconsumo', '8%', totalImpoconsumo]);
+        const impoRow = worksheet.addRow(['Impoconsumo', '8%', totalImpoconsumo]);
+        impoRow.getCell(3).numFmt = '"$"#,##0';
     }
+
     if (totalTip > 0) {
-        rows.push(['Propina / Servicio', '', totalTip]);
+        const tipRow = worksheet.addRow(['Propina / Servicio', '', totalTip]);
+        tipRow.getCell(3).numFmt = '"$"#,##0';
     }
-    rows.push(['', '', '']);
 
-    // Retentions (red section)
-    rows.push(['RETENCIONES (CRÉDITOS)', '', '']);
-    rows.push(['Retención en la Fuente', '2.5%', totalReteFuente]);
-    rows.push(['Retención de ICA', '0.4% - 1.4%', totalReteIca]);
-    rows.push(['Retención de IVA', '15% del IVA', totalReteIva]);
-    rows.push(['Total Retenciones', '', totalRetenciones]);
-    rows.push(['', '', '']);
+    worksheet.addRow([]);
 
-    // Totals
-    rows.push(['', '', '']);
-    rows.push(['TOTAL FACTURADO (Neto a Pagar)', '', totalGrandTotal]);
-    rows.push(['', '', '']);
-    rows.push(['Número de Facturas Procesadas', '', results.length]);
+    // Retentions section
+    const retHeader = worksheet.addRow(['RETENCIONES (CRÉDITOS)', '', '']);
+    retHeader.font = { bold: true };
+    retHeader.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: COLORS.CREDIT_BG }
+    };
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const reteFuenteRow = worksheet.addRow(['Retención en la Fuente', '2.5%', totalReteFuente]);
+    reteFuenteRow.getCell(3).numFmt = '"$"#,##0';
 
-    worksheet['!cols'] = [
-        { wch: 40 },  // Concepto
-        { wch: 15 },  // Base / Tasa
-        { wch: 20 },  // Valor
+    const reteIcaRow = worksheet.addRow(['Retención de ICA', '0.4% - 1.4%', totalReteIca]);
+    reteIcaRow.getCell(3).numFmt = '"$"#,##0';
+
+    const reteIvaRow = worksheet.addRow(['Retención de IVA', '15% del IVA', totalReteIva]);
+    reteIvaRow.getCell(3).numFmt = '"$"#,##0';
+
+    const totalRetRow = worksheet.addRow(['Total Retenciones', '', totalRetenciones]);
+    totalRetRow.font = { bold: true };
+    totalRetRow.getCell(3).numFmt = '"$"#,##0';
+
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+
+    // Grand total
+    const grandTotalRow = worksheet.addRow(['TOTAL FACTURADO (Neto a Pagar)', '', totalGrandTotal]);
+    grandTotalRow.font = { bold: true, size: 12 };
+    grandTotalRow.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: COLORS.TOTAL_BG }
+    };
+    grandTotalRow.getCell(3).numFmt = '"$"#,##0';
+
+    worksheet.addRow([]);
+
+    const countRow = worksheet.addRow(['Número de Facturas Procesadas', '', results.length]);
+    countRow.font = { italic: true };
+
+    // Set column widths
+    worksheet.columns = [
+        { width: 40 },  // Concepto
+        { width: 15 },  // Base / Tasa
+        { width: 20 },  // Valor
     ];
-
-    // Apply styles to header
-    const headerCell = worksheet['A1'];
-    if (headerCell) {
-        headerCell.s = {
-            font: { bold: true, sz: 14, color: { rgb: '002D44' } }
-        };
-    }
-
-    return { sheet: worksheet, rows };
 }
 
 export default generateAccountingExcel;

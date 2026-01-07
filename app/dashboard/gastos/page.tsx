@@ -27,7 +27,6 @@ import {
     Zap,
     HardDrive
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
 import { OCRItem, OCRResult, ValidationResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
@@ -537,14 +536,15 @@ export default function GastosPage() {
         }
     };
 
-    const exportToExcel = () => {
+    const exportToExcel = async () => {
         if (results.length === 0) return;
 
-        // Import the Excel export service dynamically to avoid SSR issues
-        import('@/lib/services/excel-export-service').then(({ generateAccountingExcel }) => {
+        try {
+            // Import the Excel export service dynamically to avoid SSR issues
+            const { generateAccountingExcel } = await import('@/lib/services/excel-export-service');
             const clientName = clients.find(c => c.id === selectedClientId)?.name || 'General';
 
-            const blob = generateAccountingExcel({
+            const blob = await generateAccountingExcel({
                 clientName,
                 results,
                 includeItems: true,
@@ -558,14 +558,14 @@ export default function GastosPage() {
             link.download = `asiento_contable_${clientName}_${new Date().toISOString().split('T')[0]}.xlsx`;
             link.click();
             URL.revokeObjectURL(url);
-        }).catch(err => {
+        } catch (err) {
             console.error('Error generating Excel:', err);
             addToast({
                 type: 'error',
                 title: 'Error',
                 description: 'No se pudo generar el archivo Excel'
             });
-        });
+        }
     };
 
     const formatCurrency = (value: number) => {
