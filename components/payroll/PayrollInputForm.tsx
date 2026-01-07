@@ -33,13 +33,13 @@ const SectionHeader = ({
 }) => (
     <button
         onClick={toggle}
-        className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 border-b border-gray-200 transition-colors bg-white"
+        className="w-full flex items-center justify-between p-4 bg-zinc-50 hover:bg-zinc-100 border-b border-zinc-200 transition-colors bg-white"
     >
-        <div className="flex items-center gap-2 text-slate-700 font-medium">
-            <Icon size={18} className="text-blue-600" />
+        <div className="flex items-center gap-2 text-zinc-700 font-medium">
+            <Icon size={18} className="text-emerald-600" />
             {title}
         </div>
-        {isOpen ? <ChevronDown size={18} className="text-gray-400" /> : <ChevronRight size={18} className="text-gray-400" />}
+        {isOpen ? <ChevronDown size={18} className="text-zinc-400" /> : <ChevronRight size={18} className="text-zinc-400" />}
     </button>
 );
 
@@ -71,9 +71,9 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 bg-slate-800 text-white flex items-center gap-2">
-                <Calculator size={20} className="text-blue-400" />
+        <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
+            <div className="p-4 bg-zinc-900 text-white flex items-center gap-2">
+                <Calculator size={20} className="text-emerald-400" />
                 <h2 className="font-semibold text-sm uppercase tracking-wider">Parámetros de Nómina</h2>
             </div>
 
@@ -87,24 +87,24 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
             {openSections.contract && (
                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-500 uppercase">Salario Base</label>
+                        <label className="text-xs font-semibold text-zinc-500 uppercase">Salario Base</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-slate-400">$</span>
+                            <span className="absolute left-3 top-2.5 text-zinc-400">$</span>
                             <input
                                 type="number"
                                 value={input.baseSalary}
                                 onChange={(e) => handleChange('baseSalary', Number(e.target.value))}
-                                className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-slate-800 font-medium"
+                                className="w-full pl-7 pr-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-zinc-800 font-medium"
                             />
                         </div>
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-500 uppercase">Tipo de Contrato</label>
+                        <label className="text-xs font-semibold text-zinc-500 uppercase">Tipo de Contrato</label>
                         <select
                             value={input.contractType || 'INDEFINIDO'}
                             onChange={(e) => handleChange('contractType', e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 sm:text-sm"
+                            className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none text-zinc-700 sm:text-sm"
                         >
                             <option value="INDEFINIDO">Indefinido</option>
                             <option value="FIJO">Término Fijo</option>
@@ -113,15 +113,15 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                         </select>
                     </div>
 
-                    <div className="flex items-center gap-2 md:col-span-2 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2 md:col-span-2 p-2 bg-emerald-50 rounded-lg border border-emerald-100">
                         <input
                             type="checkbox"
                             checked={input.includeTransportAid}
                             onChange={(e) => handleChange('includeTransportAid', e.target.checked)}
                             id="transportAid"
-                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                            className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 border-zinc-300"
                         />
-                        <label htmlFor="transportAid" className="text-sm text-slate-700">
+                        <label htmlFor="transportAid" className="text-sm text-zinc-700">
                             Incluir Auxilio de Transporte (Si aplica por ley)
                         </label>
                     </div>
@@ -136,7 +136,7 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                 toggle={() => toggleSection('novedades')}
             />
             {openSections.novedades && (
-                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-2 duration-200 bg-slate-50/50">
+                <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-2 duration-200 bg-zinc-50/50">
                     {[
                         { label: 'H.E. Diurna (25%)', key: 'hedHours' },
                         { label: 'H.E. Nocturna (75%)', key: 'henHours' },
@@ -146,13 +146,13 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                         { label: 'H.E. Dom/Fest N (150%)', key: 'hendfHours' },
                     ].map((item) => (
                         <div key={item.key} className="space-y-1">
-                            <label className="text-xs text-slate-500">{item.label}</label>
+                            <label className="text-xs text-zinc-500">{item.label}</label>
                             <input
                                 type="number"
                                 min="0"
                                 value={input[item.key as keyof PayrollInput] as number || 0}
                                 onChange={(e) => handleChange(item.key as keyof PayrollInput, Number(e.target.value))}
-                                className="w-full px-3 py-1.5 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none"
+                                className="w-full px-3 py-1.5 border border-zinc-300 rounded text-sm focus:border-emerald-500 outline-none"
                             />
                         </div>
                     ))}
@@ -170,31 +170,31 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                 <div className="p-4 grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-500 uppercase">Comisiones (Salarial)</label>
+                            <label className="text-xs font-semibold text-zinc-500 uppercase">Comisiones (Salarial)</label>
                             <input
                                 type="number"
                                 value={input.commissions || 0}
                                 onChange={(e) => handleChange('commissions', Number(e.target.value))}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-emerald-500 text-sm"
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-500 uppercase">Bonos Salariales</label>
+                            <label className="text-xs font-semibold text-zinc-500 uppercase">Bonos Salariales</label>
                             <input
                                 type="number"
                                 value={input.salaryBonuses || 0}
                                 onChange={(e) => handleChange('salaryBonuses', Number(e.target.value))}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-emerald-500 text-sm"
                             />
                         </div>
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-500 uppercase">Auxilios No Salariales</label>
+                        <label className="text-xs font-semibold text-zinc-500 uppercase">Auxilios No Salariales</label>
                         <input
                             type="number"
                             value={input.nonSalaryBonuses || 0}
                             onChange={(e) => handleChange('nonSalaryBonuses', Number(e.target.value))}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-emerald-500 text-sm"
                         />
                         <p className="text-[10px] text-orange-500 mt-1">* Sujeto a la regla del 40% (Art. 30 L.1393/2010)</p>
                     </div>
@@ -212,21 +212,21 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                 <div className="p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-500 uppercase">Préstamos / Libranzas</label>
+                            <label className="text-xs font-semibold text-zinc-500 uppercase">Préstamos / Libranzas</label>
                             <input
                                 type="number"
                                 value={input.loans || 0}
                                 onChange={(e) => handleChange('loans', Number(e.target.value))}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-red-500 text-sm"
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-red-500 text-sm"
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-500 uppercase">Otras Deducciones</label>
+                            <label className="text-xs font-semibold text-zinc-500 uppercase">Otras Deducciones</label>
                             <input
                                 type="number"
                                 value={input.otherDeductions || 0}
                                 onChange={(e) => handleChange('otherDeductions', Number(e.target.value))}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-red-500 text-sm"
+                                className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-red-500 text-sm"
                             />
                         </div>
                     </div>
@@ -237,15 +237,15 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                                 type="checkbox"
                                 checked={input.enableDeductions}
                                 onChange={(e) => handleChange('enableDeductions', e.target.checked)}
-                                className="w-4 h-4 text-blue-600 rounded"
+                                className="w-4 h-4 text-emerald-600 rounded"
                             />
-                            <span className="text-sm font-medium text-slate-800">Depuración Retención en la Fuente (Opcional)</span>
+                            <span className="text-sm font-medium text-zinc-800">Depuración Retención en la Fuente (Opcional)</span>
                         </div>
 
                         {input.enableDeductions && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-zinc-50 rounded-lg text-sm">
                                 <div className="space-y-1">
-                                    <label className="text-xs text-slate-500">Intereses Vivienda</label>
+                                    <label className="text-xs text-zinc-500">Intereses Vivienda</label>
                                     <input
                                         type="number"
                                         value={input.deductionsParameters.housingInterest}
@@ -254,7 +254,7 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs text-slate-500">Salud Prepagada</label>
+                                    <label className="text-xs text-zinc-500">Salud Prepagada</label>
                                     <input
                                         type="number"
                                         value={input.deductionsParameters.prepaidMedicine}
@@ -263,7 +263,7 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs text-slate-500">Aporte Voluntario Pensión</label>
+                                    <label className="text-xs text-zinc-500">Aporte Voluntario Pensión</label>
                                     <input
                                         type="number"
                                         value={input.deductionsParameters.voluntaryPension}
@@ -276,9 +276,9 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                                         type="checkbox"
                                         checked={input.deductionsParameters.hasDependents}
                                         onChange={(e) => handleDeductionParamChange('hasDependents', e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 rounded"
+                                        className="w-4 h-4 text-emerald-600 rounded"
                                     />
-                                    <label className="text-xs text-slate-700">Tiene Dependientes (10%)</label>
+                                    <label className="text-xs text-zinc-700">Tiene Dependientes (10%)</label>
                                 </div>
                             </div>
                         )}
@@ -296,11 +296,11 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
             {openSections.config && (
                 <div className="p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-500 uppercase">Clase de Riesgo ARL</label>
+                        <label className="text-xs font-semibold text-zinc-500 uppercase">Clase de Riesgo ARL</label>
                         <select
                             value={input.riskLevel}
                             onChange={(e) => handleChange('riskLevel', e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-700"
+                            className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:ring-2 focus:ring-emerald-500 outline-none text-sm text-zinc-700"
                         >
                             {(Object.keys(RISK_LEVEL_LABELS) as RiskLevel[]).map((level) => (
                                 <option key={level} value={level}>
@@ -316,13 +316,13 @@ export const PayrollInputForm: React.FC<PayrollInputFormProps> = ({ input, onCha
                             checked={input.isExempt}
                             onChange={(e) => handleChange('isExempt', e.target.checked)}
                             id="exonerated"
-                            className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-gray-300"
+                            className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-zinc-300"
                         />
                         <div className="flex flex-col">
-                            <label htmlFor="exonerated" className="text-sm font-medium text-slate-800">
+                            <label htmlFor="exonerated" className="text-sm font-medium text-zinc-800">
                                 Exonerado de Parafiscales (Art. 114-1 E.T.)
                             </label>
-                            <span className="text-xs text-slate-500">Aplica para Salud, SENA e ICBF si salario &lt; 10 SMMLV.</span>
+                            <span className="text-xs text-zinc-500">Aplica para Salud, SENA e ICBF si salario &lt; 10 SMMLV.</span>
                         </div>
                     </div>
                 </div>

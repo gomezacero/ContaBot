@@ -21,7 +21,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         activeClients: 0,
-        processedPayrolls: 0, // This will track employees count actually as per plan
+        processedPayrolls: 0,
         processedDocuments: 0,
         pendingAlerts: 0,
         documentsTrend: 0
@@ -31,10 +31,11 @@ export default function DashboardPage() {
         {
             id: 'nomina',
             title: 'Nómina',
-            description: 'Cálculos automáticos bajo ley 2025, provisiones y liquidaciones.',
+            description: 'Cálculos automáticos bajo ley 2026, provisiones y liquidaciones.',
             icon: LayoutDashboard,
             href: '/dashboard/nomina',
-            color: 'bg-[#1AB1B1]',
+            color: 'bg-emerald-600',
+            hoverColor: 'group-hover:bg-emerald-700',
             stats: `${stats.processedPayrolls} empleados activos`
         },
         {
@@ -44,6 +45,7 @@ export default function DashboardPage() {
             icon: ScanLine,
             href: '/dashboard/gastos',
             color: 'bg-purple-500',
+            hoverColor: 'group-hover:bg-purple-600',
             stats: `${stats.documentsTrend} documentos este mes`
         },
         {
@@ -52,7 +54,8 @@ export default function DashboardPage() {
             description: 'Vigilancia de NITs y alertas de vencimientos DIAN.',
             icon: CalendarDays,
             href: '/dashboard/calendario',
-            color: 'bg-[#002D44]',
+            color: 'bg-zinc-800',
+            hoverColor: 'group-hover:bg-zinc-900',
             stats: `${stats.pendingAlerts} vencimientos próximos`
         },
     ];
@@ -65,12 +68,12 @@ export default function DashboardPage() {
                     .from('clients')
                     .select('nit, classification, tax_regime, iva_periodicity, is_retention_agent', { count: 'exact' });
 
-                // 2. Fetch Employees Count (Active employees for "processed payrolls/active" stat)
+                // 2. Fetch Employees Count
                 const { count: employeesCount } = await supabase
                     .from('employees')
                     .select('*', { count: 'exact' });
 
-                // 3. Fetch OCR Results Count (Total Documents)
+                // 3. Fetch OCR Results Count
                 const { count: documentsCount } = await supabase
                     .from('expense_documents')
                     .select('*', { count: 'exact' });
@@ -84,13 +87,10 @@ export default function DashboardPage() {
                     .select('*', { count: 'exact' })
                     .gte('created_at', startOfMonth.toISOString());
 
-
                 // 4. Calculate Tax Alerts
                 let totalAlerts = 0;
                 if (clientsData) {
                     clientsData.forEach(client => {
-                        // Map DB client to TaxClientConfig
-                        // Defaulting missing fields to safe values
                         const config: TaxClientConfig = {
                             nit: client.nit || '',
                             classification: (client.classification as any) || 'JURIDICA',
@@ -105,7 +105,7 @@ export default function DashboardPage() {
                         if (!config.nit) return;
 
                         const events = getTaxDeadlines(config);
-                        const upcoming = getUpcomingEvents(events, 30); // Look ahead 30 days
+                        const upcoming = getUpcomingEvents(events, 30);
                         totalAlerts += upcoming.length;
                     });
                 }
@@ -137,7 +137,7 @@ export default function DashboardPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[600px]">
-                <Loader2 className="w-10 h-10 animate-spin text-[#1AB1B1]" />
+                <Loader2 className="w-10 h-10 animate-spin text-emerald-600" />
             </div>
         );
     }
@@ -145,11 +145,24 @@ export default function DashboardPage() {
     return (
         <div className="space-y-8 animate-fade-in">
             {/* Welcome Section */}
-            <div className="bg-gradient-to-r from-[#002D44] to-[#1AB1B1] rounded-3xl p-8 text-white shadow-lg">
-                <h1 className="text-3xl font-black mb-2">¡Bienvenido a ContaBot!</h1>
-                <p className="text-white/80 max-w-xl text-lg">
-                    Tu sistema operativo financiero. Tienes <span className="font-bold text-white underline decoration-wavy decoration-[#1AB1B1]">{stats.pendingAlerts} vencimientos tributarios</span> pendientes para los próximos 30 días.
-                </p>
+            <div className="relative bg-gradient-to-br from-zinc-900 via-zinc-800 to-emerald-900 rounded-[2rem] p-8 text-white shadow-2xl overflow-hidden">
+                {/* Background decoration */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl"></div>
+
+                <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                            <span className="text-2xl font-black">C</span>
+                        </div>
+                        <h1 className="text-3xl font-black">¡Bienvenido a Contabio!</h1>
+                    </div>
+                    <p className="text-white/70 max-w-xl text-lg leading-relaxed">
+                        Tu sistema operativo financiero. Tienes{' '}
+                        <span className="font-bold text-emerald-400">{stats.pendingAlerts} vencimientos tributarios</span>{' '}
+                        pendientes para los próximos 30 días.
+                    </p>
+                </div>
             </div>
 
             {/* Quick Stats */}
@@ -157,18 +170,18 @@ export default function DashboardPage() {
                 {quickStats.map((stat, i) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={i} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm transition-transform hover:scale-[1.02]">
+                        <div key={i} className="bg-white rounded-2xl p-6 border border-zinc-100 shadow-sm hover:shadow-lg hover:border-emerald-100 transition-all duration-300 hover:-translate-y-1">
                             <div className="flex items-start justify-between mb-4">
-                                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center">
-                                    <Icon className="w-6 h-6 text-[#002D44]" />
+                                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                                    <Icon className="w-6 h-6 text-emerald-600" />
                                 </div>
-                                <div className="flex items-center gap-1 text-xs font-bold text-[#1AB1B1] bg-teal-50 px-2 py-1 rounded-full">
+                                <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">
                                     <TrendingUp className="w-3 h-3" />
                                     {stat.trend}
                                 </div>
                             </div>
-                            <p className="text-4xl font-black text-[#002D44] tracking-tight">{stat.value}</p>
-                            <p className="text-sm text-gray-400 font-medium mt-1">{stat.label}</p>
+                            <p className="text-4xl font-black text-zinc-900 tracking-tight">{stat.value}</p>
+                            <p className="text-sm text-zinc-400 font-medium mt-1">{stat.label}</p>
                         </div>
                     );
                 })}
@@ -176,9 +189,9 @@ export default function DashboardPage() {
 
             {/* Module Cards */}
             <div>
-                <h2 className="text-xl font-black text-[#002D44] mb-6 flex items-center gap-2">
+                <h2 className="text-xl font-black text-zinc-900 mb-6 flex items-center gap-2">
                     Módulos Disponibles
-                    <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">v2.5</span>
+                    <span className="text-xs font-bold text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full">v2.6</span>
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {modules.map((module) => {
@@ -187,9 +200,9 @@ export default function DashboardPage() {
                             <Link
                                 key={module.id}
                                 href={module.href}
-                                className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden relative"
+                                className="group bg-white rounded-2xl border border-zinc-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden relative hover:-translate-y-1"
                             >
-                                <div className={`${module.color} p-6 relative h-32`}>
+                                <div className={`${module.color} ${module.hoverColor} p-6 relative h-32 transition-colors`}>
                                     <div className="absolute top-0 right-0 p-4 opacity-10 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-500">
                                         <Icon className="w-32 h-32 text-white" />
                                     </div>
@@ -201,12 +214,12 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                                 <div className="p-6">
-                                    <p className="text-gray-500 text-sm mb-6 min-h-[40px] leading-relaxed">{module.description}</p>
-                                    <div className="flex items-center justify-between border-t border-gray-50 pt-4">
-                                        <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-md">
+                                    <p className="text-zinc-500 text-sm mb-6 min-h-[40px] leading-relaxed">{module.description}</p>
+                                    <div className="flex items-center justify-between border-t border-zinc-50 pt-4">
+                                        <span className="text-xs font-bold text-zinc-400 bg-zinc-50 px-2 py-1 rounded-md">
                                             {module.stats}
                                         </span>
-                                        <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center group-hover:bg-[#002D44] group-hover:text-white transition-all transform group-hover:-rotate-45">
+                                        <div className="w-8 h-8 bg-zinc-50 rounded-full flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all transform group-hover:-rotate-45">
                                             <ArrowUpRight className="w-4 h-4" />
                                         </div>
                                     </div>

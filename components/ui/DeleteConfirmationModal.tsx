@@ -67,33 +67,33 @@ export default function DeleteConfirmationModal({
             {/* Modal */}
             <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-fade-in">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <div className="flex items-center justify-between p-6 border-b border-zinc-100">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
                             <AlertTriangle className="w-5 h-5 text-red-600" />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+                        <h3 className="text-lg font-bold text-zinc-900">{title}</h3>
                     </div>
                     <button
                         onClick={handleClose}
                         disabled={isDeleting}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2 hover:bg-zinc-100 rounded-lg transition-colors disabled:opacity-50"
                     >
-                        <X className="w-5 h-5 text-gray-400" />
+                        <X className="w-5 h-5 text-zinc-400" />
                     </button>
                 </div>
 
                 {/* Content */}
                 <div className="p-6 space-y-4">
-                    <p className="text-gray-600">{description}</p>
+                    <p className="text-zinc-600">{description}</p>
 
                     {/* Item info */}
                     {itemName && (
-                        <div className="bg-gray-50 rounded-xl p-4">
-                            <p className="text-sm text-gray-500">
+                        <div className="bg-zinc-50 rounded-xl p-4">
+                            <p className="text-sm text-zinc-500">
                                 {itemCount > 1 ? 'Registros a eliminar:' : 'Registro a eliminar:'}
                             </p>
-                            <p className="font-bold text-gray-900 mt-1">
+                            <p className="font-bold text-zinc-900 mt-1">
                                 {itemCount > 1 ? `${itemCount} registros` : itemName}
                             </p>
                         </div>
@@ -101,13 +101,13 @@ export default function DeleteConfirmationModal({
 
                     {/* Recoverable indicator */}
                     {isRecoverable && (
-                        <div className="flex items-start gap-3 bg-green-50 rounded-xl p-4">
-                            <RotateCcw className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                        <div className="flex items-start gap-3 bg-emerald-50 rounded-xl p-4">
+                            <RotateCcw className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-medium text-green-800">
+                                <p className="text-sm font-medium text-emerald-800">
                                     Recuperable por 30 dias
                                 </p>
-                                <p className="text-xs text-green-600 mt-0.5">
+                                <p className="text-xs text-emerald-600 mt-0.5">
                                     Podras restaurar este registro desde la papelera
                                 </p>
                             </div>
@@ -117,7 +117,7 @@ export default function DeleteConfirmationModal({
                     {/* Name confirmation */}
                     {requireNameConfirmation && itemName && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">
+                            <label className="text-sm font-medium text-zinc-700">
                                 Escribe <span className="font-bold text-red-600">{itemName}</span> para confirmar:
                             </label>
                             <input
@@ -125,7 +125,7 @@ export default function DeleteConfirmationModal({
                                 value={confirmText}
                                 onChange={(e) => setConfirmText(e.target.value)}
                                 placeholder="Escribe el nombre exacto"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                                 disabled={isDeleting}
                             />
                         </div>
@@ -133,11 +133,11 @@ export default function DeleteConfirmationModal({
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 p-6 bg-gray-50 border-t border-gray-100">
+                <div className="flex gap-3 p-6 bg-zinc-50 border-t border-zinc-100">
                     <button
                         onClick={handleClose}
                         disabled={isDeleting}
-                        className="flex-1 px-4 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        className="flex-1 px-4 py-3 bg-white border border-zinc-200 text-zinc-700 rounded-xl font-semibold hover:bg-zinc-50 transition-colors disabled:opacity-50"
                     >
                         Cancelar
                     </button>

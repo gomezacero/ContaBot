@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-plus-jakarta",
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
-  title: "ContaBot - Asistente Contable Inteligente",
-  description: "Financial OS para contadores colombianos. Automatiza nómina, facturas y calendario tributario con IA.",
-  keywords: ["contabot", "nómina", "contabilidad", "colombia", "impuestos", "DIAN", "calendario tributario"],
-  authors: [{ name: "ContaBot" }],
+  title: "Contabio | IA para el Contador Moderno",
+  description: "Financial OS para contadores colombianos. Automatiza nómina, facturas y calendario tributario con IA de última generación.",
+  keywords: ["contabio", "nómina", "contabilidad", "colombia", "impuestos", "DIAN", "calendario tributario", "OCR", "digitación automática"],
+  authors: [{ name: "Valueum" }],
   openGraph: {
-    title: "ContaBot - Asistente Contable Inteligente",
-    description: "Financial OS para contadores colombianos. Automatiza nómina, facturas y calendario tributario con IA.",
+    title: "Contabio | IA para el Contador Moderno",
+    description: "Financial OS para contadores colombianos. Automatiza nómina, facturas y calendario tributario con IA de última generación.",
     type: "website",
   },
 };
@@ -26,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
+      <body className={`${plusJakartaSans.variable} font-sans antialiased`} suppressHydrationWarning>
         {children}
       </body>
     </html>

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Bot, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
     const supabase = createClient();
@@ -55,38 +55,38 @@ export default function ForgotPasswordPage() {
 
     if (success) {
         return (
-            <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center px-4">
+            <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-4">
                 <div className="w-full max-w-md">
                     {/* Logo */}
                     <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-                        <div className="w-12 h-12 bg-[#002D44] text-white rounded-xl flex items-center justify-center shadow-lg">
-                            <Bot className="w-7 h-7" />
+                        <div className="w-12 h-12 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
+                            <span className="text-2xl font-black">C</span>
                         </div>
-                        <span className="text-3xl font-black tracking-tighter text-[#002D44]">ContaBot</span>
+                        <span className="text-3xl font-black tracking-tighter text-zinc-900">Contabio</span>
                     </Link>
 
                     {/* Success Card */}
-                    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 text-center">
-                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle className="w-8 h-8 text-green-600" />
+                    <div className="bg-white rounded-3xl shadow-xl border border-zinc-100 p-8 text-center">
+                        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <CheckCircle className="w-8 h-8 text-emerald-600" />
                         </div>
 
-                        <h1 className="text-2xl font-black text-[#002D44] mb-4">
+                        <h1 className="text-2xl font-black text-zinc-900 mb-4">
                             Revisa tu correo
                         </h1>
 
-                        <p className="text-gray-500 mb-6">
-                            Si existe una cuenta con el correo <strong className="text-[#002D44]">{email}</strong>,
+                        <p className="text-zinc-500 mb-6">
+                            Si existe una cuenta con el correo <strong className="text-zinc-900">{email}</strong>,
                             recibirás un enlace para restablecer tu contraseña.
                         </p>
 
-                        <p className="text-sm text-gray-400 mb-8">
+                        <p className="text-sm text-zinc-400 mb-8">
                             El enlace expirará en 1 hora. Si no encuentras el correo, revisa tu carpeta de spam.
                         </p>
 
                         <Link
                             href="/login"
-                            className="inline-flex items-center gap-2 text-[#1AB1B1] font-bold hover:underline"
+                            className="inline-flex items-center gap-2 text-emerald-600 font-bold hover:text-emerald-700 hover:underline"
                         >
                             <ArrowLeft className="w-4 h-4" />
                             Volver al inicio de sesión
@@ -98,23 +98,23 @@ export default function ForgotPasswordPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center px-4">
+        <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-4">
             <div className="w-full max-w-md">
                 {/* Logo */}
                 <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-                    <div className="w-12 h-12 bg-[#002D44] text-white rounded-xl flex items-center justify-center shadow-lg">
-                        <Bot className="w-7 h-7" />
+                    <div className="w-12 h-12 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
+                        <span className="text-2xl font-black">C</span>
                     </div>
-                    <span className="text-3xl font-black tracking-tighter text-[#002D44]">ContaBot</span>
+                    <span className="text-3xl font-black tracking-tighter text-zinc-900">Contabio</span>
                 </Link>
 
                 {/* Card */}
-                <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+                <div className="bg-white rounded-3xl shadow-xl border border-zinc-100 p-8">
                     <div className="text-center mb-8">
-                        <h1 className="text-2xl font-black text-[#002D44] mb-2">
+                        <h1 className="text-2xl font-black text-zinc-900 mb-2">
                             ¿Olvidaste tu contraseña?
                         </h1>
-                        <p className="text-gray-500 text-sm">
+                        <p className="text-zinc-500 text-sm">
                             Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
                         </p>
                     </div>
@@ -127,17 +127,17 @@ export default function ForgotPasswordPage() {
                         )}
 
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
+                            <label className="block text-sm font-bold text-zinc-700 mb-2">
                                 Correo electrónico
                             </label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="tu@email.com"
-                                    className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#1AB1B1] focus:border-transparent outline-none transition-all"
+                                    className="w-full pl-12 pr-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                                     required
                                     autoFocus
                                 />
@@ -147,7 +147,7 @@ export default function ForgotPasswordPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-[#1AB1B1] text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-teal-500/20 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -160,7 +160,7 @@ export default function ForgotPasswordPage() {
                     <div className="mt-8 text-center">
                         <Link
                             href="/login"
-                            className="inline-flex items-center gap-2 text-gray-500 hover:text-[#1AB1B1] text-sm font-semibold transition-colors"
+                            className="inline-flex items-center gap-2 text-zinc-500 hover:text-emerald-600 text-sm font-semibold transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
                             Volver al inicio de sesión
@@ -168,8 +168,8 @@ export default function ForgotPasswordPage() {
                     </div>
                 </div>
 
-                <p className="text-center text-xs text-gray-400 mt-6">
-                    ¿Necesitas ayuda? Contacta a soporte@contabot.co
+                <p className="text-center text-xs text-zinc-400 mt-6">
+                    ¿Necesitas ayuda? Contacta a soporte@contabio.co
                 </p>
             </div>
         </div>

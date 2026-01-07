@@ -5,10 +5,6 @@ import {
     ScanLine,
     Upload,
     FileText,
-    Table2,
-    Download,
-    FolderOpen,
-    CheckCircle2,
     AlertCircle,
     X,
     Plus,
@@ -21,26 +17,25 @@ import {
     ChevronRight,
     Bot,
     Files,
-    FileCheck,
     FileSpreadsheet,
     Image as ImageIcon,
     DatabaseZap,
-    History,
     Folder,
     ArrowRight,
-    FileOutput
+    DollarSign,
+    RefreshCw,
+    Zap,
+    HardDrive
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { createClient } from '@/lib/supabase/client';
 import { OCRItem, OCRResult, ValidationResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
-import { UsageIndicator, useUsageStats } from '@/components/usage/UsageIndicator';
-import { USAGE_LIMITS, FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
+import { useUsageStats } from '@/components/usage/UsageIndicator';
+import { FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
 import { InvoiceGroup } from './components/InvoiceGroup';
-import { CostMetrics } from '@/components/usage/CostMetrics';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import { useToast } from '@/components/ui/Toast';
-import { DollarSign, RefreshCw } from 'lucide-react';
 
 // Interfaces removed as they are now imported from ./types
 
@@ -621,7 +616,7 @@ export default function GastosPage() {
     if (authLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-[#1AB1B1]" />
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
             </div>
         );
     }
@@ -631,47 +626,39 @@ export default function GastosPage() {
 
             {/* GUEST BANNER */}
             {isGuest && (
-                <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center shrink-0">
-                            <Bell className="w-6 h-6 text-indigo-600 animate-bounce" />
+                            <Bell className="w-6 h-6 text-emerald-600 animate-bounce" />
                         </div>
                         <div>
-                            <h4 className="text-lg font-bold text-indigo-900 leading-tight">Organiza tus soportes por cliente</h4>
-                            <p className="text-sm text-indigo-700/80">Regístrate para crear carpetas de clientes permanentes, guardar el historial de extracciones y exportar lotes de facturas directamente a tu software.</p>
+                            <h4 className="text-lg font-bold text-emerald-900 leading-tight">Organiza tus soportes por cliente</h4>
+                            <p className="text-sm text-emerald-700/80">Regístrate para crear carpetas de clientes permanentes, guardar el historial de extracciones y exportar lotes de facturas directamente a tu software.</p>
                         </div>
                     </div>
                     <div className="flex gap-3 shrink-0">
-                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest self-center mr-2">Acceso Invitado</span>
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest self-center mr-2">Acceso Invitado</span>
                     </div>
-                </div>
-            )}
-
-            {/* USAGE INDICATOR - Para usuarios autenticados */}
-            {isAuthenticated && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
-                    <UsageIndicator />
-                    <CostMetrics />
                 </div>
             )}
 
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-200 pb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 pb-6">
                 <div>
-                    <h2 className="text-3xl font-black text-[#002D44] tracking-tight flex items-center gap-3">
-                        <ScanLine className="w-8 h-8 text-[#1AB1B1]" />
+                    <h2 className="text-3xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+                        <ScanLine className="w-8 h-8 text-emerald-600" />
                         Digitador Inteligente
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
-                        <span className="text-gray-500 font-medium">Carpeta actual:</span>
-                        <span className="bg-[#002D44] text-white px-3 py-0.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm">
-                            <Folder className="w-3 h-3 text-[#1AB1B1]" />
+                        <span className="text-zinc-500 font-medium">Carpeta actual:</span>
+                        <span className="bg-zinc-900 text-white px-3 py-0.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm">
+                            <Folder className="w-3 h-3 text-emerald-600" />
                             {selectedClient?.name || 'General'}
                         </span>
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <span className="text-[10px] font-black text-[#1AB1B1] uppercase tracking-[0.2em] self-center bg-teal-50 px-4 py-1.5 rounded-full border border-teal-100 shadow-sm">Multi-Doc Enabled v2.5</span>
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] self-center bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 shadow-sm">Multi-Doc Enabled v2.5</span>
                 </div>
             </div>
 
@@ -690,15 +677,15 @@ export default function GastosPage() {
                 <div className="lg:col-span-4 space-y-6">
 
                     {/* Folder Manager */}
-                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="bg-gray-50/80 px-8 py-5 border-b border-gray-100 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+                        <div className="bg-zinc-50/80 px-8 py-5 border-b border-zinc-100 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <Layers className="w-5 h-5 text-[#002D44]" />
-                                <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Carpetas de Cliente</span>
+                                <Layers className="w-5 h-5 text-zinc-900" />
+                                <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">Carpetas de Cliente</span>
                             </div>
                             <button
                                 onClick={() => setShowNewFolderModal(true)}
-                                className="p-1.5 bg-white border border-gray-200 text-[#1AB1B1] rounded-lg hover:bg-teal-50 transition-colors shadow-sm"
+                                className="p-1.5 bg-white border border-zinc-200 text-emerald-600 rounded-lg hover:bg-emerald-50 transition-colors shadow-sm"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -706,7 +693,7 @@ export default function GastosPage() {
                         <div className="p-4 max-h-60 overflow-y-auto space-y-1">
                             {loadingClients ? (
                                 <div className="flex justify-center py-4">
-                                    <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                                    <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
                                 </div>
                             ) : (
                                 clients.map(client => (
@@ -714,12 +701,12 @@ export default function GastosPage() {
                                         key={client.id}
                                         onClick={() => setSelectedClientId(client.id)}
                                         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${selectedClientId === client.id
-                                            ? 'bg-[#002D44] text-white shadow-md'
-                                            : 'hover:bg-gray-50 text-gray-600'
+                                            ? 'bg-zinc-900 text-white shadow-md'
+                                            : 'hover:bg-zinc-50 text-zinc-600'
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <Folder className={`w-4 h-4 ${selectedClientId === client.id ? 'text-[#1AB1B1]' : 'text-gray-400'}`} />
+                                            <Folder className={`w-4 h-4 ${selectedClientId === client.id ? 'text-emerald-600' : 'text-zinc-400'}`} />
                                             <span className="text-sm font-bold truncate max-w-[140px]">{client.name}</span>
                                         </div>
                                         <ChevronRight className={`w-3 h-3 opacity-40 ${selectedClientId === client.id ? 'block' : 'hidden'}`} />
@@ -730,18 +717,18 @@ export default function GastosPage() {
                     </div>
 
                     {/* Upload Area */}
-                    <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl relative overflow-hidden">
-                        <div className="flex p-1 bg-gray-100 rounded-2xl mb-6">
+                    <div className="bg-white rounded-2xl p-8 border border-zinc-100 shadow-xl relative overflow-hidden">
+                        <div className="flex p-1 bg-zinc-100 rounded-2xl mb-6">
                             <button
                                 onClick={() => setInputMode('FILE')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${inputMode === 'FILE' ? 'bg-white text-[#1AB1B1] shadow-md' : 'text-gray-400'
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${inputMode === 'FILE' ? 'bg-white text-emerald-600 shadow-md' : 'text-zinc-400'
                                     }`}
                             >
                                 <Upload className="w-4 h-4" /> Archivo
                             </button>
                             <button
                                 onClick={() => setInputMode('TEXT')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${inputMode === 'TEXT' ? 'bg-white text-[#1AB1B1] shadow-md' : 'text-gray-400'
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${inputMode === 'TEXT' ? 'bg-white text-emerald-600 shadow-md' : 'text-zinc-400'
                                     }`}
                             >
                                 <Type className="w-4 h-4" /> Texto
@@ -749,7 +736,7 @@ export default function GastosPage() {
                         </div>
 
                         <div
-                            className={`rounded-[2.5rem] border-2 border-dashed transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center p-6 ${processing ? 'border-[#1AB1B1] bg-teal-50/10' : 'border-gray-200 hover:border-[#1AB1B1] hover:bg-gray-50/50'
+                            className={`rounded-2xl border-2 border-dashed transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center p-6 ${processing ? 'border-emerald-600 bg-emerald-50/10' : 'border-zinc-200 hover:border-emerald-600 hover:bg-zinc-50/50'
                                 }`}
                             style={{ minHeight: '320px' }}
                             onDrop={handleDrop}
@@ -758,43 +745,43 @@ export default function GastosPage() {
                             {processing ? (
                                 <div className="flex flex-col items-center justify-center text-center">
                                     <div className="relative w-16 h-16 mb-6">
-                                        <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-                                        <div className="absolute inset-0 border-4 border-[#1AB1B1] rounded-full border-t-transparent animate-spin"></div>
-                                        <Bot className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-[#1AB1B1] animate-pulse" />
+                                        <div className="absolute inset-0 border-4 border-zinc-100 rounded-full"></div>
+                                        <div className="absolute inset-0 border-4 border-emerald-600 rounded-full border-t-transparent animate-spin"></div>
+                                        <Bot className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 text-emerald-600 animate-pulse" />
                                     </div>
-                                    <h3 className="text-sm font-black text-[#002D44] mb-1">Procesando lote...</h3>
-                                    <div className="flex items-center gap-2 bg-[#002D44] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                    <h3 className="text-sm font-black text-zinc-900 mb-1">Procesando lote...</h3>
+                                    <div className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
                                         <span>{processingCount.current} de {processingCount.total}</span>
-                                        <Files className="w-3 h-3 text-[#99D95E]" />
+                                        <Files className="w-3 h-3 text-emerald-400" />
                                     </div>
-                                    <p className="text-[10px] text-gray-400 mt-4 px-6 font-bold uppercase tracking-wider text-center">IA Analizando documentos para: {selectedClient?.name || 'General'}</p>
+                                    <p className="text-[10px] text-zinc-400 mt-4 px-6 font-bold uppercase tracking-wider text-center">IA Analizando documentos para: {selectedClient?.name || 'General'}</p>
                                 </div>
                             ) : (
                                 <>
                                     {inputMode === 'FILE' ? (
                                         <div className="flex flex-col items-center text-center cursor-pointer group w-full" onClick={() => fileInputRef.current?.click()}>
                                             <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.jpg,.png,.jpeg,.csv,.xlsx,.xls,.txt" multiple />
-                                            <div className="w-16 h-16 bg-teal-50 text-[#1AB1B1] rounded-[1.5rem] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                                            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
                                                 <Upload className="w-8 h-8" />
                                             </div>
-                                            <h3 className="text-lg font-black text-[#002D44] mb-1">Cargar Soportes</h3>
-                                            <p className="text-[10px] text-gray-400 mb-2 font-bold uppercase tracking-wider">Arrastra múltiples archivos aquí</p>
-                                            <p className="text-[9px] text-gray-300 mb-4 font-medium">JPG, PNG, PDF • Máx. 10MB por archivo</p>
+                                            <h3 className="text-lg font-black text-zinc-900 mb-1">Cargar Soportes</h3>
+                                            <p className="text-[10px] text-zinc-400 mb-2 font-bold uppercase tracking-wider">Arrastra múltiples archivos aquí</p>
+                                            <p className="text-[9px] text-zinc-300 mb-4 font-medium">JPG, PNG, PDF • Máx. 10MB por archivo</p>
                                             <div className="flex gap-2">
-                                                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-gray-400 group-hover:text-[#1AB1B1] transition-colors"><FileText className="w-4 h-4" /></div>
-                                                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-gray-400 group-hover:text-[#99D95E] transition-colors"><ImageIcon className="w-4 h-4" /></div>
-                                                <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-gray-400 group-hover:text-[#002D44] transition-colors"><FileSpreadsheet className="w-4 h-4" /></div>
+                                                <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-emerald-600 transition-colors"><FileText className="w-4 h-4" /></div>
+                                                <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-emerald-400 transition-colors"><ImageIcon className="w-4 h-4" /></div>
+                                                <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-zinc-900 transition-colors"><FileSpreadsheet className="w-4 h-4" /></div>
                                             </div>
 
                                             {/* File list */}
                                             {files.length > 0 && (
                                                 <div className="mt-4 w-full space-y-1 max-h-24 overflow-y-auto">
                                                     {files.map((file, i) => (
-                                                        <div key={i} className="flex items-center gap-2 text-xs bg-gray-50 px-3 py-2 rounded-xl">
-                                                            <FileText className="w-3 h-3 text-gray-400" />
+                                                        <div key={i} className="flex items-center gap-2 text-xs bg-zinc-50 px-3 py-2 rounded-xl">
+                                                            <FileText className="w-3 h-3 text-zinc-400" />
                                                             <span className="truncate flex-1 font-medium">{file.name}</span>
                                                             <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}>
-                                                                <X className="w-3 h-3 text-gray-400 hover:text-red-500" />
+                                                                <X className="w-3 h-3 text-zinc-400 hover:text-red-500" />
                                                             </button>
                                                         </div>
                                                     ))}
@@ -804,7 +791,7 @@ export default function GastosPage() {
                                     ) : (
                                         <div className="w-full h-full flex flex-col">
                                             <textarea
-                                                className="w-full flex-1 bg-gray-50 rounded-2xl p-4 text-sm font-bold text-gray-700 focus:outline-none focus:bg-white focus:border-[#1AB1B1] resize-none border border-gray-100 transition-all mb-4"
+                                                className="w-full flex-1 bg-zinc-50 rounded-2xl p-4 text-sm font-bold text-zinc-700 focus:outline-none focus:bg-white focus:border-emerald-600 resize-none border border-zinc-100 transition-all mb-4"
                                                 placeholder="Pega texto de múltiples facturas aquí..."
                                                 value={textInput}
                                                 onChange={(e) => setTextInput(e.target.value)}
@@ -813,7 +800,7 @@ export default function GastosPage() {
                                             <button
                                                 onClick={handleProcess}
                                                 disabled={!textInput.trim()}
-                                                className="w-full bg-[#002D44] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-black shadow-lg disabled:opacity-30 transition-all"
+                                                className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-black shadow-lg disabled:opacity-30 transition-all"
                                             >
                                                 Procesar Texto <ArrowRight className="w-4 h-4" />
                                             </button>
@@ -827,60 +814,99 @@ export default function GastosPage() {
                         {inputMode === 'FILE' && !processing && files.length > 0 && (
                             <button
                                 onClick={handleProcess}
-                                className="w-full mt-4 bg-[#1AB1B1] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-[#169a9a] shadow-lg transition-all"
+                                className="w-full mt-4 bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-emerald-700 shadow-lg transition-all"
                             >
                                 <ScanLine className="w-5 h-5" />
                                 Analizar ({files.length} archivos)
                             </button>
                         )}
                     </div>
+
+                    {/* USAGE INDICATOR - Compacto debajo del upload */}
+                    {isAuthenticated && (
+                        <div className="bg-zinc-50 rounded-xl p-4 border border-zinc-100">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3 flex-1">
+                                    <Zap className="w-4 h-4 text-emerald-600" />
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                            <span className="font-medium text-zinc-600">Archivos hoy</span>
+                                            <span className="font-bold text-emerald-600">{usageStats?.remaining?.daily_files ?? 10}/{usageStats?.limits?.daily_files ?? 10}</span>
+                                        </div>
+                                        <div className="h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-emerald-500 transition-all duration-500"
+                                                style={{ width: `${usageStats?.percentage?.files ?? 0}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="h-8 w-px bg-zinc-200" />
+                                <div className="flex items-center gap-3 flex-1">
+                                    <HardDrive className="w-4 h-4 text-zinc-400" />
+                                    <div className="flex-1">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                            <span className="font-medium text-zinc-600">Datos</span>
+                                            <span className="font-bold text-zinc-500">{formatBytes(usageStats?.daily?.bytes_processed ?? 0)}/{usageStats?.limits?.daily_bytes_mb ?? 50}MB</span>
+                                        </div>
+                                        <div className="h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-zinc-400 transition-all duration-500"
+                                                style={{ width: `${usageStats?.percentage?.bytes ?? 0}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* RIGHT COLUMN: Results Table */}
                 <div className="lg:col-span-8">
                     {results.length === 0 ? (
-                        <div className="bg-white rounded-[3rem] border-2 border-dashed border-gray-200 p-20 text-center flex flex-col items-center justify-center opacity-60 min-h-[500px] shadow-sm">
-                            <div className="w-20 h-20 bg-gray-50 rounded-[2.5rem] flex items-center justify-center mb-8">
-                                <DatabaseZap className="w-10 h-10 text-gray-200" />
+                        <div className="bg-white rounded-2xl border-2 border-dashed border-zinc-200 p-20 text-center flex flex-col items-center justify-center opacity-60 min-h-[500px] shadow-sm">
+                            <div className="w-20 h-20 bg-zinc-50 rounded-2xl flex items-center justify-center mb-8">
+                                <DatabaseZap className="w-10 h-10 text-zinc-200" />
                             </div>
-                            <h3 className="text-xl font-black text-[#002D44] mb-2 uppercase tracking-widest">Consolidación Lista</h3>
-                            <p className="text-gray-400 max-w-sm font-bold text-sm leading-relaxed">Carga varios archivos para que ContaBot cree un único archivo de exportación estructurado para tu contabilidad.</p>
+                            <h3 className="text-xl font-black text-zinc-900 mb-2 uppercase tracking-widest">Consolidación Lista</h3>
+                            <p className="text-zinc-400 max-w-sm font-bold text-sm leading-relaxed">Carga varios archivos para que Contabio cree un único archivo de exportación estructurado para tu contabilidad.</p>
                         </div>
                     ) : (
                         <div className="space-y-6 animate-fade-in">
 
                             {/* Header Info Block */}
-                            <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="bg-white rounded-2xl p-6 border border-zinc-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center text-[#1AB1B1]">
+                                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
                                         <Files className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Lote Procesado:</p>
-                                        <p className="font-black text-[#002D44] text-sm">{results.length} Facturas</p>
+                                        <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Lote Procesado:</p>
+                                        <p className="font-black text-zinc-900 text-sm">{results.length} Facturas</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={handleClearClick}
-                                        className="flex items-center gap-1 text-gray-400 hover:text-red-500 text-xs font-bold transition-colors px-3 py-2"
+                                        className="flex items-center gap-1 text-zinc-400 hover:text-red-500 text-xs font-bold transition-colors px-3 py-2"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                         Limpiar Todo
                                     </button>
-                                    <div className="flex items-center gap-4 bg-gray-50 px-6 py-2 rounded-2xl border border-gray-100">
-                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Acumulado:</span>
+                                    <div className="flex items-center gap-4 bg-zinc-50 px-6 py-2 rounded-2xl border border-zinc-100">
+                                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Acumulado:</span>
                                         <div className="flex flex-col items-end">
-                                            <span className="font-black text-[#002D44] text-lg">{formatCurrency(totalAmountCOP)}</span>
+                                            <span className="font-black text-zinc-900 text-lg">{formatCurrency(totalAmountCOP)}</span>
                                             {hasUSDInvoices && trm && (
-                                                <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                                                <span className="text-[10px] text-zinc-500 flex items-center gap-1">
                                                     <DollarSign className="w-3 h-3" />
                                                     {formatUSD(totalUSD)} × TRM {trm.rate.toLocaleString('es-CO')}
                                                 </span>
                                             )}
                                         </div>
                                         {loadingTrm && (
-                                            <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+                                            <RefreshCw className="w-3 h-3 animate-spin text-zinc-400" />
                                         )}
                                     </div>
                                 </div>
@@ -970,9 +996,9 @@ export default function GastosPage() {
                             <div className="fixed bottom-8 right-8 z-40">
                                 <button
                                     onClick={exportToExcel}
-                                    className="bg-[#002D44] hover:bg-[#001E2E] text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 transition-all hover:scale-105"
+                                    className="bg-zinc-900 hover:bg-zinc-950 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 transition-all hover:scale-105"
                                 >
-                                    <FileSpreadsheet className="w-5 h-5 text-[#99D95E]" />
+                                    <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
                                     Exportar Asiento ({totalItems} Líneas)
                                 </button>
                             </div>
@@ -985,16 +1011,16 @@ export default function GastosPage() {
             {showNewFolderModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowNewFolderModal(false)}></div>
-                    <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-md relative z-10 shadow-2xl border border-gray-100 animate-fade-in">
-                        <h3 className="text-2xl font-black text-[#002D44] mb-6 flex items-center gap-3">
-                            <Folder className="w-7 h-7 text-[#1AB1B1]" /> Nueva Carpeta
+                    <div className="bg-white rounded-2xl p-10 w-full max-w-md relative z-10 shadow-2xl border border-zinc-100 animate-fade-in">
+                        <h3 className="text-2xl font-black text-zinc-900 mb-6 flex items-center gap-3">
+                            <Folder className="w-7 h-7 text-emerald-600" /> Nueva Carpeta
                         </h3>
                         <div className="space-y-4 mb-8">
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">Nombre del Cliente / Proyecto</label>
+                                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Nombre del Cliente / Proyecto</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-4 focus:ring-teal-500/10 outline-none transition-all"
+                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                                     placeholder="Ej: Inversiones ABC"
                                     value={newFolderName}
                                     onChange={e => setNewFolderName(e.target.value)}
@@ -1002,10 +1028,10 @@ export default function GastosPage() {
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-gray-600 uppercase tracking-widest ml-1">NIT / Cédula (Opcional)</label>
+                                <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">NIT / Cédula (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-4 focus:ring-teal-500/10 outline-none transition-all"
+                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                                     placeholder="900.123.456"
                                     value={newFolderNit}
                                     onChange={e => setNewFolderNit(e.target.value)}
@@ -1013,8 +1039,8 @@ export default function GastosPage() {
                             </div>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-colors">Cancelar</button>
-                            <button onClick={handleCreateFolder} className="flex-1 bg-[#1AB1B1] text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-[#169a9a] transition-all">Crear Carpeta</button>
+                            <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-zinc-400 hover:bg-zinc-50 transition-colors">Cancelar</button>
+                            <button onClick={handleCreateFolder} className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Crear Carpeta</button>
                         </div>
                     </div>
                 </div>
@@ -1023,18 +1049,18 @@ export default function GastosPage() {
             {/* Clear Confirmation Modal */}
             {showClearConfirm && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-                    <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
+                    <div className="bg-white rounded-xl w-full max-w-md p-8 shadow-2xl">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
                                 <Trash2 className="w-6 h-6 text-red-600" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-[#002D44]">¿Limpiar Datos?</h3>
-                                <p className="text-sm text-gray-500">{results.length} registros serán eliminados</p>
+                                <h3 className="text-xl font-black text-zinc-900">¿Limpiar Datos?</h3>
+                                <p className="text-sm text-zinc-500">{results.length} registros serán eliminados</p>
                             </div>
                         </div>
 
-                        <p className="text-gray-600 mb-4">
+                        <p className="text-zinc-600 mb-4">
                             Esta acción eliminará <strong>permanentemente</strong> todos los registros OCR de la carpeta actual.
                             Esta acción no se puede deshacer.
                         </p>
@@ -1050,7 +1076,7 @@ export default function GastosPage() {
                             <button
                                 onClick={() => setShowClearConfirm(false)}
                                 disabled={clearing}
-                                className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                                className="flex-1 py-3 rounded-xl border border-zinc-200 font-bold text-zinc-600 hover:bg-zinc-50 transition-colors"
                             >
                                 Cancelar
                             </button>

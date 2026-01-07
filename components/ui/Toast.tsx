@@ -71,14 +71,14 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
     const icons = {
-        success: <CheckCircle className="w-5 h-5 text-green-500" />,
+        success: <CheckCircle className="w-5 h-5 text-emerald-500" />,
         error: <XCircle className="w-5 h-5 text-red-500" />,
         warning: <AlertTriangle className="w-5 h-5 text-amber-500" />,
         info: <Info className="w-5 h-5 text-blue-500" />
     };
 
     const bgColors = {
-        success: 'bg-green-50 border-green-200',
+        success: 'bg-emerald-50 border-emerald-200',
         error: 'bg-red-50 border-red-200',
         warning: 'bg-amber-50 border-amber-200',
         info: 'bg-blue-50 border-blue-200'
@@ -88,14 +88,14 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
         <div className={`flex items-start gap-3 p-4 rounded-xl border shadow-lg animate-slide-in ${bgColors[toast.type]}`}>
             {icons[toast.type]}
             <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm">{toast.title}</p>
+                <p className="font-semibold text-zinc-900 text-sm">{toast.title}</p>
                 {toast.description && (
-                    <p className="text-xs text-gray-600 mt-0.5">{toast.description}</p>
+                    <p className="text-xs text-zinc-600 mt-0.5">{toast.description}</p>
                 )}
                 {toast.action && (
                     <button
                         onClick={toast.action.onClick}
-                        className="text-xs font-semibold text-[#1AB1B1] hover:underline mt-2"
+                        className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline mt-2"
                     >
                         {toast.action.label}
                     </button>
@@ -105,7 +105,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
                 onClick={() => onRemove(toast.id)}
                 className="p-1 hover:bg-black/5 rounded transition-colors"
             >
-                <X className="w-4 h-4 text-gray-400" />
+                <X className="w-4 h-4 text-zinc-400" />
             </button>
         </div>
     );

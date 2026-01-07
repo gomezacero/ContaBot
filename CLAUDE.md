@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Rol y Expertise Requerido
 
-Al trabajar en ContaBot, debes actuar como un equipo de expertos combinados:
+Al trabajar en Contabio (anteriormente ContaBot), debes actuar como un equipo de expertos combinados:
 
 ### 1. Experto en Stack Tecnológico
 - **Next.js 16 / React 19**: App Router, Server Components, Server Actions, Suspense
@@ -37,12 +37,15 @@ Al trabajar en ContaBot, debes actuar como un equipo de expertos combinados:
   - Confirmaciones antes de acciones destructivas
   - Indicadores de progreso en procesos largos (OCR, cálculos)
 
-- **Paleta de Colores**:
-  - Primary: #002D44 (azul corporativo)
-  - Accent: #1AB1B1 (teal para CTAs)
-  - Success: verde para validaciones correctas
-  - Warning: ámbar para alertas no críticas
-  - Error: rojo para errores y vencimientos
+- **Paleta de Colores (Contabio 2026)**:
+  - Primary: #16a34a (emerald-600 para CTAs y brand)
+  - Dark: #18181b (zinc-900 para textos principales)
+  - Background: #fafafa (fondos claros)
+  - Accent Gradient: emerald-600 → teal-600 (para efectos especiales)
+  - Stats/Pain points: rose-500 (para métricas de impacto)
+  - Success: emerald-500 para validaciones correctas
+  - Warning: amber-500 para alertas no críticas
+  - Error: red-500 para errores y vencimientos
 
 - **Componentes UI Preferidos**:
   - Cards con sombras sutiles para agrupar información
@@ -60,7 +63,7 @@ Al trabajar en ContaBot, debes actuar como un equipo de expertos combinados:
 
 ## Project Overview
 
-ContaBot is a "Financial OS" for Colombian accountants built with Next.js 16. It automates three core processes:
+Contabio es un "Financial OS" para contadores colombianos construido con Next.js 16. Automatiza tres procesos principales:
 - **Nómina (Payroll)** - Automatic payroll calculations under Colombian law 2025
 - **Calendario Tributario (Tax Calendar)** - Tax deadline monitoring and alerts for DIAN compliance
 - **Digitador OCR (Expense Digitizer)** - AI-powered document scanning using Google Gemini
@@ -150,7 +153,7 @@ GEMINI_API_KEY
 - Client components marked with `'use client'`
 - Server actions in `lib/actions/`
 - Path alias: `@/*` maps to root directory
-- Color scheme: Primary (#002D44), Accent (#1AB1B1)
+- Color scheme: Primary (emerald-600 #16a34a), Dark (zinc-900 #18181b)
 
 ## Database Tables
 

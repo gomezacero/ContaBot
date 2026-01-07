@@ -1,20 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F9FAFB;
-  --foreground: #1D1D1F;
-  --brand-primary: #1AB1B1;
-  --brand-dark: #002D44;
-  --brand-gradient-start: #1AB1B1;
-  --brand-gradient-end: #99D95E;
+  --background: #fafafa;
+  --foreground: #18181b;
+  --brand-primary: #16a34a;
+  --brand-dark: #18181b;
+  --brand-gradient-start: #16a34a;
+  --brand-gradient-end: #0d9488;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
 }
 
 /* Custom Scrollbar */
@@ -36,13 +37,21 @@ body {
   background: #aeaeb2;
 }
 
+/* Glass Header Effect */
+.glass-header {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
 /* Brand Gradients */
 .bg-brand-gradient {
   background: linear-gradient(to right, var(--brand-gradient-start), var(--brand-gradient-end));
 }
 
-.text-brand-gradient {
-  background: linear-gradient(to right, var(--brand-gradient-start), var(--brand-gradient-end));
+/* Text Gradient - Emerald to Teal */
+.text-gradient {
+  background: linear-gradient(135deg, #16a34a 0%, #0d9488 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -65,12 +74,30 @@ body {
   }
 }
 
+@keyframes reveal {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.5s ease-out;
 }
 
 .animate-slide-up {
   animation: slideInFromBottom 0.5s ease-out;
+}
+
+.animate-reveal {
+  animation: reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -92,20 +119,33 @@ body {
 
 /* Button base styles */
 .btn-primary {
-  @apply bg-[#1AB1B1] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-teal-500/20 hover:scale-105 transition-all;
+  @apply bg-emerald-600 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 hover:scale-105 transition-all;
 }
 
 .btn-secondary {
-  @apply bg-[#002D44] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-black transition-all;
+  @apply bg-zinc-900 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-black transition-all;
 }
 
 /* Card base styles */
 .card {
-  @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+  @apply bg-white rounded-2xl border border-zinc-100 shadow-sm;
 }
 
 .card-hover {
   @apply hover:shadow-xl transition-all duration-300;
+}
+
+/* Bento Card style */
+.bento-card {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bento-card:hover {
+  border-color: rgba(22, 163, 74, 0.2);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
 }
 
 /* Toast slide-in animation */
@@ -146,4 +186,10 @@ body {
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.08) transparent;
+}
+
+/* Selection colors */
+::selection {
+  background-color: #dcfce7;
+  color: #14532d;
 }

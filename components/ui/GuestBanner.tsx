@@ -39,7 +39,7 @@ export const GuestBanner: React.FC<GuestBannerProps> = ({ className = '' }) => {
             className={`fixed bottom-0 left-0 right-0 z-40 transition-all duration-300 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
                 } ${className}`}
         >
-            <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg">
+            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg">
                 <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 flex-1">
                         <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
@@ -57,8 +57,8 @@ export const GuestBanner: React.FC<GuestBannerProps> = ({ className = '' }) => {
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <Link
-                            href="/auth/register"
-                            className="bg-white text-orange-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-orange-50 transition-colors flex items-center gap-2"
+                            href="/register"
+                            className="bg-white text-emerald-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-50 transition-colors flex items-center gap-2"
                         >
                             <UserPlus className="w-4 h-4" />
                             <span className="hidden sm:inline">Crear cuenta gratis</span>
