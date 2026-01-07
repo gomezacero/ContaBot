@@ -1366,14 +1366,16 @@ export default function NominaPage() {
                             {/* Save Actions */}
                             {selectedClientId && (
                                 <div className="flex gap-3">
-                                    <button
-                                        onClick={handleSaveToDb}
-                                        disabled={saving}
-                                        className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50"
-                                    >
-                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                        Guardar Empleado
-                                    </button>
+                                    <Tooltip content="Guarda la configuración del empleado: salario, deducciones, anticipos y parámetros base. Úsalo cuando modifiques datos del empleado." asWrapper>
+                                        <button
+                                            onClick={handleSaveToDb}
+                                            disabled={saving}
+                                            className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50"
+                                        >
+                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            Guardar Empleado
+                                        </button>
+                                    </Tooltip>
                                 </div>
                             )}
                         </>
@@ -1486,14 +1488,16 @@ export default function NominaPage() {
 
                                 {/* Save to History */}
                                 {selectedClientId && (
-                                    <button
-                                        onClick={handleSavePayroll}
-                                        disabled={saving}
-                                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md"
-                                    >
-                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                        Guardar en Histórico
-                                    </button>
+                                    <Tooltip content="Guarda un registro de esta nómina en el historial. Úsalo cada mes/quincena cuando proceses y pagues la nómina del período." asWrapper>
+                                        <button
+                                            onClick={handleSavePayroll}
+                                            disabled={saving}
+                                            className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md"
+                                        >
+                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            Guardar en Histórico
+                                        </button>
+                                    </Tooltip>
                                 )}
                             </div>
                         </div>
