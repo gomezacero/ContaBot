@@ -1,5 +1,5 @@
 import { AUX_TRANSPORTE_2026, RISK_LEVEL_RATES, SMMLV_2026, UVT_2026 } from "@/lib/constants";
-import { PayrollInput, PayrollResult, PayrollFinancials, RiskLevel, LiquidationResult } from "@/types/payroll";
+import { PayrollInput, PayrollResult, PayrollFinancials, RiskLevel, LiquidationResult, LiquidationAdvancesInput, DeduccionPersonalizada } from "@/types/payroll";
 
 // Helper: Calculate Days 360
 // Used for Liquidation Logic - Colombian standard (360 days per year, 30 days per month)
@@ -30,8 +30,9 @@ export const calculateDays360 = (startDateStr?: string, endDateStr?: string): nu
 };
 
 // Helper: Solidarity Rate 2025
-export const getSolidarityRate = (ibc: number): number => {
-    const m = SMMLV_2026;
+// Acepta smmlv opcional para permitir cálculos con años anteriores
+export const getSolidarityRate = (ibc: number, smmlv: number = SMMLV_2026): number => {
+    const m = smmlv;
     if (ibc < 4 * m) return 0;
     else if (ibc < 16 * m) return 0.01;
     else if (ibc < 17 * m) return 0.012; // 1.0% + 0.2%
@@ -43,8 +44,9 @@ export const getSolidarityRate = (ibc: number): number => {
 
 // --- STANDARD MODULE CALCULATION ---
 export const calculatePayroll = (input: PayrollInput): PayrollResult => {
-    const smmlv = SMMLV_2026;
-    const auxTransport = AUX_TRANSPORTE_2026;
+    // Usar override si está definido, sino usar valores 2026
+    const smmlv = input.smmlvOverride ?? SMMLV_2026;
+    const auxTransport = input.auxTransporteOverride ?? AUX_TRANSPORTE_2026;
 
     // Asegurar que baseSalary sea un número válido
     const baseSalary = Number(input.baseSalary) || smmlv;
@@ -88,7 +90,7 @@ export const calculatePayroll = (input: PayrollInput): PayrollResult => {
     // Employee Deductions
     const healthEmp = ibc * 0.04;
     const pensionEmp = ibc * 0.04;
-    const fspRate = getSolidarityRate(ibc);
+    const fspRate = getSolidarityRate(ibc, smmlv);
     const fsp = ibc * fspRate;
 
     // --- LOGICA RETENCIÓN EN LA FUENTE ---
@@ -313,17 +315,27 @@ export const createDefaultEmployee = (index: number = 1): PayrollInput => ({
  * - Intereses Cesantías: (Cesantías × Days × 12%) / 360
  * - Prima de Servicios: (Base × Days) / 360
  * - Vacaciones: (Salary × Days) / 720 (without transport aid)
+ *
+ * Supports advances (anticipos) for each benefit type:
+ * - Prima: by semester or direct amount
+ * - Vacaciones, Cesantías, Intereses: direct amounts
+ * - Custom deductions: up to 5 named deductions
  */
 export const calculateLiquidation = (
     input: PayrollInput,
-    payrollResult: PayrollResult
+    payrollResult: PayrollResult,
+    advances?: LiquidationAdvancesInput
 ): LiquidationResult => {
+    // Usar override si está definido, sino usar valores 2026
+    const smmlv = input.smmlvOverride ?? SMMLV_2026;
+    const auxTransport = input.auxTransporteOverride ?? AUX_TRANSPORTE_2026;
+
     // Calculate actual days worked using 360-day system
     const daysWorked = calculateDays360(input.startDate, input.endDate);
 
     // Base salary components
-    const baseSalary = Number(input.baseSalary) || SMMLV_2026;
-    const transportAid = input.includeTransportAid ? AUX_TRANSPORTE_2026 : 0;
+    const baseSalary = Number(input.baseSalary) || smmlv;
+    const transportAid = input.includeTransportAid ? auxTransport : 0;
 
     // Overtime and variables from monthly calculation
     const overtime = payrollResult.monthly.salaryData.overtime || 0;
@@ -332,16 +344,54 @@ export const calculateLiquidation = (
     // Base for benefits calculation (includes transport aid for cesantías and prima)
     const basePrestaciones = baseSalary + transportAid + overtime + variables;
 
-    // Colombian labor law formulas
+    // Colombian labor law formulas - GROSS values
     const cesantias = (basePrestaciones * daysWorked) / 360;
     const interesesCesantias = (cesantias * daysWorked * 0.12) / 360;
     const prima = (basePrestaciones * daysWorked) / 360;
     // Vacations do NOT include transport aid
     const vacaciones = (baseSalary * daysWorked) / 720;
 
-    const totalPrestaciones = cesantias + interesesCesantias + prima + vacaciones;
+    // ==========================================
+    // ANTICIPOS DE PRESTACIONES
+    // ==========================================
 
-    // Deductions from liquidation payment
+    // Calcular anticipo de prima (por semestre o monto directo)
+    let primaAnticipada = 0;
+    if (advances?.anticipos?.prima) {
+        const primaConfig = advances.anticipos.prima;
+        if (primaConfig.tipo === 'MONTO') {
+            primaAnticipada = primaConfig.montoPagado || 0;
+        } else {
+            // Calcular por semestre: cada semestre equivale a medio año de prima
+            // Valor semestre = (basePrestaciones * 180) / 360 = basePrestaciones / 2
+            const valorSemestre = basePrestaciones / 2;
+            if (primaConfig.semestreJunioPagado) primaAnticipada += valorSemestre;
+            if (primaConfig.semestreDiciembrePagado) primaAnticipada += valorSemestre;
+        }
+    }
+
+    // Otros anticipos (montos directos)
+    const vacacionesAnticipadas = advances?.anticipos?.vacacionesPagadas || 0;
+    const cesantiasAnticipadas = advances?.anticipos?.cesantiasParciales || 0;
+    const interesesCesantiasAnticipados = advances?.anticipos?.interesesCesantiasPagados || 0;
+
+    // Calcular valores NETOS (bruto - anticipo, mínimo 0)
+    const cesantiasNetas = Math.max(0, cesantias - cesantiasAnticipadas);
+    const interesesCesantiasNetos = Math.max(0, interesesCesantias - interesesCesantiasAnticipados);
+    const primaNeta = Math.max(0, prima - primaAnticipada);
+    const vacacionesNetas = Math.max(0, vacaciones - vacacionesAnticipadas);
+
+    // Totales de prestaciones
+    const totalAnticipos = primaAnticipada + vacacionesAnticipadas +
+                           cesantiasAnticipadas + interesesCesantiasAnticipados;
+    const totalPrestacionesBrutas = cesantias + interesesCesantias + prima + vacaciones;
+    const totalPrestaciones = cesantiasNetas + interesesCesantiasNetos + primaNeta + vacacionesNetas;
+
+    // ==========================================
+    // DEDUCCIONES
+    // ==========================================
+
+    // Deducciones estándar
     const loans = input.loans || 0;
     const retefuente = payrollResult.monthly.employeeDeductions.retencionFuente;
     const dedParams = input.deductionsParameters || {
@@ -358,22 +408,57 @@ export const calculateLiquidation = (
         (dedParams.afc || 0);
     const otherDeductions = input.otherDeductions || 0;
 
-    const totalDeductions = loans + retefuente + voluntaryContributions + otherDeductions;
+    // Deducciones personalizadas (máx 5)
+    const deduccionesPersonalizadas: DeduccionPersonalizada[] = advances?.deduccionesPersonalizadas || [];
+    const totalDeduccionesPersonalizadas = deduccionesPersonalizadas.reduce(
+        (sum, d) => sum + (d.valor || 0), 0
+    );
+
+    // Total de todas las deducciones
+    const totalDeductions = loans + retefuente + voluntaryContributions +
+                            otherDeductions + totalDeduccionesPersonalizadas;
+
+    // Neto a pagar = prestaciones netas - deducciones
     const netToPay = totalPrestaciones - totalDeductions;
 
     return {
         daysWorked,
         baseLiquidation: basePrestaciones,
+
+        // Desglose por prestación: Bruto / Anticipo / Neto
         cesantias,
+        cesantiasAnticipadas,
+        cesantiasNetas,
+
         interesesCesantias,
+        interesesCesantiasAnticipados,
+        interesesCesantiasNetos,
+
         prima,
+        primaAnticipada,
+        primaNeta,
+
         vacaciones,
+        vacacionesAnticipadas,
+        vacacionesNetas,
+
+        // Totales
+        totalPrestacionesBrutas,
+        totalAnticipos,
         totalPrestaciones,
+
         deductions: {
             loans,
             retefuente,
             voluntaryContributions,
             other: otherDeductions,
+            anticiposPrestaciones: {
+                prima: primaAnticipada,
+                vacaciones: vacacionesAnticipadas,
+                cesantias: cesantiasAnticipadas,
+                interesesCesantias: interesesCesantiasAnticipados,
+            },
+            deduccionesPersonalizadas,
             total: totalDeductions
         },
         netToPay: Math.max(0, netToPay) // Ensure non-negative

@@ -440,21 +440,81 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     // ===== 4. RESUMEN GENERAL =====
     sectionHeader('4', 'RESUMEN GENERAL DE LA LIQUIDACION');
 
-    autoTable(doc, {
-        startY: yPos,
-        body: [
-            ['Cesantías', formatCurrency(cesantias)],
-            ['Intereses de cesantías', formatCurrency(interesesCesantias)],
-            ['Prima de servicios', formatCurrency(prima)],
-            ['Vacaciones', formatCurrency(vacaciones)],
-        ],
-        foot: [['TOTAL PRESTACIONES SOCIALES', formatCurrency(totalPrestaciones)]],
-        theme: 'plain',
-        footStyles: { fillColor: [254, 242, 242], textColor: redText, fontStyle: 'bold', fontSize: 9 },
-        styles: { fontSize: 8, cellPadding: 3 },
-        columnStyles: { 1: { halign: 'right' } },
-        margin: { left: margin, right: margin },
-    });
+    // Check if there are any advances (anticipos)
+    const hasAnticipos = liquidation && (
+        liquidation.cesantiasAnticipadas > 0 ||
+        liquidation.interesesCesantiasAnticipados > 0 ||
+        liquidation.primaAnticipada > 0 ||
+        liquidation.vacacionesAnticipadas > 0
+    );
+
+    if (hasAnticipos && liquidation) {
+        // Show detailed table with Bruto/Anticipo/Neto columns
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Concepto', 'Valor Bruto', 'Anticipo', 'Valor Neto']],
+            body: [
+                [
+                    'Cesantías',
+                    formatCurrency(liquidation.cesantias),
+                    liquidation.cesantiasAnticipadas > 0 ? `-${formatCurrency(liquidation.cesantiasAnticipadas)}` : '-',
+                    formatCurrency(liquidation.cesantiasNetas)
+                ],
+                [
+                    'Intereses de cesantías',
+                    formatCurrency(liquidation.interesesCesantias),
+                    liquidation.interesesCesantiasAnticipados > 0 ? `-${formatCurrency(liquidation.interesesCesantiasAnticipados)}` : '-',
+                    formatCurrency(liquidation.interesesCesantiasNetos)
+                ],
+                [
+                    'Prima de servicios',
+                    formatCurrency(liquidation.prima),
+                    liquidation.primaAnticipada > 0 ? `-${formatCurrency(liquidation.primaAnticipada)}` : '-',
+                    formatCurrency(liquidation.primaNeta)
+                ],
+                [
+                    'Vacaciones',
+                    formatCurrency(liquidation.vacaciones),
+                    liquidation.vacacionesAnticipadas > 0 ? `-${formatCurrency(liquidation.vacacionesAnticipadas)}` : '-',
+                    formatCurrency(liquidation.vacacionesNetas)
+                ],
+            ],
+            foot: [[
+                'TOTAL PRESTACIONES',
+                formatCurrency(liquidation.totalPrestacionesBrutas),
+                `-${formatCurrency(liquidation.totalAnticipos)}`,
+                formatCurrency(liquidation.totalPrestaciones)
+            ]],
+            theme: 'striped',
+            headStyles: { fillColor: [230, 230, 230], textColor: primaryText, fontStyle: 'bold', fontSize: 8 },
+            footStyles: { fillColor: [254, 242, 242], textColor: redText, fontStyle: 'bold', fontSize: 9 },
+            styles: { fontSize: 8, cellPadding: 3 },
+            columnStyles: {
+                0: { cellWidth: 50 },
+                1: { halign: 'right' },
+                2: { halign: 'right', textColor: [180, 83, 9] },
+                3: { halign: 'right', fontStyle: 'bold' }
+            },
+            margin: { left: margin, right: margin },
+        });
+    } else {
+        // Original simple table when no anticipos
+        autoTable(doc, {
+            startY: yPos,
+            body: [
+                ['Cesantías', formatCurrency(cesantias)],
+                ['Intereses de cesantías', formatCurrency(interesesCesantias)],
+                ['Prima de servicios', formatCurrency(prima)],
+                ['Vacaciones', formatCurrency(vacaciones)],
+            ],
+            foot: [['TOTAL PRESTACIONES SOCIALES', formatCurrency(totalPrestaciones)]],
+            theme: 'plain',
+            footStyles: { fillColor: [254, 242, 242], textColor: redText, fontStyle: 'bold', fontSize: 9 },
+            styles: { fontSize: 8, cellPadding: 3 },
+            columnStyles: { 1: { halign: 'right' } },
+            margin: { left: margin, right: margin },
+        });
+    }
     yPos = (doc as any).lastAutoTable.finalY + 5;
 
     // ===== 5. DESCUENTOS =====
@@ -474,6 +534,16 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     if (otherDeductions > 0) {
         deductionsBody.push(['Otras Deducciones', formatCurrency(otherDeductions)]);
     }
+
+    // Add custom deductions (deduccionesPersonalizadas) if present
+    if (liquidation?.deductions?.deduccionesPersonalizadas && liquidation.deductions.deduccionesPersonalizadas.length > 0) {
+        for (const deduccion of liquidation.deductions.deduccionesPersonalizadas) {
+            if (deduccion.valor > 0) {
+                deductionsBody.push([deduccion.nombre || 'Deducción personalizada', formatCurrency(deduccion.valor)]);
+            }
+        }
+    }
+
     // If no deductions, show zero row
     if (deductionsBody.length === 0) {
         deductionsBody.push(['Sin deducciones', formatCurrency(0)]);
