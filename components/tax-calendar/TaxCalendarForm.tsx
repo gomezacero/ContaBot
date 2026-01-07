@@ -46,7 +46,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-[30px] w-full max-w-3xl p-8 shadow-2xl overflow-y-auto max-h-[85vh] animate-in zoom-in-95 duration-200">
-                <h2 className="text-2xl font-black text-[#002D44] mb-6">Nuevo Calendario Tributario</h2>
+                <h2 className="text-2xl font-black text-zinc-900 mb-6">Nuevo Calendario Tributario</h2>
 
                 {/* Warning Note */}
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-6 flex gap-3 text-sm text-amber-800">
@@ -61,14 +61,14 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                 <div className="space-y-6">
                     {/* TYPE OF PROFILE */}
                     <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Tipo de Perfil</label>
+                        <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Tipo de Perfil</label>
                         <div className="flex gap-4">
                             <button
                                 type="button"
                                 onClick={() => setFormData({ ...formData, classification: 'NATURAL' })}
                                 className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${formData.classification === 'NATURAL'
-                                    ? 'border-gray-200 bg-gray-100 text-slate-800 shadow-inner'
-                                    : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                    ? 'border-zinc-200 bg-zinc-100 text-zinc-800 shadow-inner'
+                                    : 'border-transparent bg-zinc-50 text-zinc-400 hover:bg-zinc-100'
                                     }`}
                             >
                                 Persona Natural
@@ -77,8 +77,8 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                                 type="button"
                                 onClick={() => setFormData({ ...formData, classification: 'JURIDICA' })}
                                 className={`flex-1 py-3 rounded-xl border-2 font-bold transition-all ${formData.classification === 'JURIDICA'
-                                    ? 'border-blue-100 bg-white text-blue-600 shadow-sm ring-2 ring-blue-50'
-                                    : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                    ? 'border-emerald-100 bg-white text-emerald-600 shadow-sm ring-2 ring-emerald-50'
+                                    : 'border-transparent bg-zinc-50 text-zinc-400 hover:bg-zinc-100'
                                     }`}
                             >
                                 Empresa / Jurídica
@@ -89,7 +89,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                     {/* BASIC INFO */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
                                 Nombre o Razón Social <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -98,7 +98,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
                                 placeholder="Ej: Inversiones ABC S.A.S"
-                                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#1AB1B1] outline-none font-medium transition-colors ${showNameError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium transition-colors ${showNameError ? 'border-red-300 bg-red-50' : 'border-zinc-200'
                                     }`}
                             />
                             {showNameError && (
@@ -108,7 +108,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
                                 NIT / Cédula / Identificación <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -117,7 +117,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                                 onChange={(e) => setFormData({ ...formData, nit: e.target.value })}
                                 onBlur={() => setTouched(prev => ({ ...prev, nit: true }))}
                                 placeholder="Ej: 1033724226"
-                                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#1AB1B1] outline-none font-medium text-slate-700 transition-colors ${showNitError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                className={`w-full px-4 py-3 bg-zinc-50 border rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium text-zinc-700 transition-colors ${showNitError ? 'border-red-300 bg-red-50' : 'border-zinc-200'
                                     }`}
                             />
                             {showNitError && (
@@ -131,13 +131,13 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                     {/* TAX CONFIG */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-xs font-bold text-[#4B6BFB] uppercase tracking-wider mb-2 flex items-center gap-1">
-                                <span className="text-[#4B6BFB]">❖</span> Régimen Tributario
+                            <label className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                <span className="text-emerald-600">❖</span> Régimen Tributario
                             </label>
                             <select
                                 value={formData.taxRegime}
                                 onChange={(e) => setFormData({ ...formData, taxRegime: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-[#1AB1B1] outline-none appearance-none font-medium text-slate-700"
+                                className="w-full px-4 py-3 border border-zinc-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-medium text-zinc-700"
                             >
                                 <option value="ORDINARIO">Régimen Ordinario</option>
                                 <option value="SIMPLE">Régimen Simple (RST)</option>
@@ -145,13 +145,13 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-[#4B6BFB] uppercase tracking-wider mb-2 flex items-center gap-1">
-                                <span className="text-[#4B6BFB]">🛡</span> Periodicidad IVA
+                            <label className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                <span className="text-emerald-600">🛡</span> Periodicidad IVA
                             </label>
                             <select
                                 value={formData.ivaPeriodicity}
                                 onChange={(e) => setFormData({ ...formData, ivaPeriodicity: e.target.value })}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-[#1AB1B1] outline-none appearance-none font-medium text-slate-700"
+                                className="w-full px-4 py-3 border border-zinc-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 outline-none appearance-none font-medium text-zinc-700"
                             >
                                 <option value="BIMESTRAL">Bimestral</option>
                                 <option value="CUATRIMESTRAL">Cuatrimestral</option>
@@ -174,8 +174,8 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                                         type="button"
                                         onClick={() => toggleAlertDay(day)}
                                         className={`px-5 py-2 rounded-lg text-sm font-bold border transition-all ${isSelected
-                                            ? 'bg-red-50 border-red-200 text-red-600'
-                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                            ? 'bg-rose-50 border-rose-200 text-rose-600'
+                                            : 'bg-white border-zinc-200 text-zinc-400 hover:border-zinc-300'
                                             }`}
                                     >
                                         {isSelected && '✓ '}
@@ -189,12 +189,12 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                     {/* CHANNELS */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                                 <Sparkles className="w-4 h-4 text-amber-500" />
                                 Canales de Alerta
                             </label>
                             {isGuest && (
-                                <span className="text-[10px] bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
+                                <span className="text-[10px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3 py-1.5 rounded-full font-bold flex items-center gap-1.5 shadow-sm">
                                     <Lock className="w-3 h-3" />
                                     REQUIERE CUENTA
                                 </span>
@@ -204,29 +204,29 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Email Channel */}
                             <div className={`p-4 rounded-2xl border-2 transition-all ${isGuest
-                                    ? 'bg-gray-50 border-gray-200'
+                                    ? 'bg-zinc-50 border-zinc-200'
                                     : formData.emailAlert
-                                        ? 'bg-blue-50 border-blue-300 shadow-md'
-                                        : 'bg-white border-gray-200 hover:border-blue-200'
+                                        ? 'bg-emerald-50 border-emerald-300 shadow-md'
+                                        : 'bg-white border-zinc-200 hover:border-emerald-200'
                                 }`}>
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${formData.emailAlert && !isGuest ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-400'
+                                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${formData.emailAlert && !isGuest ? 'bg-emerald-500 text-white' : 'bg-zinc-100 text-zinc-400'
                                         }`}>
                                         <Mail className="w-5 h-5" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-slate-800 text-sm">Email</p>
-                                        <p className="text-xs text-gray-400 truncate">Alertas en tu correo</p>
+                                        <p className="font-bold text-zinc-800 text-sm">Email</p>
+                                        <p className="text-xs text-zinc-400 truncate">Alertas en tu correo</p>
                                     </div>
                                     {isGuest ? (
-                                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                            <Lock className="w-4 h-4 text-gray-400" />
+                                        <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                                            <Lock className="w-4 h-4 text-zinc-400" />
                                         </div>
                                     ) : (
                                         <button
                                             type="button"
                                             onClick={() => setFormData({ ...formData, emailAlert: !formData.emailAlert })}
-                                            className={`w-12 h-7 rounded-full p-1 transition-all flex-shrink-0 ${formData.emailAlert ? 'bg-blue-500' : 'bg-gray-200'}`}
+                                            className={`w-12 h-7 rounded-full p-1 transition-all flex-shrink-0 ${formData.emailAlert ? 'bg-emerald-500' : 'bg-zinc-200'}`}
                                         >
                                             <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.emailAlert ? 'translate-x-5' : ''}`} />
                                         </button>
@@ -235,16 +235,16 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             </div>
 
                             {/* WhatsApp Channel */}
-                            <div className="p-4 rounded-2xl border-2 bg-gray-50 border-gray-200">
+                            <div className="p-4 rounded-2xl border-2 bg-zinc-50 border-zinc-200">
                                 <div className="flex items-center gap-4">
                                     <div className="w-11 h-11 rounded-xl bg-green-50 text-green-400 flex items-center justify-center flex-shrink-0">
                                         <MessageCircle className="w-5 h-5" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-gray-500 text-sm">WhatsApp</p>
-                                        <p className="text-xs text-gray-400 truncate">Próximamente</p>
+                                        <p className="font-bold text-zinc-500 text-sm">WhatsApp</p>
+                                        <p className="text-xs text-zinc-400 truncate">Próximamente</p>
                                     </div>
-                                    <span className="text-[9px] bg-slate-800 text-white px-2 py-1 rounded-md font-bold flex items-center gap-1 flex-shrink-0">
+                                    <span className="text-[9px] bg-zinc-800 text-white px-2 py-1 rounded-md font-bold flex items-center gap-1 flex-shrink-0">
                                         <Sparkles className="w-2.5 h-2.5" /> PRO
                                     </span>
                                 </div>
@@ -252,11 +252,11 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                         </div>
 
                         {isGuest && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                                    <Sparkles className="w-4 h-4 text-amber-600" />
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                    <Sparkles className="w-4 h-4 text-emerald-600" />
                                 </div>
-                                <p className="text-xs text-amber-700 font-medium">
+                                <p className="text-xs text-emerald-700 font-medium">
                                     Inicia sesión para configurar alertas y recibir recordatorios de vencimientos
                                 </p>
                             </div>
@@ -270,8 +270,8 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             onClick={handleSubmit}
                             disabled={isLoading}
                             className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${isLoading
-                                ? 'bg-gray-400 text-white cursor-wait'
-                                : 'bg-black text-white hover:bg-slate-800'
+                                ? 'bg-zinc-400 text-white cursor-wait'
+                                : 'bg-zinc-900 text-white hover:bg-zinc-800'
                                 }`}
                         >
                             {isLoading ? (
@@ -291,7 +291,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             type="button"
                             onClick={onCancel}
                             disabled={isLoading}
-                            className="w-full text-center text-gray-400 text-sm font-medium hover:text-gray-600 py-2"
+                            className="w-full text-center text-zinc-400 text-sm font-medium hover:text-zinc-600 py-2"
                         >
                             Cancelar
                         </button>

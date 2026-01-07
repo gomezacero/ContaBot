@@ -1,82 +1,94 @@
-# 🤖 ContaBot: Financial OS for Colombian Accountants
+# Contabio: IA para el Contador Moderno
 
-[![Bun](https://img.shields.io/badge/Bun-%23000000.svg?style=for-the-badge&logo=bun&logoColor=white)](https://bun.sh)
-[![Next.js](https://img.shields.io/badge/next.js-%23000000.svg?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/next.js_16-%23000000.svg?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Gemini](https://img.shields.io/badge/Gemini_2.0_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
 
-**ContaBot** is a high-performance Financial Operating System designed specifically for the Colombian accounting landscape. It combines modern web aesthetics with mission-critical tools for payroll, tax automation, and document processing.
+**Contabio** es un sistema operativo financiero de alto rendimiento diseñado específicamente para el mercado contable colombiano. Combina estética web moderna con herramientas críticas para nómina, automatización tributaria y procesamiento de documentos.
 
 ---
 
-## 🚀 Core Features
+## Core Features
 
-### 📊 Real-Time Dashboard
-A centralized command center that pulls live metrics directly from your Supabase instance.
-- **Dynamic Stats:** Active clients, managed employees, and monthly document trends.
-- **Smart Alerts:** Automated tax deadline warnings derived from individual client NITs.
+### Real-Time Dashboard
+Un centro de comando centralizado con métricas en vivo desde tu instancia de Supabase.
+- **Stats Dinámicos:** Clientes activos, empleados gestionados y tendencias mensuales de documentos.
+- **Alertas Inteligentes:** Avisos automáticos de vencimientos tributarios derivados de los NITs de cada cliente.
 
-### 🧾 Nómina Pro & Liquidación
-A premium payroll calculator that turns complex Colombian regulations into a smooth experience.
-- **Smart Logic:** Automatic Transport Aid calculation, Parafiscale exemptions (Ley 1607), and ARL risk levels.
-- **Premium UX:** Animated totals and contextual tooltips explaining legal terms as you type.
-- **Export Ready:** Save and track historical payroll records with a single click.
+### Nómina Pro & Liquidación
+Una calculadora de nómina premium que transforma las complejas regulaciones colombianas en una experiencia fluida.
+- **Lógica Inteligente:** Cálculo automático de Auxilio de Transporte, exenciones de Parafiscales (Ley 1607) y niveles de riesgo ARL.
+- **UX Premium:** Totales animados y tooltips contextuales que explican términos legales mientras escribes.
+- **Export Listo:** Guarda y rastrea registros históricos de nómina con un solo clic.
 
-### 👁️ OCR Digitador (AI Engine)
-Stop manual data entry. Our high-precision engine powered by **Gemini 2.0 Flash** extracts data from invoices with incredible accuracy.
-- **Full Extraction:** Entity, NIT, Currency, Subtotal, IVA, and even **Impoconsumo** and **Tips**.
-- **Batch Processing:** Group and manage multiple invoices simultaneously.
+### OCR Digitador (Motor IA)
+Detén la digitación manual. Nuestro motor de alta precisión impulsado por **Gemini 2.0 Flash** extrae datos de facturas con increíble exactitud.
+- **Extracción Completa:** Entidad, NIT, Moneda, Subtotal, IVA, e incluso **Impoconsumo** y **Propinas**.
+- **Procesamiento por Lotes:** Agrupa y gestiona múltiples facturas simultáneamente.
 
-### 📅 2025 Tax Calendar
-Never miss a deadline. Our system calculates exact dates for Renta, IVA, and Retención based on the DIAN 2025 schedule.
+### Calendario Tributario 2026
+Nunca pierdas un vencimiento. Nuestro sistema calcula fechas exactas para Renta, IVA y Retención basándose en el calendario DIAN 2026.
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
-- **Runtime:** [Bun](https://bun.sh) (Selected for speed)
-- **Database / Auth:** Supabase
+- **Framework:** Next.js 16 (App Router), React 19
+- **Runtime:** Node.js / npm
+- **Database / Auth:** Supabase (PostgreSQL + Auth)
 - **AI Core:** Google Gemini 2.0 Flash API
-- **Styling:** Tailwind CSS + Framer Motion
+- **Styling:** Tailwind CSS 4
 - **Icons:** Lucide React
 
 ---
 
-## ⚙️ Quick Start (Developer Mode)
+## Quick Start (Modo Desarrollador)
 
-ContaBot is optimized for the **Bun** ecosystem.
-
-1. **Clone the repository:**
+1. **Clonar el repositorio:**
    ```bash
    git clone https://github.com/gomezacero/ContaBot.git
    cd ContaBot
    ```
 
-2. **Install dependencies:**
+2. **Instalar dependencias:**
    ```bash
-   bun install
+   npm install
    ```
 
-3. **Set up Environment Variables:**
-   Create a `.env.local` file with:
+3. **Configurar Variables de Entorno:**
+   Crear un archivo `.env.local` con:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
    - `GEMINI_API_KEY`
 
-4. **Run development server:**
+4. **Ejecutar servidor de desarrollo:**
    ```bash
-   bun dev
+   npm run dev
    ```
 
 ---
 
-## 🎨 Visual Philosophy
-ContaBot follows the **2025 Design Language**:
-- **Glassmorphism:** Light, translucent surfaces.
-- **Vibrant Gradients:** Focused on purple and indigo palettes.
-- **Micro-interactions:** Every interaction should feel alive (animations, hovers, and pulses).
+## Filosofía Visual
+
+Contabio sigue el **Lenguaje de Diseño 2026**:
+- **Glassmorphism:** Superficies ligeras y translúcidas con blur.
+- **Gradientes Emerald:** Paleta enfocada en verde esmeralda y teal.
+- **Micro-interacciones:** Cada interacción debe sentirse viva (animaciones, hovers y pulsos).
+- **Fuente:** Plus Jakarta Sans para un look moderno y profesional.
 
 ---
 
-Developed with ❤️ for accountants who value time and design.
+## Paleta de Colores
+
+| Elemento | Color | Código |
+|----------|-------|--------|
+| Primary | Emerald | `#16a34a` |
+| Dark | Zinc | `#18181b` |
+| Background | Light | `#fafafa` |
+| Accent | Teal | `#0d9488` |
+| Stats | Rose | `#f43f5e` |
+
+---
+
+Desarrollado con por **Valueum** para contadores que valoran su tiempo y el diseño.

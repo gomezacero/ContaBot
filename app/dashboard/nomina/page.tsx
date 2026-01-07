@@ -161,25 +161,25 @@ function dbToPayrollInput(emp: DBEmployee): PayrollInput {
 
 // UI Components
 const Section: React.FC<{ title: string; icon: React.ReactNode; isOpen: boolean; onToggle: () => void; children: React.ReactNode }> = ({ title, icon, isOpen, onToggle, children }) => (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm transition-all duration-300">
-        <button onClick={onToggle} className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm transition-all duration-300">
+        <button onClick={onToggle} className="w-full flex items-center justify-between p-4 bg-zinc-50 hover:bg-zinc-100 transition-colors">
             <div className="flex items-center gap-3">
-                <div className={`p-1.5 rounded-lg ${isOpen ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-500'}`}>
+                <div className={`p-1.5 rounded-lg ${isOpen ? 'bg-emerald-100 text-emerald-600' : 'bg-zinc-200 text-zinc-500'}`}>
                     {icon}
                 </div>
-                <span className="font-semibold text-gray-800 text-sm">{title}</span>
+                <span className="font-semibold text-zinc-800 text-sm">{title}</span>
             </div>
-            {isOpen ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            {isOpen ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
         </button>
-        {isOpen && <div className="p-4 lg:p-5 border-t border-gray-100 animate-in slide-in-from-top-1">{children}</div>}
+        {isOpen && <div className="p-4 lg:p-5 border-t border-zinc-100 animate-in slide-in-from-top-1">{children}</div>}
     </div>
 );
 
 const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date'; value: any; onChange: (val: any) => void; placeholder?: string }> = ({ label, type, value, onChange, placeholder }) => (
     <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</label>
+        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{label}</label>
         <div className="relative">
-            {type === 'money' && <span className="absolute left-3 top-2.5 text-gray-400 text-xs">$</span>}
+            {type === 'money' && <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>}
             <input
                 type={type === 'money' ? 'text' : type}
                 value={type === 'money' ? (value ? Number(value).toLocaleString('es-CO') : '') : (value ?? '')}
@@ -188,7 +188,7 @@ const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date
                     const v = type === 'money' ? e.target.value.replace(/\D/g, '') : e.target.value;
                     onChange(type === 'number' || type === 'money' ? Number(v) : v);
                 }}
-                className={`w-full bg-white border border-gray-200 rounded-lg py-2 ${type === 'money' ? 'pl-6' : 'pl-3'} pr-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500`}
+                className={`w-full bg-white border border-zinc-200 rounded-lg py-2 ${type === 'money' ? 'pl-6' : 'pl-3'} pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500`}
             />
         </div>
     </div>
@@ -196,18 +196,18 @@ const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date
 
 const Toggle: React.FC<{ label: string; checked: boolean; onChange: (v: boolean) => void }> = ({ label, checked, onChange }) => (
     <label className="flex items-center justify-between gap-4 cursor-pointer group w-full">
-        <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 whitespace-nowrap">{label}</span>
+        <span className="text-sm font-medium text-zinc-600 group-hover:text-zinc-900 whitespace-nowrap">{label}</span>
         <div className="relative flex-shrink-0">
             <input type="checkbox" className="sr-only" checked={checked} onChange={e => onChange(e.target.checked)} />
-            <div className={`w-9 h-5 rounded-full shadow-inner transition-colors ${checked ? 'bg-purple-600' : 'bg-gray-300'}`}></div>
+            <div className={`w-9 h-5 rounded-full shadow-inner transition-colors ${checked ? 'bg-emerald-600' : 'bg-zinc-300'}`}></div>
             <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
         </div>
     </label>
 );
 
-const ResultRow: React.FC<{ label: string; value: number; isBold?: boolean; color?: string }> = ({ label, value, isBold, color = 'text-gray-900' }) => (
+const ResultRow: React.FC<{ label: string; value: number; isBold?: boolean; color?: string }> = ({ label, value, isBold, color = 'text-zinc-900' }) => (
     <div className="flex justify-between items-center py-1">
-        <span className="text-gray-600">{label}</span>
+        <span className="text-zinc-600">{label}</span>
         <span className={`${isBold ? 'font-bold' : 'font-medium'} ${color}`}>{formatCurrency(value)}</span>
     </div>
 );
@@ -735,7 +735,7 @@ export default function NominaPage() {
     if (loading && clients.length === 0) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
             </div>
         );
     }
@@ -745,16 +745,16 @@ export default function NominaPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-purple-100 text-purple-700 rounded-2xl">
+                    <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl">
                         <Calculator className="w-6 h-6" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Calculadora Pro 2025</h1>
-                        <p className="text-sm text-gray-500">Control total de variables para liquidaciones complejas.</p>
+                        <h1 className="text-2xl font-bold text-zinc-900">Calculadora Pro 2025</h1>
+                        <p className="text-sm text-zinc-500">Control total de variables para liquidaciones complejas.</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-zinc-100">
                     {saved && (
                         <div className="flex items-center gap-1 text-green-600 text-xs font-bold animate-fade-in px-2">
                             <CheckCircle2 className="w-4 h-4" />
@@ -764,7 +764,7 @@ export default function NominaPage() {
                     <select
                         value={selectedClientId || ''}
                         onChange={(e) => setSelectedClientId(e.target.value || null)}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-gray-50 focus:ring-2 focus:ring-purple-500 outline-none min-w-[200px]"
+                        className="px-3 py-2 border border-zinc-200 rounded-lg text-sm font-medium bg-zinc-50 focus:ring-2 focus:ring-emerald-500 outline-none min-w-[200px]"
                     >
                         <option value="">📝 Modo Demo (Local)</option>
                         {clients.map(client => (
@@ -775,7 +775,7 @@ export default function NominaPage() {
                     </select>
                     <button
                         onClick={() => setShowClientModal(true)}
-                        className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
                         title="Agregar Cliente"
                     >
                         <Plus className="w-5 h-5" />
@@ -792,7 +792,7 @@ export default function NominaPage() {
             )}
 
             {/* Employee Horizontal List + Tab Switcher */}
-            <div className="bg-white p-1.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+            <div className="bg-white p-1.5 rounded-xl shadow-sm border border-zinc-100 flex items-center justify-between">
                 {/* Employee Tabs - Left Side */}
                 <div className="flex items-center overflow-x-auto no-scrollbar flex-1 pl-2">
                     {employees.map((emp) => {
@@ -802,14 +802,14 @@ export default function NominaPage() {
                                 key={emp.id}
                                 onClick={() => setActiveEmployeeId(emp.id)}
                                 className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all group relative border select-none ${isActive
-                                    ? 'bg-purple-50 border-purple-200 shadow-sm'
-                                    : 'bg-transparent border-transparent hover:bg-gray-50'
+                                    ? 'bg-emerald-50 border-emerald-200 shadow-sm'
+                                    : 'bg-transparent border-transparent hover:bg-zinc-50'
                                     }`}
                             >
                                 <UserCircle2 className="w-4 h-4" />
                                 <div className="flex flex-col min-w-0">
-                                    <span className={`text-xs truncate max-w-[100px] font-medium ${isActive ? 'text-purple-900' : 'text-gray-600 group-hover:text-gray-900'}`}>{emp.name}</span>
-                                    {isActive && <span className="h-0.5 w-full bg-purple-500 rounded-full mt-0.5 animate-in zoom-in"></span>}
+                                    <span className={`text-xs truncate max-w-[100px] font-medium ${isActive ? 'text-zinc-900' : 'text-zinc-600 group-hover:text-zinc-900'}`}>{emp.name}</span>
+                                    {isActive && <span className="h-0.5 w-full bg-emerald-500 rounded-full mt-0.5 animate-in zoom-in"></span>}
                                 </div>
 
                                 {employees.length > 1 && (
@@ -818,7 +818,7 @@ export default function NominaPage() {
                                         className={`ml-1 p-1 rounded-md transition-all duration-200
                                             ${isActive
                                                 ? 'text-red-400 hover:text-red-600 hover:bg-red-50 opacity-100'
-                                                : 'text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
+                                                : 'text-zinc-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0'
                                             }`}
                                         title="Eliminar empleado"
                                     >
@@ -831,42 +831,42 @@ export default function NominaPage() {
                     <button
                         onClick={handleAddEmployee}
                         className={`ml-2 p-2 rounded-lg transition-all ${employees.length === 0
-                            ? 'bg-purple-600 text-white shadow-lg animate-pulse ring-4 ring-purple-100'
-                            : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                            ? 'bg-emerald-600 text-white shadow-lg animate-pulse ring-4 ring-emerald-100'
+                            : 'text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
                     >
                         <Plus className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Tab Switcher - Right Side (mismo ancho que panel derecho: 1/3 - gap) */}
-                <div className="hidden lg:flex items-center gap-1 ml-4 flex-shrink-0 bg-gray-50 p-1.5 rounded-xl w-[calc(33.333%-24px)]">
+                <div className="hidden lg:flex items-center gap-1 ml-4 flex-shrink-0 bg-zinc-50 p-1.5 rounded-xl w-[calc(33.333%-24px)]">
                     <button
                         onClick={() => setActiveTab('nomina')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                     >
                         <DollarSign className="w-4 h-4" />
                         Nómina
                     </button>
                     <button
                         onClick={() => setActiveTab('liquidacion')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                     >
                         <Wallet className="w-4 h-4" />
                         Liquidación
                     </button>
                 </div>
                 {/* Tab Switcher - Mobile */}
-                <div className="flex lg:hidden items-center gap-1 ml-4 flex-shrink-0 bg-gray-50 p-1 rounded-xl">
+                <div className="flex lg:hidden items-center gap-1 ml-4 flex-shrink-0 bg-zinc-50 p-1 rounded-xl">
                     <button
                         onClick={() => setActiveTab('nomina')}
-                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                     >
                         <DollarSign className="w-4 h-4" />
                         Nómina
                     </button>
                     <button
                         onClick={() => setActiveTab('liquidacion')}
-                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
                     >
                         <Wallet className="w-4 h-4" />
                         Liquidación
@@ -888,9 +888,9 @@ export default function NominaPage() {
                                     <Input label="Nombre Empleado" type="text" value={activeEmployee.name} onChange={v => handleInputChange('name', v)} placeholder="" />
                                     <Input label="Salario Básico" type="money" value={activeEmployee.baseSalary} onChange={v => handleInputChange('baseSalary', v)} />
                                     <div className="col-span-1">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tipo Contrato</label>
+                                        <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Tipo Contrato</label>
                                         <select
-                                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                                            className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm"
                                             value={activeEmployee.contractType}
                                             onChange={e => handleInputChange('contractType', e.target.value)}
                                         >
@@ -909,22 +909,22 @@ export default function NominaPage() {
                             </Section>
 
                             {/* PARÁMETROS BASE DE CÁLCULO */}
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-4">
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <Settings className="w-4 h-4 text-blue-600" />
-                                    <h3 className="text-sm font-semibold text-blue-800">Parámetros Base de Cálculo</h3>
+                                    <Settings className="w-4 h-4 text-emerald-600" />
+                                    <h3 className="text-sm font-semibold text-emerald-800">Parámetros Base de Cálculo</h3>
                                     <Tooltip content="Para liquidaciones de empleados que iniciaron en años anteriores, seleccione el año base correspondiente. Los valores de SMMLV y Auxilio se ajustarán automáticamente." />
                                 </div>
-                                <p className="text-xs text-blue-600 mb-3">
+                                <p className="text-xs text-emerald-600 mb-3">
                                     Útil para liquidar empleados con la base salarial de años anteriores (regla de los últimos 6 meses).
                                 </p>
 
                                 <div className="grid grid-cols-3 gap-4">
                                     {/* Selector de Año */}
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">Año Base</label>
+                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Año Base</label>
                                         <select
-                                            className="w-full bg-white border border-blue-200 rounded-lg py-2 px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                            className="w-full bg-white border border-emerald-200 rounded-lg py-2 px-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                             value={anoBase}
                                             onChange={(e) => {
                                                 const year = Number(e.target.value) as AnoBase;
@@ -942,9 +942,9 @@ export default function NominaPage() {
 
                                     {/* SMMLV Editable */}
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">SMMLV</label>
+                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">SMMLV</label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400 text-xs">$</span>
+                                            <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>
                                             <input
                                                 type="text"
                                                 value={smmlvOverride.toLocaleString('es-CO')}
@@ -952,16 +952,16 @@ export default function NominaPage() {
                                                     const v = e.target.value.replace(/\D/g, '');
                                                     setSmmlvOverride(Number(v) || 0);
                                                 }}
-                                                className="w-full bg-white border border-blue-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                                className="w-full bg-white border border-emerald-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                             />
                                         </div>
                                     </div>
 
                                     {/* Auxilio Transporte Editable */}
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-blue-500 uppercase tracking-wide">Aux. Transporte</label>
+                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Aux. Transporte</label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400 text-xs">$</span>
+                                            <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>
                                             <input
                                                 type="text"
                                                 value={auxOverride.toLocaleString('es-CO')}
@@ -969,7 +969,7 @@ export default function NominaPage() {
                                                     const v = e.target.value.replace(/\D/g, '');
                                                     setAuxOverride(Number(v) || 0);
                                                 }}
-                                                className="w-full bg-white border border-blue-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                                className="w-full bg-white border border-emerald-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                                             />
                                         </div>
                                     </div>
@@ -990,9 +990,9 @@ export default function NominaPage() {
                             <Section title="II. Seguridad Social y Configuración" icon={<UserCog className="w-4 h-4" />} isOpen={openSections.has('section2')} onToggle={() => toggleSection('section2')}>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="col-span-1">
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Riesgo ARL</label>
+                                        <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Riesgo ARL</label>
                                         <select
-                                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                                            className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm"
                                             value={activeEmployee.riskLevel}
                                             onChange={e => handleInputChange('riskLevel', e.target.value as RiskLevel)}
                                         >
@@ -1022,7 +1022,7 @@ export default function NominaPage() {
                                     <Input label="Recargo Noct. (0.35)" type="number" value={activeEmployee.rnHours} onChange={v => handleInputChange('rnHours', v)} />
                                     <Input label="H.E.D Festiva (2.00)" type="number" value={activeEmployee.heddfHours} onChange={v => handleInputChange('heddfHours', v)} />
                                     <Input label="H.E.N Festiva (2.50)" type="number" value={activeEmployee.hendfHours} onChange={v => handleInputChange('hendfHours', v)} />
-                                    <div className="col-span-3 h-px bg-gray-100 my-2"></div>
+                                    <div className="col-span-3 h-px bg-zinc-100 my-2"></div>
                                     <Input label="Comisiones" type="money" value={activeEmployee.commissions} onChange={v => handleInputChange('commissions', v)} />
                                     <Input label="Bonif. Salariales" type="money" value={activeEmployee.salaryBonuses} onChange={v => handleInputChange('salaryBonuses', v)} />
                                 </div>
@@ -1044,14 +1044,14 @@ export default function NominaPage() {
                                     </div>
 
                                     {/* Toggle Deducciones Retefuente */}
-                                    <div className="border-t border-gray-100 pt-4">
-                                        <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-100">
+                                    <div className="border-t border-zinc-100 pt-4">
+                                        <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-100">
                                             <div className="flex items-center gap-2">
-                                                <BadgePercent className="w-4 h-4 text-purple-600" />
-                                                <span className="text-sm font-medium text-purple-800">¿Activar deducciones Retefuente?</span>
+                                                <BadgePercent className="w-4 h-4 text-emerald-600" />
+                                                <span className="text-sm font-medium text-emerald-800">¿Activar deducciones Retefuente?</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className={`text-xs font-bold ${!activeEmployee.enableDeductions ? 'text-purple-700' : 'text-gray-400'}`}>NO</span>
+                                                <span className={`text-xs font-bold ${!activeEmployee.enableDeductions ? 'text-emerald-700' : 'text-zinc-400'}`}>NO</span>
                                                 <div className="relative">
                                                     <input
                                                         type="checkbox"
@@ -1061,20 +1061,20 @@ export default function NominaPage() {
                                                     />
                                                     <div
                                                         onClick={() => handleInputChange('enableDeductions', !activeEmployee.enableDeductions)}
-                                                        className={`w-10 h-5 rounded-full shadow-inner transition-colors cursor-pointer ${activeEmployee.enableDeductions ? 'bg-purple-600' : 'bg-gray-300'}`}
+                                                        className={`w-10 h-5 rounded-full shadow-inner transition-colors cursor-pointer ${activeEmployee.enableDeductions ? 'bg-emerald-600' : 'bg-zinc-300'}`}
                                                     >
                                                         <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full shadow transition-transform ${activeEmployee.enableDeductions ? 'translate-x-5' : 'translate-x-0'}`}></div>
                                                     </div>
                                                 </div>
-                                                <span className={`text-xs font-bold ${activeEmployee.enableDeductions ? 'text-purple-700' : 'text-gray-400'}`}>SI</span>
+                                                <span className={`text-xs font-bold ${activeEmployee.enableDeductions ? 'text-emerald-700' : 'text-zinc-400'}`}>SI</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Campos Condicionales de Retefuente */}
                                     {activeEmployee.enableDeductions && (
-                                        <div className="bg-gray-50 rounded-xl p-4 space-y-4 border border-gray-200 animate-in slide-in-from-top-2">
-                                            <p className="text-xs text-gray-500 font-medium">Configure los beneficios tributarios para reducir la base de retención en la fuente (Art. 383 E.T.)</p>
+                                        <div className="bg-zinc-50 rounded-xl p-4 space-y-4 border border-zinc-200 animate-in slide-in-from-top-2">
+                                            <p className="text-xs text-zinc-500 font-medium">Configure los beneficios tributarios para reducir la base de retención en la fuente (Art. 383 E.T.)</p>
 
                                             <div className="grid grid-cols-2 gap-4">
                                                 <Input
@@ -1130,7 +1130,7 @@ export default function NominaPage() {
                                     <div className="space-y-5">
                                         {/* Header con descripción y badge total */}
                                         <div className="flex items-center justify-between">
-                                            <p className="text-xs text-gray-500">Montos ya pagados que se descontarán de la liquidación</p>
+                                            <p className="text-xs text-zinc-500">Montos ya pagados que se descontarán de la liquidación</p>
                                             {(anticipos.prima.montoPagado > 0 || anticipos.vacacionesPagadas > 0 ||
                                               anticipos.cesantiasParciales > 0 || anticipos.interesesCesantiasPagados > 0) && (
                                                 <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold">
@@ -1149,13 +1149,13 @@ export default function NominaPage() {
                                                     <Gift className="w-4 h-4 text-pink-600" />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <label className="text-sm font-semibold text-gray-700">Prima de Servicios</label>
-                                                    <p className="text-xs text-gray-400">Pagada por semestre o monto directo</p>
+                                                    <label className="text-sm font-semibold text-zinc-700">Prima de Servicios</label>
+                                                    <p className="text-xs text-zinc-400">Pagada por semestre o monto directo</p>
                                                 </div>
                                                 <select
                                                     value={anticipos.prima.tipo}
                                                     onChange={(e) => updatePrima('tipo', e.target.value as TipoPrimaAnticipada)}
-                                                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                                    className="px-3 py-2 bg-white border border-zinc-200 rounded-lg text-sm font-medium text-zinc-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                                                 >
                                                     <option value="MONTO">Monto directo</option>
                                                     <option value="SEMESTRE">Por semestre</option>
@@ -1168,7 +1168,7 @@ export default function NominaPage() {
                                                     <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer border-2 transition-all ${
                                                         anticipos.prima.semestreJunioPagado
                                                             ? 'bg-pink-100 border-pink-400'
-                                                            : 'bg-white border-gray-200 hover:border-pink-300'
+                                                            : 'bg-white border-zinc-200 hover:border-pink-300'
                                                     }`}>
                                                         <input
                                                             type="checkbox"
@@ -1177,15 +1177,15 @@ export default function NominaPage() {
                                                             className="w-4 h-4 text-pink-600 rounded focus:ring-pink-500"
                                                         />
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Junio</span>
-                                                            <p className="text-xs text-gray-400">Ene-Jun</p>
+                                                            <span className="text-sm font-medium text-zinc-700">Junio</span>
+                                                            <p className="text-xs text-zinc-400">Ene-Jun</p>
                                                         </div>
                                                     </label>
                                                     {/* Checkbox Diciembre */}
                                                     <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer border-2 transition-all ${
                                                         anticipos.prima.semestreDiciembrePagado
                                                             ? 'bg-pink-100 border-pink-400'
-                                                            : 'bg-white border-gray-200 hover:border-pink-300'
+                                                            : 'bg-white border-zinc-200 hover:border-pink-300'
                                                     }`}>
                                                         <input
                                                             type="checkbox"
@@ -1194,20 +1194,20 @@ export default function NominaPage() {
                                                             className="w-4 h-4 text-pink-600 rounded focus:ring-pink-500"
                                                         />
                                                         <div>
-                                                            <span className="text-sm font-medium text-gray-700">Diciembre</span>
-                                                            <p className="text-xs text-gray-400">Jul-Dic</p>
+                                                            <span className="text-sm font-medium text-zinc-700">Diciembre</span>
+                                                            <p className="text-xs text-zinc-400">Jul-Dic</p>
                                                         </div>
                                                     </label>
                                                 </div>
                                             ) : (
                                                 <div className="ml-12">
                                                     <div className="relative w-48">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-medium">$</span>
                                                         <input
                                                             type="text"
                                                             value={anticipos.prima.montoPagado ? anticipos.prima.montoPagado.toLocaleString('es-CO') : ''}
                                                             onChange={(e) => updatePrima('montoPagado', Number(e.target.value.replace(/\D/g, '')))}
-                                                            className="w-full pl-7 pr-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                                            className="w-full pl-7 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                                                             placeholder="0"
                                                         />
                                                     </div>
@@ -1218,15 +1218,15 @@ export default function NominaPage() {
                                         {/* Grid 3 columnas: Vacaciones, Cesantías, Int. Cesantías */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {/* Vacaciones Card */}
-                                            <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-cyan-300 transition-colors">
+                                            <div className="bg-white rounded-xl p-4 border border-zinc-200 hover:border-cyan-300 transition-colors">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center">
                                                         <Palmtree className="w-4 h-4 text-cyan-600" />
                                                     </div>
-                                                    <label className="text-sm font-semibold text-gray-700">Vacaciones</label>
+                                                    <label className="text-sm font-semibold text-zinc-700">Vacaciones</label>
                                                 </div>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-medium text-sm">$</span>
                                                     <input
                                                         type="text"
                                                         value={anticipos.vacacionesPagadas ? anticipos.vacacionesPagadas.toLocaleString('es-CO') : ''}
@@ -1234,22 +1234,22 @@ export default function NominaPage() {
                                                             ...prev,
                                                             vacacionesPagadas: Number(e.target.value.replace(/\D/g, ''))
                                                         }))}
-                                                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:bg-white transition-colors"
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:bg-white transition-colors"
                                                         placeholder="0"
                                                     />
                                                 </div>
                                             </div>
 
                                             {/* Cesantías Card */}
-                                            <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-emerald-300 transition-colors">
+                                            <div className="bg-white rounded-xl p-4 border border-zinc-200 hover:border-emerald-300 transition-colors">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
                                                         <PiggyBank className="w-4 h-4 text-emerald-600" />
                                                     </div>
-                                                    <label className="text-sm font-semibold text-gray-700">Cesantias</label>
+                                                    <label className="text-sm font-semibold text-zinc-700">Cesantias</label>
                                                 </div>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-medium text-sm">$</span>
                                                     <input
                                                         type="text"
                                                         value={anticipos.cesantiasParciales ? anticipos.cesantiasParciales.toLocaleString('es-CO') : ''}
@@ -1257,22 +1257,22 @@ export default function NominaPage() {
                                                             ...prev,
                                                             cesantiasParciales: Number(e.target.value.replace(/\D/g, ''))
                                                         }))}
-                                                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-colors"
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-colors"
                                                         placeholder="0"
                                                     />
                                                 </div>
                                             </div>
 
                                             {/* Int. Cesantías Card */}
-                                            <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-violet-300 transition-colors">
+                                            <div className="bg-white rounded-xl p-4 border border-zinc-200 hover:border-violet-300 transition-colors">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="w-8 h-8 bg-violet-100 rounded-lg flex items-center justify-center">
                                                         <Percent className="w-4 h-4 text-violet-600" />
                                                     </div>
-                                                    <label className="text-sm font-semibold text-gray-700">Int. Cesantias</label>
+                                                    <label className="text-sm font-semibold text-zinc-700">Int. Cesantias</label>
                                                 </div>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-medium text-sm">$</span>
                                                     <input
                                                         type="text"
                                                         value={anticipos.interesesCesantiasPagados ? anticipos.interesesCesantiasPagados.toLocaleString('es-CO') : ''}
@@ -1280,7 +1280,7 @@ export default function NominaPage() {
                                                             ...prev,
                                                             interesesCesantiasPagados: Number(e.target.value.replace(/\D/g, ''))
                                                         }))}
-                                                        className="w-full pl-7 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-colors"
+                                                        className="w-full pl-7 pr-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-violet-500 focus:border-violet-500 focus:bg-white transition-colors"
                                                         placeholder="0"
                                                     />
                                                 </div>
@@ -1298,7 +1298,7 @@ export default function NominaPage() {
                             >
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-xs text-gray-500">Embargos, prestamos adicionales, etc. (maximo 5)</p>
+                                            <p className="text-xs text-zinc-500">Embargos, prestamos adicionales, etc. (maximo 5)</p>
                                             <button
                                                 onClick={addDeduccionPersonalizada}
                                                 disabled={deduccionesPersonalizadas.length >= 5}
@@ -1310,15 +1310,15 @@ export default function NominaPage() {
                                         </div>
 
                                         {deduccionesPersonalizadas.length === 0 ? (
-                                            <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                                                <ListMinus className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                                                <p className="text-sm text-gray-400">Sin deducciones adicionales</p>
-                                                <p className="text-xs text-gray-300 mt-1">Haz clic en &quot;Agregar&quot; para crear una deduccion</p>
+                                            <div className="text-center py-8 bg-zinc-50 rounded-xl border-2 border-dashed border-zinc-200">
+                                                <ListMinus className="w-10 h-10 text-zinc-300 mx-auto mb-2" />
+                                                <p className="text-sm text-zinc-400">Sin deducciones adicionales</p>
+                                                <p className="text-xs text-zinc-300 mt-1">Haz clic en &quot;Agregar&quot; para crear una deduccion</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-3">
                                                 {deduccionesPersonalizadas.map((d, index) => (
-                                                    <div key={d.id} className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 p-3 rounded-xl transition-colors group">
+                                                    <div key={d.id} className="flex items-center gap-3 bg-zinc-50 hover:bg-zinc-100 p-3 rounded-xl transition-colors group">
                                                         <span className="w-7 h-7 bg-red-100 rounded-full flex items-center justify-center text-xs font-bold text-red-600 flex-shrink-0">
                                                             {index + 1}
                                                         </span>
@@ -1327,21 +1327,21 @@ export default function NominaPage() {
                                                             placeholder="Concepto (ej: Embargo judicial)"
                                                             value={d.nombre}
                                                             onChange={(e) => updateDeduccion(d.id, 'nombre', e.target.value)}
-                                                            className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none"
+                                                            className="flex-1 min-w-0 px-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none"
                                                         />
                                                         <div className="relative w-36 flex-shrink-0">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-medium text-sm">$</span>
                                                             <input
                                                                 type="number"
                                                                 value={d.valor || ''}
                                                                 onChange={(e) => updateDeduccion(d.id, 'valor', Number(e.target.value) || 0)}
-                                                                className="w-full pl-7 pr-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                className="w-full pl-7 pr-3 py-2.5 bg-white border border-zinc-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                                 placeholder="0"
                                                             />
                                                         </div>
                                                         <button
                                                             onClick={() => removeDeduccion(d.id)}
-                                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                                                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
                                                             title="Eliminar deduccion"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
@@ -1350,9 +1350,9 @@ export default function NominaPage() {
                                                 ))}
 
                                                 {/* Total de deducciones personalizadas */}
-                                                <div className="flex justify-end pt-2 border-t border-gray-200">
+                                                <div className="flex justify-end pt-2 border-t border-zinc-200">
                                                     <div className="text-sm">
-                                                        <span className="text-gray-500 mr-2">Total deducciones:</span>
+                                                        <span className="text-zinc-500 mr-2">Total deducciones:</span>
                                                         <span className="font-bold text-red-600">
                                                             {formatCurrency(deduccionesPersonalizadas.reduce((sum, d) => sum + (d.valor || 0), 0))}
                                                         </span>
@@ -1369,7 +1369,7 @@ export default function NominaPage() {
                                     <button
                                         onClick={handleSaveToDb}
                                         disabled={saving}
-                                        className="flex-1 flex items-center justify-center gap-2 bg-purple-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-purple-700 transition-all disabled:opacity-50"
+                                        className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-emerald-700 transition-all disabled:opacity-50"
                                     >
                                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                         Guardar Empleado
@@ -1386,25 +1386,25 @@ export default function NominaPage() {
                     {/* PAYROLL CONTENT (TAB: NOMINA) */}
                     {activeTab === 'nomina' && result && (
                         <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6">
-                            <div className="bg-white rounded-3xl shadow-xl border border-purple-100 overflow-hidden">
-                                <div className="bg-purple-900 p-6 text-white relative overflow-hidden">
+                            <div className="bg-white rounded-3xl shadow-xl border border-emerald-100 overflow-hidden">
+                                <div className="bg-zinc-900 p-6 text-white relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-8 opacity-10 transform rotate-12">
                                         <DollarSign className="w-32 h-32" />
                                     </div>
-                                    <p className="text-purple-200 text-xs font-bold uppercase tracking-widest mb-1">Neto a Pagar</p>
+                                    <p className="text-emerald-200 text-xs font-bold uppercase tracking-widest mb-1">Neto a Pagar</p>
                                     <h2 className="text-4xl font-bold tracking-tight mb-4">
                                         <AnimatedCounter value={result.monthly.netPay} formatter={formatCurrency} />
                                     </h2>
 
-                                    <div className="grid grid-cols-2 gap-4 border-t border-purple-700/50 pt-4">
+                                    <div className="grid grid-cols-2 gap-4 border-t border-emerald-700/50 pt-4">
                                         <div>
-                                            <p className="text-xs text-purple-300">Total Devengado</p>
+                                            <p className="text-xs text-emerald-300">Total Devengado</p>
                                             <p className="font-semibold">
                                                 <AnimatedCounter value={result.monthly.salaryData.totalAccrued} formatter={formatCurrency} />
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-purple-300">Total Deducciones</p>
+                                            <p className="text-xs text-emerald-300">Total Deducciones</p>
                                             <p className="font-semibold">
                                                 <AnimatedCounter value={result.monthly.employeeDeductions.totalDeductions} formatter={formatCurrency} />
                                             </p>
@@ -1415,7 +1415,7 @@ export default function NominaPage() {
                                 <div className="p-6 space-y-6">
                                     {/* SS Detail */}
                                     <div>
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Detalle Seguridad Social</h3>
+                                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Detalle Seguridad Social</h3>
                                         <div className="space-y-2 text-sm">
                                             <ResultRow label="Salud (Empleado)" value={result.monthly.employeeDeductions.health} />
                                             <ResultRow label="Pensión (Empleado)" value={result.monthly.employeeDeductions.pension} />
@@ -1425,26 +1425,26 @@ export default function NominaPage() {
 
                                     {/* Employer Costs */}
                                     <div>
-                                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Costo Empleador</h3>
-                                        <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm border border-gray-100">
+                                        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Costo Empleador</h3>
+                                        <div className="bg-zinc-50 rounded-xl p-4 space-y-2 text-sm border border-zinc-100">
                                             <ResultRow label="Salud (Patrono)" value={result.monthly.employerCosts.health} />
                                             <ResultRow label="Pensión (Patrono)" value={result.monthly.employerCosts.pension} />
                                             <ResultRow label="ARL" value={result.monthly.employerCosts.arl} />
                                             <ResultRow label="Parafiscales (CCF+ICBF+SENA)" value={result.monthly.employerCosts.compensationBox + result.monthly.employerCosts.sena + result.monthly.employerCosts.icbf} />
-                                            <div className="border-t border-gray-200 my-2 pt-2 font-bold text-gray-900 flex justify-between">
+                                            <div className="border-t border-zinc-200 my-2 pt-2 font-bold text-zinc-900 flex justify-between">
                                                 <span>Total Provisiones</span>
                                                 <span>{formatCurrency(result.monthly.employerCosts.cesantias + result.monthly.employerCosts.interesesCesantias + result.monthly.employerCosts.prima + result.monthly.employerCosts.vacations)}</span>
                                             </div>
                                             <div className="pt-2 text-right">
-                                                <span className="text-xs text-gray-500 mr-2">Costo Total Nómina:</span>
-                                                <span className="font-bold text-purple-700">
+                                                <span className="text-xs text-zinc-500 mr-2">Costo Total Nómina:</span>
+                                                <span className="font-bold text-emerald-700">
                                                     <AnimatedCounter value={result.monthly.totals.grandTotalCost} formatter={formatCurrency} />
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 flex items-center gap-2 text-xs text-purple-700">
+                                    <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 flex items-center gap-2 text-xs text-emerald-700">
                                         <Building2 className="w-4 h-4" />
                                         <span>IBC Calculado: <strong>{formatCurrency(result.monthly.salaryData.baseSalary)}</strong></span>
                                     </div>
@@ -1453,12 +1453,12 @@ export default function NominaPage() {
 
                             {/* Nomina Actions */}
                             <div className="space-y-3">
-                                <div className="bg-white rounded-xl p-4 border border-gray-200 space-y-3 shadow-sm">
-                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Acciones de Nómina</p>
+                                <div className="bg-white rounded-xl p-4 border border-zinc-200 space-y-3 shadow-sm">
+                                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">Acciones de Nómina</p>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => setShowPreviewModal('nomina')}
-                                            className="flex-1 flex items-center justify-center gap-2 bg-gray-50 text-gray-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-gray-100 transition-colors"
+                                            className="flex-1 flex items-center justify-center gap-2 bg-zinc-50 text-zinc-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-zinc-100 transition-colors"
                                         >
                                             <Eye className="w-4 h-4" />
                                             Vista Previa
@@ -1476,7 +1476,7 @@ export default function NominaPage() {
                                                     });
                                                 }
                                             }}
-                                            className="flex-1 flex items-center justify-center gap-2 bg-purple-900 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
+                                            className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
                                         >
                                             <Download className="w-4 h-4" />
                                             Descargar PDF
@@ -1489,7 +1489,7 @@ export default function NominaPage() {
                                     <button
                                         onClick={handleSavePayroll}
                                         disabled={saving}
-                                        className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md"
+                                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md"
                                     >
                                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                         Guardar en Histórico
@@ -1531,26 +1531,26 @@ export default function NominaPage() {
                                                     </div>
                                                     <p className="text-xl font-bold text-amber-800">{liquidationResult.daysWorked}</p>
                                                 </div>
-                                                <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-center">
-                                                    <div className="flex items-center justify-center gap-1 text-gray-500 mb-1">
+                                                <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200 text-center">
+                                                    <div className="flex items-center justify-center gap-1 text-zinc-500 mb-1">
                                                         <DollarSign className="w-3.5 h-3.5" />
                                                         <span className="text-[10px] font-medium uppercase">Base Liquidación</span>
                                                     </div>
-                                                    <p className="text-base font-bold text-gray-800">{formatCurrency(liquidationResult.baseLiquidation)}</p>
+                                                    <p className="text-base font-bold text-zinc-800">{formatCurrency(liquidationResult.baseLiquidation)}</p>
                                                 </div>
                                             </div>
 
                                             {/* Detalle de Liquidación - Formato filas */}
-                                            <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-                                                <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold px-4 py-2 bg-gray-100 border-b border-gray-200">
+                                            <div className="bg-zinc-50 rounded-xl border border-zinc-100 overflow-hidden">
+                                                <p className="text-[10px] text-zinc-500 uppercase tracking-wide font-bold px-4 py-2 bg-zinc-100 border-b border-zinc-200">
                                                     Detalle de Liquidación
                                                 </p>
-                                                <div className="divide-y divide-gray-100">
+                                                <div className="divide-y divide-zinc-100">
                                                     {/* Cesantías */}
                                                     <div className="flex justify-between items-center px-4 py-3">
-                                                        <span className="text-sm text-gray-600">Cesantías</span>
+                                                        <span className="text-sm text-zinc-600">Cesantías</span>
                                                         <div className="text-right">
-                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.cesantiasNetas)}</span>
+                                                            <span className="text-sm font-semibold text-zinc-800">{formatCurrency(liquidationResult.cesantiasNetas)}</span>
                                                             {liquidationResult.cesantiasAnticipadas > 0 && (
                                                                 <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.cesantiasAnticipadas)}</p>
                                                             )}
@@ -1558,9 +1558,9 @@ export default function NominaPage() {
                                                     </div>
                                                     {/* Intereses Cesantías */}
                                                     <div className="flex justify-between items-center px-4 py-3">
-                                                        <span className="text-sm text-gray-600">Int. Cesantías</span>
+                                                        <span className="text-sm text-zinc-600">Int. Cesantías</span>
                                                         <div className="text-right">
-                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.interesesCesantiasNetos)}</span>
+                                                            <span className="text-sm font-semibold text-zinc-800">{formatCurrency(liquidationResult.interesesCesantiasNetos)}</span>
                                                             {liquidationResult.interesesCesantiasAnticipados > 0 && (
                                                                 <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.interesesCesantiasAnticipados)}</p>
                                                             )}
@@ -1568,9 +1568,9 @@ export default function NominaPage() {
                                                     </div>
                                                     {/* Prima Servicios */}
                                                     <div className="flex justify-between items-center px-4 py-3">
-                                                        <span className="text-sm text-gray-600">Prima Servicios</span>
+                                                        <span className="text-sm text-zinc-600">Prima Servicios</span>
                                                         <div className="text-right">
-                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.primaNeta)}</span>
+                                                            <span className="text-sm font-semibold text-zinc-800">{formatCurrency(liquidationResult.primaNeta)}</span>
                                                             {liquidationResult.primaAnticipada > 0 && (
                                                                 <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.primaAnticipada)}</p>
                                                             )}
@@ -1578,9 +1578,9 @@ export default function NominaPage() {
                                                     </div>
                                                     {/* Vacaciones */}
                                                     <div className="flex justify-between items-center px-4 py-3">
-                                                        <span className="text-sm text-gray-600">Vacaciones</span>
+                                                        <span className="text-sm text-zinc-600">Vacaciones</span>
                                                         <div className="text-right">
-                                                            <span className="text-sm font-semibold text-gray-800">{formatCurrency(liquidationResult.vacacionesNetas)}</span>
+                                                            <span className="text-sm font-semibold text-zinc-800">{formatCurrency(liquidationResult.vacacionesNetas)}</span>
                                                             {liquidationResult.vacacionesAnticipadas > 0 && (
                                                                 <p className="text-[10px] text-amber-600">Anticipo: -{formatCurrency(liquidationResult.vacacionesAnticipadas)}</p>
                                                             )}
@@ -1588,7 +1588,7 @@ export default function NominaPage() {
                                                     </div>
                                                     {/* Total */}
                                                     <div className="flex justify-between items-center px-4 py-3 bg-amber-50">
-                                                        <span className="text-sm font-bold text-gray-700">Total Neto</span>
+                                                        <span className="text-sm font-bold text-zinc-700">Total Neto</span>
                                                         <span className="text-sm font-bold text-amber-700">{formatCurrency(liquidationResult.totalPrestaciones)}</span>
                                                     </div>
                                                 </div>
@@ -1635,7 +1635,7 @@ export default function NominaPage() {
                                             )}
 
                                             {/* Período */}
-                                            <p className="text-xs text-gray-400 text-center pt-2 border-t border-gray-100">
+                                            <p className="text-xs text-zinc-400 text-center pt-2 border-t border-zinc-100">
                                                 Período: {activeEmployee.startDate} a {activeEmployee.endDate}
                                             </p>
                                         </div>
@@ -1651,8 +1651,8 @@ export default function NominaPage() {
                                                     <MinusCircle className="w-5 h-5 text-red-600" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-sm font-bold text-gray-800">Deducciones Aplicadas</h4>
-                                                    <p className="text-xs text-gray-500">Montos que se descontaran del total</p>
+                                                    <h4 className="text-sm font-bold text-zinc-800">Deducciones Aplicadas</h4>
+                                                    <p className="text-xs text-zinc-500">Montos que se descontaran del total</p>
                                                 </div>
                                             </div>
 
@@ -1660,7 +1660,7 @@ export default function NominaPage() {
                                                 {/* Anticipos de Prestaciones */}
                                                 {anticipos.prima.montoPagado > 0 && (
                                                     <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
-                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                        <span className="text-sm text-zinc-600 flex items-center gap-2">
                                                             <Gift className="w-4 h-4 text-pink-500" />
                                                             Prima Anticipada
                                                         </span>
@@ -1669,7 +1669,7 @@ export default function NominaPage() {
                                                 )}
                                                 {anticipos.vacacionesPagadas > 0 && (
                                                     <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
-                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                        <span className="text-sm text-zinc-600 flex items-center gap-2">
                                                             <Palmtree className="w-4 h-4 text-cyan-500" />
                                                             Vacaciones Pagadas
                                                         </span>
@@ -1678,7 +1678,7 @@ export default function NominaPage() {
                                                 )}
                                                 {anticipos.cesantiasParciales > 0 && (
                                                     <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
-                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                        <span className="text-sm text-zinc-600 flex items-center gap-2">
                                                             <PiggyBank className="w-4 h-4 text-emerald-500" />
                                                             Cesantias Parciales
                                                         </span>
@@ -1687,7 +1687,7 @@ export default function NominaPage() {
                                                 )}
                                                 {anticipos.interesesCesantiasPagados > 0 && (
                                                     <div className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
-                                                        <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                        <span className="text-sm text-zinc-600 flex items-center gap-2">
                                                             <Percent className="w-4 h-4 text-violet-500" />
                                                             Int. Cesantias Pagados
                                                         </span>
@@ -1699,7 +1699,7 @@ export default function NominaPage() {
                                                 {deduccionesPersonalizadas.map((d) => (
                                                     d.valor > 0 && (
                                                         <div key={d.id} className="flex justify-between items-center py-2 px-3 bg-white/60 rounded-lg">
-                                                            <span className="text-sm text-gray-600 flex items-center gap-2">
+                                                            <span className="text-sm text-zinc-600 flex items-center gap-2">
                                                                 <ListMinus className="w-4 h-4 text-red-500" />
                                                                 {d.nombre || 'Deduccion'}
                                                             </span>
@@ -1761,7 +1761,7 @@ export default function NominaPage() {
                                             <button
                                                 onClick={handleSaveLiquidation}
                                                 disabled={saving}
-                                                className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md disabled:opacity-50"
+                                                className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold text-sm hover:brightness-110 transition-all shadow-md disabled:opacity-50"
                                             >
                                                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                                                 Guardar Liquidación
@@ -1770,11 +1770,11 @@ export default function NominaPage() {
                                     </div>
                                 </>
                             ) : (
-                                <div className="bg-white rounded-[2rem] p-10 text-center border-2 border-dashed border-gray-100 flex flex-col items-center justify-center text-gray-400">
-                                    <div className="p-4 bg-gray-50 rounded-full mb-4">
-                                        <Calculator className="w-8 h-8 text-gray-300" />
+                                <div className="bg-white rounded-[2rem] p-10 text-center border-2 border-dashed border-zinc-100 flex flex-col items-center justify-center text-zinc-400">
+                                    <div className="p-4 bg-zinc-50 rounded-full mb-4">
+                                        <Calculator className="w-8 h-8 text-zinc-300" />
                                     </div>
-                                    <h3 className="text-lg font-bold text-gray-600">Calculando Prestaciones...</h3>
+                                    <h3 className="text-lg font-bold text-zinc-600">Calculando Prestaciones...</h3>
                                     <p className="text-sm max-w-xs mt-2">Complete los datos del empleado y el período para ver la proyección de liquidación definitiva.</p>
                                 </div>
                             )}
@@ -1787,39 +1787,39 @@ export default function NominaPage() {
             {showClientModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-[2rem] max-w-md w-full p-6 shadow-2xl">
-                        <h2 className="text-xl font-black text-gray-900 mb-4">Crear Nuevo Cliente</h2>
+                        <h2 className="text-xl font-black text-zinc-900 mb-4">Crear Nuevo Cliente</h2>
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre del Cliente *</label>
+                                <label className="block text-sm font-bold text-zinc-700 mb-1">Nombre del Cliente *</label>
                                 <input
                                     type="text"
                                     value={newClientName}
                                     onChange={(e) => setNewClientName(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                                    className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                                     placeholder="Empresa S.A.S"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">NIT</label>
+                                <label className="block text-sm font-bold text-zinc-700 mb-1">NIT</label>
                                 <input
                                     type="text"
                                     value={newClientNit}
                                     onChange={(e) => setNewClientNit(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                                    className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                                     placeholder="900123456-1"
                                 />
                             </div>
                             <div className="flex justify-end gap-3 pt-4">
                                 <button
                                     onClick={() => setShowClientModal(false)}
-                                    className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium"
+                                    className="px-4 py-2 text-zinc-500 hover:bg-zinc-100 rounded-lg font-medium"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={handleCreateClient}
                                     disabled={!newClientName.trim() || saving}
-                                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold hover:brightness-110 disabled:opacity-50"
+                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:brightness-110 disabled:opacity-50"
                                 >
                                     {saving ? 'Creando...' : 'Crear Cliente'}
                                 </button>
@@ -1834,7 +1834,7 @@ export default function NominaPage() {
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
                     <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
                         {/* Header */}
-                        <div className={`p-4 flex items-center justify-between ${showPreviewModal === 'nomina' ? 'bg-purple-900' : 'bg-amber-600'} text-white`}>
+                        <div className={`p-4 flex items-center justify-between ${showPreviewModal === 'nomina' ? 'bg-zinc-900' : 'bg-amber-600'} text-white`}>
                             <div className="flex items-center gap-3">
                                 <FileText className="w-5 h-5" />
                                 <h2 className="font-bold">
@@ -1847,41 +1847,41 @@ export default function NominaPage() {
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
+                        <div className="flex-1 overflow-y-auto p-6 bg-zinc-100">
                             <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto" style={{ fontFamily: 'system-ui, sans-serif' }}>
                                 {showPreviewModal === 'nomina' ? (
                                     <>
                                         {/* Nómina Preview */}
-                                        <div className="text-center border-b-2 border-purple-900 pb-4 mb-4">
-                                            <h1 className="text-xl font-bold text-purple-900">COMPROBANTE DE NÓMINA</h1>
-                                            <p className="text-sm text-gray-600">Período: {activeEmployee.startDate} - {activeEmployee.endDate}</p>
+                                        <div className="text-center border-b-2 border-zinc-900 pb-4 mb-4">
+                                            <h1 className="text-xl font-bold text-zinc-900">COMPROBANTE DE NÓMINA</h1>
+                                            <p className="text-sm text-zinc-600">Período: {activeEmployee.startDate} - {activeEmployee.endDate}</p>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                                            <div className="bg-gray-50 p-3 rounded">
-                                                <p className="text-xs text-gray-500 font-bold">EMPRESA</p>
+                                            <div className="bg-zinc-50 p-3 rounded">
+                                                <p className="text-xs text-zinc-500 font-bold">EMPRESA</p>
                                                 <p className="font-medium">{clients.find(c => c.id === selectedClientId)?.name || 'ContaBot S.A.S'}</p>
-                                                <p className="text-gray-600">NIT: {clients.find(c => c.id === selectedClientId)?.nit || '900.123.456-7'}</p>
+                                                <p className="text-zinc-600">NIT: {clients.find(c => c.id === selectedClientId)?.nit || '900.123.456-7'}</p>
                                             </div>
-                                            <div className="bg-gray-50 p-3 rounded">
-                                                <p className="text-xs text-gray-500 font-bold">EMPLEADO</p>
+                                            <div className="bg-zinc-50 p-3 rounded">
+                                                <p className="text-xs text-zinc-500 font-bold">EMPLEADO</p>
                                                 <p className="font-medium">{activeEmployee.name}</p>
-                                                <p className="text-gray-600">CC: {activeEmployee.documentNumber || 'N/A'}</p>
+                                                <p className="text-zinc-600">CC: {activeEmployee.documentNumber || 'N/A'}</p>
                                             </div>
                                         </div>
 
                                         <table className="w-full text-sm mb-4">
                                             <thead>
-                                                <tr className="bg-teal-600 text-white">
+                                                <tr className="bg-emerald-600 text-white">
                                                     <th className="text-left p-2 rounded-tl">Concepto</th>
                                                     <th className="text-right p-2 rounded-tr">Valor</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr className="border-b"><td className="p-2">Salario Base</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.baseSalary)}</td></tr>
-                                                <tr className="border-b bg-gray-50"><td className="p-2">Auxilio de Transporte</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.transportAid)}</td></tr>
+                                                <tr className="border-b bg-zinc-50"><td className="p-2">Auxilio de Transporte</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.transportAid)}</td></tr>
                                                 {(result.monthly.salaryData.overtime ?? 0) > 0 && <tr className="border-b"><td className="p-2">Horas Extra</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.overtime ?? 0)}</td></tr>}
-                                                <tr className="bg-teal-50 font-bold"><td className="p-2">TOTAL DEVENGADO</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.totalAccrued)}</td></tr>
+                                                <tr className="bg-emerald-50 font-bold"><td className="p-2">TOTAL DEVENGADO</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.totalAccrued)}</td></tr>
                                             </tbody>
                                         </table>
 
@@ -1894,13 +1894,13 @@ export default function NominaPage() {
                                             </thead>
                                             <tbody>
                                                 <tr className="border-b"><td className="p-2">Salud (4%)</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.health)}</td></tr>
-                                                <tr className="border-b bg-gray-50"><td className="p-2">Pensión (4%)</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.pension)}</td></tr>
+                                                <tr className="border-b bg-zinc-50"><td className="p-2">Pensión (4%)</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.pension)}</td></tr>
                                                 {result.monthly.employeeDeductions.solidarityFund > 0 && <tr className="border-b"><td className="p-2">Fondo Solidaridad</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.solidarityFund)}</td></tr>}
                                                 <tr className="bg-red-50 font-bold"><td className="p-2">TOTAL DEDUCCIONES</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.totalDeductions)}</td></tr>
                                             </tbody>
                                         </table>
 
-                                        <div className="bg-teal-600 text-white p-4 rounded-lg flex justify-between items-center">
+                                        <div className="bg-emerald-600 text-white p-4 rounded-lg flex justify-between items-center">
                                             <span className="font-bold">NETO A PAGAR</span>
                                             <span className="text-2xl font-bold">{formatCurrency(result.monthly.netPay)}</span>
                                         </div>
@@ -1909,33 +1909,33 @@ export default function NominaPage() {
                                     <>
                                         {/* Liquidación Preview */}
                                         <div className="text-center border-b-2 border-amber-600 pb-4 mb-4">
-                                            <h1 className="text-xl font-bold text-gray-900">LIQUIDACIÓN DE PRESTACIONES SOCIALES</h1>
-                                            <p className="text-sm text-gray-500 italic">(Colombia – Código Sustantivo del Trabajo)</p>
+                                            <h1 className="text-xl font-bold text-zinc-900">LIQUIDACIÓN DE PRESTACIONES SOCIALES</h1>
+                                            <p className="text-sm text-zinc-500 italic">(Colombia – Código Sustantivo del Trabajo)</p>
                                         </div>
 
-                                        <div className="bg-gray-100 p-3 rounded mb-4 text-sm">
+                                        <div className="bg-zinc-100 p-3 rounded mb-4 text-sm">
                                             <div className="grid grid-cols-2 gap-2">
-                                                <p><span className="text-gray-500">Trabajador:</span> <strong>{activeEmployee.name}</strong></p>
-                                                <p><span className="text-gray-500">Documento:</span> {activeEmployee.documentNumber || 'N/A'}</p>
-                                                <p><span className="text-gray-500">Fecha ingreso:</span> {activeEmployee.startDate}</p>
-                                                <p><span className="text-gray-500">Fecha retiro:</span> {activeEmployee.endDate}</p>
-                                                <p><span className="text-gray-500">Días laborados:</span> <strong>{liquidationResult?.daysWorked}</strong></p>
-                                                <p><span className="text-gray-500">Salario base:</span> {formatCurrency(activeEmployee.baseSalary)}</p>
+                                                <p><span className="text-zinc-500">Trabajador:</span> <strong>{activeEmployee.name}</strong></p>
+                                                <p><span className="text-zinc-500">Documento:</span> {activeEmployee.documentNumber || 'N/A'}</p>
+                                                <p><span className="text-zinc-500">Fecha ingreso:</span> {activeEmployee.startDate}</p>
+                                                <p><span className="text-zinc-500">Fecha retiro:</span> {activeEmployee.endDate}</p>
+                                                <p><span className="text-zinc-500">Días laborados:</span> <strong>{liquidationResult?.daysWorked}</strong></p>
+                                                <p><span className="text-zinc-500">Salario base:</span> {formatCurrency(activeEmployee.baseSalary)}</p>
                                             </div>
                                         </div>
 
                                         <table className="w-full text-sm mb-4">
                                             <thead>
-                                                <tr className="bg-gray-200">
+                                                <tr className="bg-zinc-200">
                                                     <th className="text-left p-2">Concepto</th>
                                                     <th className="text-right p-2">Valor</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr className="border-b"><td className="p-2">Cesantías</td><td className="text-right p-2">{formatCurrency(liquidationResult?.cesantias || 0)}</td></tr>
-                                                <tr className="border-b bg-gray-50"><td className="p-2">Intereses de Cesantías (12%)</td><td className="text-right p-2">{formatCurrency(liquidationResult?.interesesCesantias || 0)}</td></tr>
+                                                <tr className="border-b bg-zinc-50"><td className="p-2">Intereses de Cesantías (12%)</td><td className="text-right p-2">{formatCurrency(liquidationResult?.interesesCesantias || 0)}</td></tr>
                                                 <tr className="border-b"><td className="p-2">Prima de Servicios</td><td className="text-right p-2">{formatCurrency(liquidationResult?.prima || 0)}</td></tr>
-                                                <tr className="border-b bg-gray-50"><td className="p-2">Vacaciones</td><td className="text-right p-2">{formatCurrency(liquidationResult?.vacaciones || 0)}</td></tr>
+                                                <tr className="border-b bg-zinc-50"><td className="p-2">Vacaciones</td><td className="text-right p-2">{formatCurrency(liquidationResult?.vacaciones || 0)}</td></tr>
                                                 <tr className="bg-amber-50 font-bold"><td className="p-2">TOTAL PRESTACIONES</td><td className="text-right p-2">{formatCurrency(liquidationResult?.totalPrestaciones || 0)}</td></tr>
                                             </tbody>
                                         </table>
@@ -1959,10 +1959,10 @@ export default function NominaPage() {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
+                        <div className="p-4 bg-zinc-50 border-t flex justify-end gap-3">
                             <button
                                 onClick={() => setShowPreviewModal(null)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                                className="px-4 py-2 text-zinc-600 hover:bg-zinc-200 rounded-lg font-medium transition-colors"
                             >
                                 Cerrar
                             </button>
@@ -1988,7 +1988,7 @@ export default function NominaPage() {
                                     }
                                     setShowPreviewModal(null);
                                 }}
-                                className={`px-6 py-2 text-white rounded-lg font-bold flex items-center gap-2 ${showPreviewModal === 'nomina' ? 'bg-purple-900 hover:bg-purple-800' : 'bg-amber-600 hover:bg-amber-700'}`}
+                                className={`px-6 py-2 text-white rounded-lg font-bold flex items-center gap-2 ${showPreviewModal === 'nomina' ? 'bg-zinc-900 hover:bg-emerald-800' : 'bg-amber-600 hover:bg-amber-700'}`}
                             >
                                 <Download className="w-4 h-4" />
                                 Descargar PDF
@@ -2007,27 +2007,27 @@ export default function NominaPage() {
                                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <ThumbsUp className="w-8 h-8 text-green-600" />
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-900 mb-2">¡Gracias por tu feedback!</h2>
-                                <p className="text-gray-600">Tu opinión nos ayuda a mejorar ContaBot.</p>
+                                <h2 className="text-xl font-bold text-zinc-900 mb-2">¡Gracias por tu feedback!</h2>
+                                <p className="text-zinc-600">Tu opinión nos ayuda a mejorar ContaBot.</p>
                             </div>
                         ) : (
                             <>
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-purple-100 rounded-xl">
-                                            <MessageSquare className="w-5 h-5 text-purple-600" />
+                                        <div className="p-2 bg-emerald-100 rounded-xl">
+                                            <MessageSquare className="w-5 h-5 text-emerald-600" />
                                         </div>
-                                        <h2 className="text-lg font-bold text-gray-900">Califica el módulo de Nómina</h2>
+                                        <h2 className="text-lg font-bold text-zinc-900">Califica el módulo de Nómina</h2>
                                     </div>
-                                    <button onClick={() => setShowFeedbackModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                                        <X className="w-5 h-5 text-gray-400" />
+                                    <button onClick={() => setShowFeedbackModal(false)} className="p-1 hover:bg-zinc-100 rounded-lg">
+                                        <X className="w-5 h-5 text-zinc-400" />
                                     </button>
                                 </div>
 
                                 <div className="space-y-5">
                                     {/* Star Rating */}
                                     <div>
-                                        <p className="text-sm text-gray-600 mb-3">¿Qué tan útil te parece este módulo?</p>
+                                        <p className="text-sm text-zinc-600 mb-3">¿Qué tan útil te parece este módulo?</p>
                                         <div className="flex justify-center gap-2">
                                             {[1, 2, 3, 4, 5].map((star) => (
                                                 <button
@@ -2036,12 +2036,12 @@ export default function NominaPage() {
                                                     className="p-1 transition-transform hover:scale-110"
                                                 >
                                                     <Star
-                                                        className={`w-10 h-10 ${star <= feedbackRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                                                        className={`w-10 h-10 ${star <= feedbackRating ? 'fill-yellow-400 text-yellow-400' : 'text-zinc-300'}`}
                                                     />
                                                 </button>
                                             ))}
                                         </div>
-                                        <p className="text-center text-sm text-gray-500 mt-2">
+                                        <p className="text-center text-sm text-zinc-500 mt-2">
                                             {feedbackRating === 0 && 'Selecciona una calificación'}
                                             {feedbackRating === 1 && 'Muy malo'}
                                             {feedbackRating === 2 && 'Malo'}
@@ -2053,14 +2053,14 @@ export default function NominaPage() {
 
                                     {/* Comment */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-zinc-700 mb-2">
                                             Comentarios (opcional)
                                         </label>
                                         <textarea
                                             value={feedbackComment}
                                             onChange={(e) => setFeedbackComment(e.target.value)}
                                             placeholder="¿Qué podríamos mejorar? ¿Qué te gustaría ver?"
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none resize-none"
+                                            className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                                             rows={3}
                                         />
                                     </div>
@@ -2069,7 +2069,7 @@ export default function NominaPage() {
                                     <button
                                         onClick={handleSubmitFeedback}
                                         disabled={feedbackRating === 0 || submittingFeedback}
-                                        className="w-full flex items-center justify-center gap-2 bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {submittingFeedback ? (
                                             <Loader2 className="w-5 h-5 animate-spin" />
@@ -2090,7 +2090,7 @@ export default function NominaPage() {
             {/* Floating Feedback Button */}
             <button
                 onClick={() => setShowFeedbackModal(true)}
-                className="fixed bottom-6 right-6 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 transition-all hover:scale-105 z-40 flex items-center gap-2 group"
+                className="fixed bottom-6 right-6 bg-emerald-600 text-white p-4 rounded-full shadow-lg hover:bg-emerald-700 transition-all hover:scale-105 z-40 flex items-center gap-2 group"
             >
                 <MessageSquare className="w-5 h-5" />
                 <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-medium">

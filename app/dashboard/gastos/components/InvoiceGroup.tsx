@@ -52,24 +52,24 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
     const hasNonUnitItems = group.items.some(item => item.unitOfMeasure && item.unitOfMeasure !== 'Und');
 
     return (
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden transition-all hover:shadow-md">
+        <div className="bg-white rounded-xl border border-zinc-100 shadow-sm overflow-hidden transition-all hover:shadow-md">
             {/* Header / Summary Card */}
             <div
                 onClick={() => setExpanded(!expanded)}
-                className={`p-6 cursor-pointer flex flex-col md:flex-row justify-between items-center gap-4 transition-colors ${expanded ? 'bg-slate-50' : 'bg-white hover:bg-gray-50'}`}
+                className={`p-6 cursor-pointer flex flex-col md:flex-row justify-between items-center gap-4 transition-colors ${expanded ? 'bg-zinc-50' : 'bg-white hover:bg-zinc-50'}`}
             >
                 <div className="flex items-center gap-5 w-full md:w-auto">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${expanded ? 'bg-[#002D44] text-white' : 'bg-white border-2 border-[#1AB1B1] text-[#002D44]'}`}>
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${expanded ? 'bg-zinc-900 text-white' : 'bg-white border-2 border-emerald-600 text-zinc-900'}`}>
                         <ShoppingBag className="w-5 h-5" />
                     </div>
 
                     <div className="flex flex-col">
-                        <h4 className="font-black text-[#002D44] text-lg leading-tight">{group.entity}</h4>
+                        <h4 className="font-black text-zinc-900 text-lg leading-tight">{group.entity}</h4>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
-                            <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-md flex items-center gap-1">
                                 <Hash className="w-3 h-3" /> NIT: {group.nit}
                             </span>
-                            <span className="text-[10px] font-bold text-[#1AB1B1] bg-teal-50 px-2 py-0.5 rounded-md">
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
                                 {group.invoiceCount} Facturas
                             </span>
                             {group.currency === 'USD' && (
@@ -84,10 +84,10 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
 
                 <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
                     <div className="text-right">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Grupo ({group.currency || 'COP'})</p>
-                        <p className="font-black text-[#002D44] text-xl text-right">
+                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Grupo ({group.currency || 'COP'})</p>
+                        <p className="font-black text-zinc-900 text-xl text-right">
                             {formatCurrency(group.total)}
-                            <span className="text-xs text-gray-400 ml-1">{group.currency || 'COP'}</span>
+                            <span className="text-xs text-zinc-400 ml-1">{group.currency || 'COP'}</span>
                         </p>
                     </div>
 
@@ -98,14 +98,14 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                     e.stopPropagation();
                                     onDelete(group.entity);
                                 }}
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                                 title="Eliminar grupo"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
                         )}
 
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${expanded ? 'bg-[#1AB1B1] text-white rotate-180' : 'bg-gray-100 text-gray-400'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${expanded ? 'bg-emerald-600 text-white rotate-180' : 'bg-zinc-100 text-zinc-400'}`}>
                             <ChevronDown className="w-5 h-5" />
                         </div>
                     </div>
@@ -114,12 +114,12 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
 
             {/* Expanded Content */}
             {expanded && (
-                <div className="border-t border-gray-100 animate-slide-down">
+                <div className="border-t border-zinc-100 animate-slide-down">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
-                            <thead className="bg-[#002D44]/5 text-[10px] font-black text-[#002D44] uppercase tracking-[0.2em]">
+                            <thead className="bg-zinc-900/5 text-[10px] font-black text-zinc-900 uppercase tracking-[0.2em]">
                                 <tr>
-                                    <th className="px-8 py-4 sticky left-0 z-10 bg-slate-50 md:bg-transparent">Item / Concepto</th>
+                                    <th className="px-8 py-4 sticky left-0 z-10 bg-zinc-50 md:bg-transparent">Item / Concepto</th>
                                     <th className="px-4 py-4 text-center">{hasNonUnitItems ? 'Cant. / Unid.' : 'Cant.'}</th>
                                     <th className="px-6 py-4 text-right">Unitario</th>
                                     {hasDiscounts && <th className="px-4 py-4 text-right text-red-500">Descuento</th>}
@@ -127,29 +127,29 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                     <th className="px-6 py-4 text-center">Archivo Origen</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 text-sm">
+                            <tbody className="divide-y divide-zinc-100 text-sm">
                                 {group.items.map((item, idx) => {
                                     // Calculate display discount
                                     const discountValue = item.discount || 0;
                                     const hasItemDiscount = discountValue > 0 || (item.discountPercentage && item.discountPercentage > 0);
 
                                     return (
-                                        <tr key={idx} className="hover:bg-teal-50/20 transition-colors group">
-                                            <td className="px-8 py-4 text-gray-700 font-bold">
+                                        <tr key={idx} className="hover:bg-emerald-50/20 transition-colors group">
+                                            <td className="px-8 py-4 text-zinc-700 font-bold">
                                                 <div className="flex flex-col">
                                                     <span>{item.description}</span>
-                                                    <span className="text-[9px] text-[#1AB1B1] font-black uppercase tracking-wider mt-0.5">{item.category || 'General'}</span>
+                                                    <span className="text-[9px] text-emerald-600 font-black uppercase tracking-wider mt-0.5">{item.category || 'General'}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-4 text-center font-mono text-gray-500">
+                                            <td className="px-4 py-4 text-center font-mono text-zinc-500">
                                                 <span>{item.quantity}</span>
                                                 {item.unitOfMeasure && item.unitOfMeasure !== 'Und' && (
-                                                    <span className="ml-1 text-[10px] font-bold text-gray-400 bg-gray-100 px-1 py-0.5 rounded">
+                                                    <span className="ml-1 text-[10px] font-bold text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">
                                                         {item.unitOfMeasure}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-6 py-4 text-right font-mono text-gray-500">{formatCurrency(item.unitPrice)}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-zinc-500">{formatCurrency(item.unitPrice)}</td>
                                             {hasDiscounts && (
                                                 <td className="px-4 py-4 text-right font-mono">
                                                     {hasItemDiscount ? (
@@ -160,15 +160,15 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                                             )}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-gray-300">-</span>
+                                                        <span className="text-zinc-300">-</span>
                                                     )}
                                                 </td>
                                             )}
-                                            <td className="px-8 py-4 text-right font-black text-[#002D44]">{formatCurrency(item.total)}</td>
+                                            <td className="px-8 py-4 text-right font-black text-zinc-900">{formatCurrency(item.total)}</td>
                                             <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-lg border border-gray-100 shrink-0">
-                                                    <FileText className="w-3 h-3 text-gray-400 group-hover:text-[#1AB1B1]" />
-                                                    <span className="text-[10px] font-bold text-gray-500 truncate max-w-[100px]">{item.fileName}</span>
+                                                <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-zinc-50 rounded-lg border border-zinc-100 shrink-0">
+                                                    <FileText className="w-3 h-3 text-zinc-400 group-hover:text-emerald-600" />
+                                                    <span className="text-[10px] font-bold text-zinc-500 truncate max-w-[100px]">{item.fileName}</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -176,10 +176,10 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                 })}
                             </tbody>
                             {/* Tax Summary Footer */}
-                            <tfoot className="bg-gray-50/80 border-t border-gray-200">
+                            <tfoot className="bg-zinc-50/80 border-t border-zinc-200">
                                 <tr>
-                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Subtotal</td>
-                                    <td className="px-8 py-3 text-right font-mono text-sm text-gray-600">{formatCurrency(group.subtotal)}</td>
+                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-3 text-right text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtotal</td>
+                                    <td className="px-8 py-3 text-right font-mono text-sm text-zinc-600">{formatCurrency(group.subtotal)}</td>
                                     <td></td>
                                 </tr>
                                 {/* AIU Section - Colombian construction/service invoicing */}
@@ -215,22 +215,22 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                 )}
                                 {group.iva > 0 && (
                                     <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">IVA (19%)</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-gray-600">{formatCurrency(group.iva)}</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-zinc-500 uppercase tracking-wider">IVA (19%)</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-zinc-600">{formatCurrency(group.iva)}</td>
                                         <td></td>
                                     </tr>
                                 )}
                                 {group.tax_inc > 0 && (
                                     <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Impoconsumo</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-gray-600">{formatCurrency(group.tax_inc)}</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-zinc-500 uppercase tracking-wider">Impoconsumo</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-zinc-600">{formatCurrency(group.tax_inc)}</td>
                                         <td></td>
                                     </tr>
                                 )}
                                 {group.tip > 0 && (
                                     <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-[#1AB1B1] uppercase tracking-wider">Propina / Servicio</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-[#1AB1B1]">{formatCurrency(group.tip)}</td>
+                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-emerald-600 uppercase tracking-wider">Propina / Servicio</td>
+                                        <td className="px-8 py-1 text-right font-mono text-sm text-emerald-600">{formatCurrency(group.tip)}</td>
                                         <td></td>
                                     </tr>
                                 )}
@@ -243,9 +243,9 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                         <td></td>
                                     </tr>
                                 )}
-                                <tr className="border-t border-gray-200">
-                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-4 text-right text-sm font-black text-[#002D44] uppercase tracking-wider">Total a Pagar</td>
-                                    <td className="px-8 py-4 text-right font-black text-lg text-[#002D44]">{formatCurrency(group.total)}</td>
+                                <tr className="border-t border-zinc-200">
+                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-4 text-right text-sm font-black text-zinc-900 uppercase tracking-wider">Total a Pagar</td>
+                                    <td className="px-8 py-4 text-right font-black text-lg text-zinc-900">{formatCurrency(group.total)}</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -259,15 +259,15 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                     )}
 
                     {/* Optional Footer for the group */}
-                    <div className="bg-gray-50 px-8 py-3 border-t border-gray-100 flex justify-between items-center">
-                        <p className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
+                    <div className="bg-zinc-50 px-8 py-3 border-t border-zinc-100 flex justify-between items-center">
+                        <p className="text-[10px] font-bold text-zinc-400 flex items-center gap-2">
                             {group.validation && (
-                                <span className="text-gray-500">
+                                <span className="text-zinc-500">
                                     Confianza: {Math.round((group.validation.overallConfidence || 0) * 100)}%
                                 </span>
                             )}
                         </p>
-                        <p className="text-[10px] font-bold text-gray-400 flex items-center gap-2">
+                        <p className="text-[10px] font-bold text-zinc-400 flex items-center gap-2">
                             {isLowConfidence && <span className="text-orange-500 flex items-center gap-1">⚠️ Revisar Confianza</span>}
                         </p>
                     </div>

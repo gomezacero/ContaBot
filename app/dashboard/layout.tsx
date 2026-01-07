@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ToastProvider } from '@/components/ui/Toast';
 import {
-    Bot,
     LayoutDashboard,
     ScanLine,
     CalendarDays,
@@ -16,7 +15,6 @@ import {
     Menu,
     X,
     ChevronDown,
-    Sparkles,
     Trash2
 } from 'lucide-react';
 
@@ -94,24 +92,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-[#1AB1B1] border-t-transparent rounded-full animate-spin" />
+            <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+                <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
 
     return (
         <ToastProvider>
-        <div className="min-h-screen bg-[#F9FAFB]">
+        <div className="min-h-screen bg-[#fafafa]">
             {/* Navigation Header */}
-            <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-gray-100">
+            <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-100">
                 <div className="container mx-auto px-6 h-20 flex items-center justify-between max-w-7xl">
                     <div className="flex items-center gap-12">
-                        <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer group">
-                            <div className="w-10 h-10 bg-[#002D44] text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                                <Bot className="w-6 h-6" />
+                        <Link href="/dashboard" className="flex items-center gap-3 cursor-pointer group">
+                            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+                                <span className="text-white font-black text-xl">C</span>
                             </div>
-                            <span className="text-2xl font-black tracking-tighter text-[#002D44]">ContaBot</span>
+                            <span className="text-2xl font-extrabold tracking-tight text-zinc-900">Contabio</span>
                         </Link>
 
                         {/* Desktop Nav */}
@@ -122,7 +120,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     <Link
                                         key={item.id}
                                         href={item.href}
-                                        className={`text-sm font-semibold transition-all ${isActive ? 'text-[#1AB1B1]' : 'text-gray-400 hover:text-[#002D44]'
+                                        className={`text-sm font-semibold transition-all ${isActive ? 'text-emerald-600' : 'text-zinc-400 hover:text-zinc-900'
                                             }`}
                                     >
                                         {item.label}
@@ -140,39 +138,39 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     e.stopPropagation();
                                     setUserMenuOpen(!userMenuOpen);
                                 }}
-                                className="flex items-center gap-2 hover:bg-gray-100 rounded-xl px-3 py-2 transition-colors"
+                                className="flex items-center gap-2 hover:bg-zinc-100 rounded-xl px-3 py-2 transition-colors"
                             >
-                                <div className={`w-10 h-10 ${isGuest ? 'bg-gray-400' : 'bg-[#1AB1B1]'} text-white rounded-full flex items-center justify-center font-bold`}>
+                                <div className={`w-10 h-10 ${isGuest ? 'bg-zinc-400' : 'bg-emerald-600'} text-white rounded-full flex items-center justify-center font-bold`}>
                                     {isGuest ? 'I' : (user?.profile?.name?.[0]?.toUpperCase() || 'U')}
                                 </div>
-                                <span className="hidden md:block text-sm font-semibold text-gray-700">
+                                <span className="hidden md:block text-sm font-semibold text-zinc-700">
                                     {isGuest ? 'Invitado' : (user?.profile?.name || 'Usuario')}
                                 </span>
-                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {userMenuOpen && (
                                 <div
-                                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 animate-fade-in"
+                                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-zinc-100 py-2 animate-fade-in"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     {isGuest ? (
                                         // Guest Menu
                                         <>
-                                            <div className="px-4 py-3 border-b border-gray-100">
-                                                <p className="font-bold text-gray-600">Modo Invitado</p>
-                                                <p className="text-xs text-gray-400">Tus datos se guardan localmente</p>
+                                            <div className="px-4 py-3 border-b border-zinc-100">
+                                                <p className="font-bold text-zinc-600">Modo Invitado</p>
+                                                <p className="text-xs text-zinc-400">Tus datos se guardan localmente</p>
                                             </div>
                                             <Link
                                                 href="/login"
-                                                className="flex items-center gap-3 px-4 py-3 text-sm text-[#1AB1B1] hover:bg-teal-50 transition-colors font-semibold"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-emerald-600 hover:bg-emerald-50 transition-colors font-semibold"
                                             >
                                                 <LogIn className="w-4 h-4" />
                                                 Iniciar Sesión
                                             </Link>
                                             <Link
                                                 href="/register"
-                                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
                                             >
                                                 <User className="w-4 h-4" />
                                                 Crear Cuenta Gratis
@@ -181,20 +179,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     ) : (
                                         // Authenticated User Menu
                                         <>
-                                            <div className="px-4 py-2 border-b border-gray-100">
-                                                <p className="font-bold text-[#002D44]">{user?.profile?.name}</p>
-                                                <p className="text-xs text-gray-400">{user?.email}</p>
+                                            <div className="px-4 py-2 border-b border-zinc-100">
+                                                <p className="font-bold text-zinc-900">{user?.profile?.name}</p>
+                                                <p className="text-xs text-zinc-400">{user?.email}</p>
                                             </div>
                                             <Link
                                                 href="/dashboard/perfil"
-                                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
                                             >
                                                 <User className="w-4 h-4" />
                                                 Mi Perfil
                                             </Link>
                                             <Link
                                                 href="/dashboard/papelera"
-                                                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                                className="flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                                 Papelera
@@ -215,7 +213,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         {/* Mobile Menu Button */}
                         <button
                             onClick={() => setMenuOpen(!menuOpen)}
-                            className="lg:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                            className="lg:hidden p-2 hover:bg-zinc-100 rounded-xl transition-colors"
                         >
                             {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                         </button>
@@ -224,7 +222,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
                 {/* Mobile Nav */}
                 {menuOpen && (
-                    <nav className="lg:hidden bg-white border-t border-gray-100 px-6 py-4 animate-fade-in">
+                    <nav className="lg:hidden bg-white border-t border-zinc-100 px-6 py-4 animate-fade-in">
                         {navItems.map((item) => {
                             const isActive = pathname.startsWith(item.href);
                             const Icon = item.icon;
@@ -233,7 +231,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     key={item.id}
                                     href={item.href}
                                     onClick={() => setMenuOpen(false)}
-                                    className={`flex items-center gap-3 py-3 text-sm font-semibold transition-all ${isActive ? 'text-[#1AB1B1]' : 'text-gray-500'
+                                    className={`flex items-center gap-3 py-3 text-sm font-semibold transition-all ${isActive ? 'text-emerald-600' : 'text-zinc-500'
                                         }`}
                                 >
                                     <Icon className="w-5 h-5" />

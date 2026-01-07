@@ -20,9 +20,9 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
     const margin = 20;
     let yPos = 20;
 
-    // Colors
-    const primaryColor: [number, number, number] = [0, 45, 68]; // #002D44
-    const accentColor: [number, number, number] = [26, 177, 177]; // #1AB1B1
+    // Colors - Contabio brand
+    const primaryColor: [number, number, number] = [24, 24, 27]; // zinc-900 #18181b
+    const accentColor: [number, number, number] = [22, 163, 74]; // emerald-600 #16a34a
 
     // ===== HEADER =====
     doc.setFillColor(...primaryColor);
@@ -57,7 +57,7 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
     doc.setFontSize(10);
-    doc.text(companyName || employee.companyName || 'ContaBot S.A.S', margin + 5, yPos + 18);
+    doc.text(companyName || employee.companyName || 'Contabio S.A.S', margin + 5, yPos + 18);
     doc.setFontSize(9);
     doc.text(`NIT: ${companyNit || employee.companyNit || '900.123.456-7'}`, margin + 5, yPos + 26);
 
@@ -207,7 +207,7 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
 
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
-    doc.text('Generado con ContaBot - www.contabot.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 6, { align: 'center' });
+    doc.text('Generado con Contabio - www.contabio.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 6, { align: 'center' });
 
     // Save the PDF
     const fileName = `nomina_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -612,7 +612,7 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     doc.rect(0, doc.internal.pageSize.getHeight() - 10, pageWidth, 10, 'F');
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
-    doc.text('Generado con ContaBot - www.contabot.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 4, { align: 'center' });
+    doc.text('Generado con Contabio - www.contabio.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 4, { align: 'center' });
 
     // Save the PDF
     const fileName = `liquidacion_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
