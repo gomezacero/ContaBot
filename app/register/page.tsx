@@ -16,6 +16,7 @@ export default function RegisterPage() {
         phone: '',
         firmName: '',
         occupation: 'INDEPENDENT' as 'INDEPENDENT' | 'OUTSOURCING' | 'INHOUSE',
+        userType: 'contador' as 'contador' | 'firma' | 'empresa',
     });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -104,6 +105,7 @@ export default function RegisterPage() {
                         phone: formData.phone,
                         firm_name: formData.firmName,
                         occupation: formData.occupation,
+                        user_type: formData.userType,
                     },
                 },
             });
@@ -124,6 +126,7 @@ export default function RegisterPage() {
                         phone: formData.phone || null,
                         firm_name: formData.firmName || null,
                         occupation: formData.occupation,
+                        user_type: formData.userType,
                         role: 'ACCOUNTANT',
                         membership_type: 'FREEMIUM',
                     }, {
@@ -337,21 +340,38 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* Occupation */}
-                        <div>
-                            <label className="block text-sm font-bold text-zinc-700 mb-2">
-                                ¿Cómo trabajas?
-                            </label>
-                            <select
-                                name="occupation"
-                                value={formData.occupation}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white"
-                            >
-                                <option value="INDEPENDENT">Contador Independiente</option>
-                                <option value="OUTSOURCING">Outsourcing Contable</option>
-                                <option value="INHOUSE">Contador de Planta</option>
-                            </select>
+                        {/* Occupation & User Type */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                    ¿Cómo trabajas?
+                                </label>
+                                <select
+                                    name="occupation"
+                                    value={formData.occupation}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white"
+                                >
+                                    <option value="INDEPENDENT">Independiente</option>
+                                    <option value="OUTSOURCING">Outsourcing</option>
+                                    <option value="INHOUSE">En empresa</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                    Tipo de cuenta
+                                </label>
+                                <select
+                                    name="userType"
+                                    value={formData.userType}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white"
+                                >
+                                    <option value="contador">Contador</option>
+                                    <option value="firma">Firma Contable</option>
+                                    <option value="empresa">Empresa</option>
+                                </select>
+                            </div>
                         </div>
 
                         <button

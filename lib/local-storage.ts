@@ -5,6 +5,9 @@ const STORAGE_KEYS = {
     CLIENTS: 'contabot_clients',
     PAYROLL_PRESETS: 'contabot_payroll_presets',
     GUEST_BANNER_DISMISSED: 'contabot_guest_banner_dismissed',
+    // Feedback system keys
+    FEEDBACK_USAGE: 'contabio_feedback_usage',
+    FEEDBACK_COOLDOWN: 'contabio_feedback_cooldown',
 } as const;
 
 // Client type for localStorage

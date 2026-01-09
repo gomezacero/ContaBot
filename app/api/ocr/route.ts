@@ -100,6 +100,51 @@ EXTRAE EXACTAMENTE ESTOS DATOS:
     - Devuelve UN SOLO objeto JSON por documento, NO un array con duplicados
     - Si el recibo tiene multiples paginas/secciones, consolidar en UNA sola factura
     - NUNCA dupliques items, totales o facturas completas
+14. **EXTRACCION DE TABLAS DE ITEMS - PRECIO UNITARIO VS TOTAL**:
+    - CRITICO: Si ves una tabla con columnas tipo CANTIDAD | DESCRIPCION | PRECIO | TOTAL:
+      * El PRECIO UNITARIO es el valor en la columna de precio (NO el total)
+      * El TOTAL es el resultado de cantidad × precio unitario
+    - Columnas de PRECIO UNITARIO: "VLR.UNIT", "P.UNIT", "PRECIO", "VALOR", "PVP", "UNIT"
+    - Columnas de TOTAL ITEM: "VLR.TOTAL", "SUBTOTAL", "TOTAL", "IMPORTE"
+    - Si solo ves CANTIDAD y TOTAL, calcula: unitPrice = total / quantity
+    - NUNCA confundas el precio total con el precio unitario
+    - VALIDACION OBLIGATORIA: Antes de responder, verifica que quantity × unitPrice ≈ total para cada item
+    - Si la validacion falla, revisa si invertiste unitPrice con total y corrige
+15. **EXTRACTOS BANCARIOS**:
+    - Detecta: Bancolombia, Davivienda, BBVA, Banco de Bogota, Banco Popular, Scotiabank, Itau
+    - entity = Nombre del banco (ej: "Bancolombia S.A.")
+    - nit = NIT del banco
+    - date = Fecha del extracto o periodo (ej: "Enero 2025")
+    - invoiceNumber = Numero de extracto o referencia
+    - ITEMS = Cada movimiento como un item:
+      * description: Descripcion del movimiento (ej: "Transferencia ACH", "Compra POS Exito")
+      * quantity: 1
+      * unitPrice: Valor del movimiento (POSITIVO si es credito/entrada, NEGATIVO si es debito/salida)
+      * total: Mismo valor que unitPrice
+      * category: "Movimiento bancario - CREDITO" o "Movimiento bancario - DEBITO"
+    - subtotal = Suma de creditos (entradas)
+    - total = Saldo final o suma de todos los movimientos
+    - Detecta: "ABONO", "CONSIGNACION", "TRANSFERENCIA REC" = Credito (positivo)
+    - Detecta: "CARGO", "PAGO", "RETIRO", "COMPRA", "TRANSFERENCIA ENV" = Debito (negativo)
+16. **FACTURAS POS / TIRILLAS DE SUPERMERCADO**:
+    - Establecimientos: Exito, Alkosto, Carulla, D1, Ara, Olimpica, Jumbo, Makro, PriceSmart
+    - Formato tipico: Tirilla angosta y larga
+    - Items listados con codigo de barras o PLU
+    - entity: Nombre del supermercado (ej: "Almacenes Exito S.A.")
+    - nit: NIT visible en encabezado
+    - date: Fecha y hora de compra
+    - invoiceNumber: Numero de transaccion o factura POS
+    - ITEMS: Cada producto comprado
+      * description: Nombre del producto (puede estar truncado)
+      * quantity: Cantidad (puede ser peso en Kg para productos a granel)
+      * unitOfMeasure: "Und" o "Kg" segun corresponda
+      * unitPrice: Precio unitario
+      * total: Subtotal del item
+      * category: Inferir categoria (Alimentos, Bebidas, Aseo, Hogar)
+    - subtotal = Total antes de descuentos
+    - iva = 0 si dice "IVA INCLUIDO" (ya esta en el precio)
+    - total = Valor pagado final
+    - Busca seccion de medios de pago al final (Efectivo, Tarjeta, etc.)
 
 IMPORTANTE: Responde UNICAMENTE con un objeto JSON valido.
 

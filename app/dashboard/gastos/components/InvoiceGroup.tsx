@@ -1,59 +1,62 @@
 import { useState } from 'react';
-import { ChevronDown, FileText, ShoppingBag, Hash, Trash2, DollarSign } from 'lucide-react';
+import { ChevronDown, ShoppingBag, Hash, Trash2, DollarSign } from 'lucide-react';
 import { OCRItem, ValidationResult } from '../types';
 import { ValidationBadge } from './ValidationBadge';
-import { ValidationDetails } from './ValidationDetails';
+import { InvoiceCard, InvoiceData } from './InvoiceCard';
 
-interface GroupedInvoiceData {
+// Re-export InvoiceData for use in page.tsx
+export type { InvoiceData } from './InvoiceCard';
+
+// New grouped structure with invoices array instead of flat items
+export interface GroupedInvoiceData {
     nit: string;
     entity: string;
-    total: number;
-    // Aggregated tax data for the group
-    subtotal: number;
-    iva: number;
-    tax_inc: number;
-    tip: number;
-    // AIU (Colombian construction/service invoicing)
-    aiu?: {
-        administracion: number;
-        imprevistos: number;
-        utilidad: number;
-        base_gravable: number;
-    };
-    retentions: {
-        reteFuente: number;
-        reteIca: number;
-        reteIva: number;
-    };
     currency: string;
-    items: (OCRItem & { fileName: string; hasValidationError?: boolean })[];
     invoiceCount: number;
-    // Validation result for the first/primary invoice
+    // Array of individual invoices
+    invoices: InvoiceData[];
+    // Consolidated totals for the vendor
+    totals: {
+        subtotal: number;
+        iva: number;
+        tax_inc: number;
+        tip: number;
+        aiu?: {
+            administracion: number;
+            imprevistos: number;
+            utilidad: number;
+            base_gravable?: number;
+        };
+        retentions: {
+            reteFuente: number;
+            reteIca: number;
+            reteIva: number;
+        };
+        total: number;
+    };
+    // First invoice's validation (for summary display)
     validation?: ValidationResult;
+    // DEPRECATED: flat items array (kept for backward compatibility)
+    items?: (OCRItem & { fileName: string; hasValidationError?: boolean })[];
 }
 
 interface InvoiceGroupProps {
     group: GroupedInvoiceData;
     formatCurrency: (amount: number) => string;
     onDelete?: (entity: string) => void;
+    onDeleteInvoice?: (invoiceId: string, fileName: string) => void;
+    onDeleteItem?: (invoiceId: string, fileName: string, itemIndex: number) => void;
 }
 
-export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupProps) {
+export function InvoiceGroup({ group, formatCurrency, onDelete, onDeleteInvoice, onDeleteItem }: InvoiceGroupProps) {
     const [expanded, setExpanded] = useState(false);
 
-    // Calculate aggregated confidence (mock logic or real if available)
-    const avgConfidence = group.items.reduce((acc, item) => acc + (item.confidence || 0), 0) / group.items.length || 0;
-    const isLowConfidence = avgConfidence < 0.7;
-
-    // Check if any items have discounts (to conditionally show discount column)
-    const hasDiscounts = group.items.some(item => (item.discount && item.discount > 0) || (item.discountPercentage && item.discountPercentage > 0));
-
-    // Check if any items have non-default unit of measure
-    const hasNonUnitItems = group.items.some(item => item.unitOfMeasure && item.unitOfMeasure !== 'Und');
+    // Calculate total items across all invoices
+    const totalItems = group.invoices.reduce((sum, inv) => sum + inv.items.length, 0);
 
     return (
         <div className="bg-white rounded-xl border border-zinc-100 shadow-sm overflow-hidden transition-all hover:shadow-md">
-            {/* Header / Summary Card */}
+            {/* Vendor Header / Summary Card */}
             <div
                 onClick={() => setExpanded(!expanded)}
                 className={`p-6 cursor-pointer flex flex-col md:flex-row justify-between items-center gap-4 transition-colors ${expanded ? 'bg-zinc-50' : 'bg-white hover:bg-zinc-50'}`}
@@ -70,7 +73,10 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                 <Hash className="w-3 h-3" /> NIT: {group.nit}
                             </span>
                             <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                                {group.invoiceCount} Facturas
+                                {group.invoiceCount} {group.invoiceCount === 1 ? 'Factura' : 'Facturas'}
+                            </span>
+                            <span className="text-[10px] font-bold text-zinc-400 bg-zinc-50 px-2 py-0.5 rounded-md">
+                                {totalItems} items
                             </span>
                             {group.currency === 'USD' && (
                                 <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -84,9 +90,9 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
 
                 <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
                     <div className="text-right">
-                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Grupo ({group.currency || 'COP'})</p>
+                        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Proveedor</p>
                         <p className="font-black text-zinc-900 text-xl text-right">
-                            {formatCurrency(group.total)}
+                            {formatCurrency(group.totals.total)}
                             <span className="text-xs text-zinc-400 ml-1">{group.currency || 'COP'}</span>
                         </p>
                     </div>
@@ -99,7 +105,7 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                                     onDelete(group.entity);
                                 }}
                                 className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                title="Eliminar grupo"
+                                title="Eliminar todas las facturas de este proveedor"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
@@ -112,164 +118,109 @@ export function InvoiceGroup({ group, formatCurrency, onDelete }: InvoiceGroupPr
                 </div>
             </div>
 
-            {/* Expanded Content */}
+            {/* Expanded Content - Nested Invoices */}
             {expanded && (
                 <div className="border-t border-zinc-100 animate-slide-down">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-zinc-900/5 text-[10px] font-black text-zinc-900 uppercase tracking-[0.2em]">
-                                <tr>
-                                    <th className="px-8 py-4 sticky left-0 z-10 bg-zinc-50 md:bg-transparent">Item / Concepto</th>
-                                    <th className="px-4 py-4 text-center">{hasNonUnitItems ? 'Cant. / Unid.' : 'Cant.'}</th>
-                                    <th className="px-6 py-4 text-right">Unitario</th>
-                                    {hasDiscounts && <th className="px-4 py-4 text-right text-red-500">Descuento</th>}
-                                    <th className="px-8 py-4 text-right">Total</th>
-                                    <th className="px-6 py-4 text-center">Archivo Origen</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-100 text-sm">
-                                {group.items.map((item, idx) => {
-                                    // Calculate display discount
-                                    const discountValue = item.discount || 0;
-                                    const hasItemDiscount = discountValue > 0 || (item.discountPercentage && item.discountPercentage > 0);
-
-                                    return (
-                                        <tr key={idx} className="hover:bg-emerald-50/20 transition-colors group">
-                                            <td className="px-8 py-4 text-zinc-700 font-bold">
-                                                <div className="flex flex-col">
-                                                    <span>{item.description}</span>
-                                                    <span className="text-[9px] text-emerald-600 font-black uppercase tracking-wider mt-0.5">{item.category || 'General'}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 text-center font-mono text-zinc-500">
-                                                <span>{item.quantity}</span>
-                                                {item.unitOfMeasure && item.unitOfMeasure !== 'Und' && (
-                                                    <span className="ml-1 text-[10px] font-bold text-zinc-400 bg-zinc-100 px-1 py-0.5 rounded">
-                                                        {item.unitOfMeasure}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-mono text-zinc-500">{formatCurrency(item.unitPrice)}</td>
-                                            {hasDiscounts && (
-                                                <td className="px-4 py-4 text-right font-mono">
-                                                    {hasItemDiscount ? (
-                                                        <span className="text-red-500">
-                                                            -{formatCurrency(discountValue)}
-                                                            {item.discountPercentage && item.discountPercentage > 0 && (
-                                                                <span className="text-[10px] ml-1">({Math.round(item.discountPercentage * 100)}%)</span>
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-zinc-300">-</span>
-                                                    )}
-                                                </td>
-                                            )}
-                                            <td className="px-8 py-4 text-right font-black text-zinc-900">{formatCurrency(item.total)}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-zinc-50 rounded-lg border border-zinc-100 shrink-0">
-                                                    <FileText className="w-3 h-3 text-zinc-400 group-hover:text-emerald-600" />
-                                                    <span className="text-[10px] font-bold text-zinc-500 truncate max-w-[100px]">{item.fileName}</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                            {/* Tax Summary Footer */}
-                            <tfoot className="bg-zinc-50/80 border-t border-zinc-200">
-                                <tr>
-                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-3 text-right text-xs font-bold text-zinc-500 uppercase tracking-wider">Subtotal</td>
-                                    <td className="px-8 py-3 text-right font-mono text-sm text-zinc-600">{formatCurrency(group.subtotal)}</td>
-                                    <td></td>
-                                </tr>
-                                {/* AIU Section - Colombian construction/service invoicing */}
-                                {group.aiu && (group.aiu.administracion > 0 || group.aiu.imprevistos > 0 || group.aiu.utilidad > 0) && (
-                                    <>
-                                        {group.aiu.administracion > 0 && (
-                                            <tr>
-                                                <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">+ Administración</td>
-                                                <td className="px-8 py-1 text-right font-mono text-sm text-blue-600">{formatCurrency(group.aiu.administracion)}</td>
-                                                <td></td>
-                                            </tr>
-                                        )}
-                                        {group.aiu.imprevistos > 0 && (
-                                            <tr>
-                                                <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">+ Imprevistos</td>
-                                                <td className="px-8 py-1 text-right font-mono text-sm text-blue-600">{formatCurrency(group.aiu.imprevistos)}</td>
-                                                <td></td>
-                                            </tr>
-                                        )}
-                                        {group.aiu.utilidad > 0 && (
-                                            <tr>
-                                                <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-blue-600 uppercase tracking-wider">+ Utilidad</td>
-                                                <td className="px-8 py-1 text-right font-mono text-sm text-blue-600">{formatCurrency(group.aiu.utilidad)}</td>
-                                                <td></td>
-                                            </tr>
-                                        )}
-                                        <tr className="border-t border-blue-200">
-                                            <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-2 text-right text-xs font-black text-blue-800 uppercase tracking-wider">Base Gravable (AIU)</td>
-                                            <td className="px-8 py-2 text-right font-mono text-sm font-bold text-blue-800">{formatCurrency(group.aiu.base_gravable)}</td>
-                                            <td></td>
-                                        </tr>
-                                    </>
-                                )}
-                                {group.iva > 0 && (
-                                    <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-zinc-500 uppercase tracking-wider">IVA (19%)</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-zinc-600">{formatCurrency(group.iva)}</td>
-                                        <td></td>
-                                    </tr>
-                                )}
-                                {group.tax_inc > 0 && (
-                                    <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-zinc-500 uppercase tracking-wider">Impoconsumo</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-zinc-600">{formatCurrency(group.tax_inc)}</td>
-                                        <td></td>
-                                    </tr>
-                                )}
-                                {group.tip > 0 && (
-                                    <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-emerald-600 uppercase tracking-wider">Propina / Servicio</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-emerald-600">{formatCurrency(group.tip)}</td>
-                                        <td></td>
-                                    </tr>
-                                )}
-                                {(group.retentions.reteFuente > 0 || group.retentions.reteIca > 0 || group.retentions.reteIva > 0) && (
-                                    <tr>
-                                        <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-1 text-right text-xs font-bold text-red-400 uppercase tracking-wider">Menos Retenciones</td>
-                                        <td className="px-8 py-1 text-right font-mono text-sm text-red-500">
-                                            - {formatCurrency(group.retentions.reteFuente + group.retentions.reteIca + group.retentions.reteIva)}
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                )}
-                                <tr className="border-t border-zinc-200">
-                                    <td colSpan={hasDiscounts ? 4 : 3} className="px-8 py-4 text-right text-sm font-black text-zinc-900 uppercase tracking-wider">Total a Pagar</td>
-                                    <td className="px-8 py-4 text-right font-black text-lg text-zinc-900">{formatCurrency(group.total)}</td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                    {/* Invoice Cards */}
+                    <div className="p-4 space-y-3">
+                        {group.invoices.map((invoice, idx) => (
+                            <InvoiceCard
+                                key={invoice.id || `${invoice.fileName}-${idx}`}
+                                invoice={invoice}
+                                invoiceIndex={idx}
+                                formatCurrency={formatCurrency}
+                                onDeleteInvoice={onDeleteInvoice ? () => onDeleteInvoice(invoice.id || '', invoice.fileName) : undefined}
+                                onDeleteItem={onDeleteItem ? (itemIdx) => onDeleteItem(invoice.id || '', invoice.fileName, itemIdx) : undefined}
+                            />
+                        ))}
                     </div>
-                    {/* Validation Details Panel */}
-                    {group.validation && (
-                        <div className="px-8 py-2">
-                            <ValidationDetails validation={group.validation} />
-                        </div>
-                    )}
 
-                    {/* Optional Footer for the group */}
-                    <div className="bg-zinc-50 px-8 py-3 border-t border-zinc-100 flex justify-between items-center">
-                        <p className="text-[10px] font-bold text-zinc-400 flex items-center gap-2">
-                            {group.validation && (
-                                <span className="text-zinc-500">
-                                    Confianza: {Math.round((group.validation.overallConfidence || 0) * 100)}%
-                                </span>
+                    {/* Consolidated Vendor Totals */}
+                    <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 text-white p-5 mx-4 mb-4 rounded-xl">
+                        <h5 className="font-bold text-sm uppercase tracking-wider text-zinc-400 mb-3">
+                            Totales del Proveedor ({group.invoiceCount} {group.invoiceCount === 1 ? 'factura' : 'facturas'})
+                        </h5>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            <span className="text-zinc-400">Subtotal</span>
+                            <span className="text-right font-mono">{formatCurrency(group.totals.subtotal)}</span>
+
+                            {/* AIU Section */}
+                            {group.totals.aiu && (group.totals.aiu.administracion > 0 || group.totals.aiu.imprevistos > 0 || group.totals.aiu.utilidad > 0) && (
+                                <>
+                                    {group.totals.aiu.administracion > 0 && (
+                                        <>
+                                            <span className="text-blue-400 text-xs">+ Administración</span>
+                                            <span className="text-right font-mono text-blue-400 text-xs">{formatCurrency(group.totals.aiu.administracion)}</span>
+                                        </>
+                                    )}
+                                    {group.totals.aiu.imprevistos > 0 && (
+                                        <>
+                                            <span className="text-blue-400 text-xs">+ Imprevistos</span>
+                                            <span className="text-right font-mono text-blue-400 text-xs">{formatCurrency(group.totals.aiu.imprevistos)}</span>
+                                        </>
+                                    )}
+                                    {group.totals.aiu.utilidad > 0 && (
+                                        <>
+                                            <span className="text-blue-400 text-xs">+ Utilidad</span>
+                                            <span className="text-right font-mono text-blue-400 text-xs">{formatCurrency(group.totals.aiu.utilidad)}</span>
+                                        </>
+                                    )}
+                                    <span className="text-blue-300 font-medium text-xs">Base Gravable (AIU)</span>
+                                    <span className="text-right font-mono text-blue-300 text-xs">{formatCurrency(group.totals.aiu.base_gravable || 0)}</span>
+                                </>
                             )}
-                        </p>
-                        <p className="text-[10px] font-bold text-zinc-400 flex items-center gap-2">
-                            {isLowConfidence && <span className="text-orange-500 flex items-center gap-1">⚠️ Revisar Confianza</span>}
-                        </p>
+
+                            {group.totals.iva > 0 && (
+                                <>
+                                    <span className="text-zinc-400">IVA Total</span>
+                                    <span className="text-right font-mono">{formatCurrency(group.totals.iva)}</span>
+                                </>
+                            )}
+
+                            {group.totals.tax_inc > 0 && (
+                                <>
+                                    <span className="text-zinc-400">Impoconsumo Total</span>
+                                    <span className="text-right font-mono">{formatCurrency(group.totals.tax_inc)}</span>
+                                </>
+                            )}
+
+                            {group.totals.tip > 0 && (
+                                <>
+                                    <span className="text-emerald-400">Propina / Servicio</span>
+                                    <span className="text-right font-mono text-emerald-400">{formatCurrency(group.totals.tip)}</span>
+                                </>
+                            )}
+
+                            {/* Retentions */}
+                            {(group.totals.retentions.reteFuente > 0 || group.totals.retentions.reteIca > 0 || group.totals.retentions.reteIva > 0) && (
+                                <>
+                                    {group.totals.retentions.reteFuente > 0 && (
+                                        <>
+                                            <span className="text-red-400 text-xs">- ReteFuente</span>
+                                            <span className="text-right font-mono text-red-400 text-xs">{formatCurrency(group.totals.retentions.reteFuente)}</span>
+                                        </>
+                                    )}
+                                    {group.totals.retentions.reteIca > 0 && (
+                                        <>
+                                            <span className="text-red-400 text-xs">- ReteICA</span>
+                                            <span className="text-right font-mono text-red-400 text-xs">{formatCurrency(group.totals.retentions.reteIca)}</span>
+                                        </>
+                                    )}
+                                    {group.totals.retentions.reteIva > 0 && (
+                                        <>
+                                            <span className="text-red-400 text-xs">- ReteIVA</span>
+                                            <span className="text-right font-mono text-red-400 text-xs">{formatCurrency(group.totals.retentions.reteIva)}</span>
+                                        </>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Total */}
+                            <span className="font-bold text-lg border-t border-zinc-700 pt-3 mt-2">TOTAL PROVEEDOR</span>
+                            <span className="font-bold text-lg text-right font-mono border-t border-zinc-700 pt-3 mt-2 text-emerald-400">
+                                {formatCurrency(group.totals.total)}
+                            </span>
+                        </div>
                     </div>
                 </div>
             )}

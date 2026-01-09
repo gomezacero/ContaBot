@@ -8,7 +8,6 @@ import {
     AlertCircle,
     X,
     Plus,
-    Type,
     Loader2,
     AlertTriangle,
     Trash2,
@@ -21,20 +20,22 @@ import {
     Image as ImageIcon,
     DatabaseZap,
     Folder,
-    ArrowRight,
     DollarSign,
     RefreshCw,
     Zap,
-    HardDrive
+    HardDrive,
+    Building2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { OCRItem, OCRResult, ValidationResult } from './types';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { useUsageStats } from '@/components/usage/UsageIndicator';
 import { FILE_LIMITS, formatBytes } from '@/lib/usage-limits';
-import { InvoiceGroup } from './components/InvoiceGroup';
-import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
+import { InvoiceGroup, GroupedInvoiceData } from './components/InvoiceGroup';
+import type { InvoiceData } from './components/InvoiceCard';
 import { useToast } from '@/components/ui/Toast';
+import { useFeedback } from '@/components/feedback';
+import { useClient } from '@/lib/context/ClientContext';
 
 // Interfaces removed as they are now imported from ./types
 
@@ -45,14 +46,6 @@ interface TRMData {
     source: 'api' | 'cache' | 'fallback';
 }
 
-interface DBClient {
-    id: string;
-    name: string;
-    nit: string | null;
-}
-
-type InputMode = 'FILE' | 'TEXT';
-
 export default function GastosPage() {
     const supabase = createClient();
     const { isAuthenticated, isLoading: authLoading } = useAuthStatus();
@@ -60,18 +53,14 @@ export default function GastosPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { stats: usageStats, refresh: refreshUsage } = useUsageStats();
 
-    // Client state
-    const [clients, setClients] = useState<DBClient[]>([]);
-    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+    // Client state from global context
+    const { clients, selectedClientId, setSelectedClientId, refreshClients, isLoading: loadingClients } = useClient();
     const [showNewFolderModal, setShowNewFolderModal] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
     const [newFolderNit, setNewFolderNit] = useState('');
-    const [loadingClients, setLoadingClients] = useState(true);
 
     // Input state
-    const [inputMode, setInputMode] = useState<InputMode>('FILE');
     const [files, setFiles] = useState<File[]>([]);
-    const [textInput, setTextInput] = useState('');
 
     // Processing state
     const [processing, setProcessing] = useState(false);
@@ -81,41 +70,23 @@ export default function GastosPage() {
     const [savedCount, setSavedCount] = useState(0);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [clearing, setClearing] = useState(false);
+    const [clearConfirmText, setClearConfirmText] = useState('');
 
     // Delete modal state
-    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; entity: string; count: number }>({
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; entity: string; count: number; totalAmount: number }>({
         isOpen: false,
         entity: '',
-        count: 0
+        count: 0,
+        totalAmount: 0
     });
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [deletingGroup, setDeletingGroup] = useState(false);
     const { addToast } = useToast();
+    const { trackAction } = useFeedback();
 
     // TRM state for USD to COP conversion
     const [trm, setTrm] = useState<TRMData | null>(null);
     const [loadingTrm, setLoadingTrm] = useState(false);
-
-    // Load clients
-    const loadClients = useCallback(async () => {
-        try {
-            const { data, error } = await supabase
-                .from('clients')
-                .select('id, name, nit')
-                .order('name');
-            if (error) throw error;
-            setClients(data || []);
-            if (data && data.length > 0 && !selectedClientId) {
-                setSelectedClientId(data[0].id);
-            }
-        } catch {
-            console.error('Error loading clients');
-        } finally {
-            setLoadingClients(false);
-        }
-    }, [supabase, selectedClientId]);
-
-    useEffect(() => {
-        loadClients();
-    }, [loadClients]);
 
     // Fetch TRM on mount (for USD to COP conversion)
     const fetchTRM = useCallback(async () => {
@@ -165,6 +136,7 @@ export default function GastosPage() {
 
             if (data && data.length > 0) {
                 const loadedResults: OCRResult[] = data.map(record => ({
+                    id: record.id, // Database record ID - required for deletion
                     fileName: record.filename || 'Documento',
                     entity: record.vendor || 'Desconocido',
                     nit: record.nit || '',
@@ -213,7 +185,9 @@ export default function GastosPage() {
                 .single();
 
             if (error) throw error;
-            setClients([...clients, data]);
+
+            // Refresh clients from context and select the new one
+            await refreshClients();
             setSelectedClientId(data.id);
             setNewFolderName('');
             setNewFolderNit('');
@@ -299,37 +273,22 @@ export default function GastosPage() {
 
     // Process documents
     const handleProcess = async () => {
-        if (inputMode === 'FILE' && files.length === 0) return;
-        if (inputMode === 'TEXT' && !textInput.trim()) return;
+        if (files.length === 0) return;
 
         setProcessing(true);
         setError(null);
-        setProcessingCount({ current: 0, total: inputMode === 'FILE' ? files.length : 1 });
+        setProcessingCount({ current: 0, total: files.length });
 
         try {
-            let response;
+            const formData = new FormData();
+            files.forEach(file => formData.append('files', file));
+            if (selectedClientId) formData.append('clientId', selectedClientId);
+            setProcessingCount({ current: 1, total: files.length });
 
-            if (inputMode === 'TEXT') {
-                setProcessingCount({ current: 1, total: 1 });
-                response = await fetch('/api/ocr', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: textInput,
-                        clientId: selectedClientId
-                    }),
-                });
-            } else {
-                const formData = new FormData();
-                files.forEach(file => formData.append('files', file));
-                if (selectedClientId) formData.append('clientId', selectedClientId);
-                setProcessingCount({ current: 1, total: files.length });
-
-                response = await fetch('/api/ocr', {
-                    method: 'POST',
-                    body: formData,
-                });
-            }
+            const response = await fetch('/api/ocr', {
+                method: 'POST',
+                body: formData,
+            });
 
             const data = await response.json();
 
@@ -350,12 +309,11 @@ export default function GastosPage() {
                 throw new Error(data.error || 'Error procesando documentos');
             }
 
-            setResults(prev => [...prev, ...data.results]);
-
             // Refrescar estadísticas de uso
             await refreshUsage();
 
-            // Auto-save to Supabase for authenticated users
+            // Auto-save to Supabase for authenticated users and get IDs
+            const resultsWithIds: OCRResult[] = [];
             if (isAuthenticated && data.results.length > 0) {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
@@ -368,7 +326,7 @@ export default function GastosPage() {
 
                             if (result.invoiceNumber) {
                                 // Primary: Match by invoice_number + nit (allows same invoice# from different vendors)
-                                const { data } = await supabase
+                                const { data: existingData } = await supabase
                                     .from('ocr_results')
                                     .select('id')
                                     .eq('client_id', selectedClientId)
@@ -376,10 +334,10 @@ export default function GastosPage() {
                                     .eq('nit', result.nit || '')
                                     .is('deleted_at', null)
                                     .maybeSingle();
-                                existing = data;
+                                existing = existingData;
                             } else {
                                 // Fallback: Match by filename + vendor + date (for receipts without invoice numbers)
-                                const { data } = await supabase
+                                const { data: existingData } = await supabase
                                     .from('ocr_results')
                                     .select('id')
                                     .eq('client_id', selectedClientId)
@@ -388,54 +346,80 @@ export default function GastosPage() {
                                     .eq('invoice_date', result.date || '')
                                     .is('deleted_at', null)
                                     .maybeSingle();
-                                existing = data;
+                                existing = existingData;
                             }
 
                             if (existing) {
                                 console.log(`Skipping duplicate: ${result.invoiceNumber || result.fileName} from ${result.entity}`);
+                                // Still add to results with existing ID
+                                resultsWithIds.push({ ...result, id: existing.id });
                                 continue;
                             }
 
-                            await supabase.from('ocr_results').insert({
-                                user_id: user.id,
-                                client_id: selectedClientId,
-                                filename: result.fileName || 'text_input',
-                                file_type: inputMode === 'FILE' ? 'image' : 'text',
-                                vendor: result.entity,
-                                nit: result.nit || null,
-                                invoice_number: result.invoiceNumber,
-                                invoice_date: result.date,
-                                subtotal: result.subtotal || 0,
-                                iva: result.iva || 0,
-                                tax_inc: result.tax_inc || 0,
-                                tip: result.tip || 0,
-                                retentions: result.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
-                                total: result.total || 0,
-                                items: result.items || [],
-                                confidence: result.confidence || 0,
-                                tokens_input: result.tokens_input || 0,
-                                tokens_output: result.tokens_output || 0,
-                                cost_estimated: result.cost_estimated || 0,
-                                // New OCR feature fields
-                                currency: result.currency || 'COP',
-                                aiu: result.aiu || null,
-                                iva_rate: result.iva_rate || null,
-                                tax_inc_rate: result.tax_inc_rate || null,
-                                // Validation persistence
-                                validation_result: result.validation || null,
-                                validation_passed: result.validation?.isValid ?? null
-                            });
-                            savedThisSession++;
+                            // Insert and get the generated ID
+                            const { data: insertedData, error: insertError } = await supabase
+                                .from('ocr_results')
+                                .insert({
+                                    user_id: user.id,
+                                    client_id: selectedClientId,
+                                    filename: result.fileName || 'text_input',
+                                    file_type: 'image',
+                                    vendor: result.entity,
+                                    nit: result.nit || null,
+                                    invoice_number: result.invoiceNumber,
+                                    invoice_date: result.date,
+                                    subtotal: result.subtotal || 0,
+                                    iva: result.iva || 0,
+                                    tax_inc: result.tax_inc || 0,
+                                    tip: result.tip || 0,
+                                    retentions: result.retentions || { reteFuente: 0, reteIca: 0, reteIva: 0 },
+                                    total: result.total || 0,
+                                    items: result.items || [],
+                                    confidence: result.confidence || 0,
+                                    tokens_input: result.tokens_input || 0,
+                                    tokens_output: result.tokens_output || 0,
+                                    cost_estimated: result.cost_estimated || 0,
+                                    // New OCR feature fields
+                                    currency: result.currency || 'COP',
+                                    aiu: result.aiu || null,
+                                    iva_rate: result.iva_rate || null,
+                                    tax_inc_rate: result.tax_inc_rate || null,
+                                    // Validation persistence
+                                    validation_result: result.validation || null,
+                                    validation_passed: result.validation?.isValid ?? null
+                                })
+                                .select('id')
+                                .single();
+
+                            if (insertError) {
+                                console.error('Error inserting OCR result:', insertError);
+                                resultsWithIds.push(result); // Add without ID as fallback
+                            } else {
+                                // Add result with the database-generated ID
+                                resultsWithIds.push({ ...result, id: insertedData.id });
+                                savedThisSession++;
+                            }
                         } catch (saveErr) {
                             console.error('Error saving OCR result:', saveErr);
+                            resultsWithIds.push(result); // Add without ID as fallback
                         }
                     }
                     setSavedCount(prev => prev + savedThisSession);
                 }
+            } else {
+                // For guest users, add results without IDs
+                resultsWithIds.push(...data.results);
             }
 
-            if (inputMode === 'FILE') setFiles([]);
-            if (inputMode === 'TEXT') setTextInput('');
+            // Update state with results that include database IDs
+            setResults(prev => [...prev, ...resultsWithIds]);
+
+            // Track para feedback después de procesamiento OCR exitoso
+            if (resultsWithIds.length > 0) {
+                trackAction('gastos', 'ocr_process');
+            }
+
+            setFiles([]);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error procesando');
         } finally {
@@ -481,7 +465,9 @@ export default function GastosPage() {
     const openDeleteGroupModal = (entity: string) => {
         if (!selectedClientId) return;
         const groupResults = results.filter(r => r.entity === entity);
-        setDeleteModal({ isOpen: true, entity, count: groupResults.length });
+        const totalAmount = groupResults.reduce((sum, r) => sum + r.total, 0);
+        setDeleteModal({ isOpen: true, entity, count: groupResults.length, totalAmount });
+        setDeleteConfirmText('');
     };
 
     const handleDeleteGroup = async () => {
@@ -536,6 +522,129 @@ export default function GastosPage() {
         }
     };
 
+    // Handle individual item deletion within a group
+    const handleDeleteItem = async (invoiceId: string, fileName: string, itemIndex: number) => {
+        if (!selectedClientId) return;
+
+        try {
+            // Find the OCR result by ID (or fileName as fallback)
+            const resultToUpdate = results.find(r => r.id === invoiceId || r.fileName === fileName);
+            if (!resultToUpdate || !resultToUpdate.id) {
+                console.error('Result not found for invoiceId:', invoiceId);
+                return;
+            }
+
+            // If the document has only one item, delete the entire document
+            if (resultToUpdate.items.length <= 1) {
+                await supabase.rpc('soft_delete_record', {
+                    p_table_name: 'ocr_results',
+                    p_record_id: resultToUpdate.id,
+                    p_reason: `Eliminación de único item de ${resultToUpdate.entity}`
+                });
+                setResults(prev => prev.filter(r => r.id !== resultToUpdate.id));
+
+                addToast({
+                    type: 'success',
+                    title: 'Documento eliminado',
+                    description: `Documento de "${resultToUpdate.entity}" movido a la papelera`,
+                    action: {
+                        label: 'Ver papelera',
+                        onClick: () => window.location.href = '/dashboard/papelera'
+                    }
+                });
+            } else {
+                // Remove only the specific item from the items array
+                // We need to find the correct item index within this specific document
+                const itemsInThisDoc = resultToUpdate.items;
+                const updatedItems = itemsInThisDoc.filter((_, idx) => idx !== itemIndex);
+
+                // Update in database
+                const { error: updateError } = await supabase
+                    .from('ocr_results')
+                    .update({
+                        items: updatedItems,
+                        // Recalculate totals
+                        total: updatedItems.reduce((sum, item) => sum + (item.total || 0), 0),
+                        subtotal: updatedItems.reduce((sum, item) => sum + (item.total || 0), 0)
+                    })
+                    .eq('id', resultToUpdate.id);
+
+                if (updateError) {
+                    console.error('Error updating items:', updateError);
+                    addToast({
+                        type: 'error',
+                        title: 'Error',
+                        description: 'No se pudo eliminar el item'
+                    });
+                    return;
+                }
+
+                // Update local state
+                setResults(prev => prev.map(r =>
+                    r.id === resultToUpdate.id
+                        ? {
+                            ...r,
+                            items: updatedItems,
+                            total: updatedItems.reduce((sum, item) => sum + (item.total || 0), 0),
+                            subtotal: updatedItems.reduce((sum, item) => sum + (item.total || 0), 0)
+                        }
+                        : r
+                ));
+
+                addToast({
+                    type: 'success',
+                    title: 'Item eliminado',
+                    description: `Item de "${resultToUpdate.entity}" eliminado correctamente`
+                });
+            }
+        } catch (err) {
+            console.error('Error in handleDeleteItem:', err);
+            addToast({
+                type: 'error',
+                title: 'Error',
+                description: 'No se pudo eliminar el item'
+            });
+        }
+    };
+
+    // Handle deleting an entire invoice (single document)
+    const handleDeleteInvoice = async (invoiceId: string, fileName: string) => {
+        if (!selectedClientId || !invoiceId) return;
+
+        try {
+            const resultToDelete = results.find(r => r.id === invoiceId);
+            if (!resultToDelete) {
+                console.error('Invoice not found:', invoiceId);
+                return;
+            }
+
+            await supabase.rpc('soft_delete_record', {
+                p_table_name: 'ocr_results',
+                p_record_id: invoiceId,
+                p_reason: `Eliminación de factura: ${fileName}`
+            });
+
+            setResults(prev => prev.filter(r => r.id !== invoiceId));
+
+            addToast({
+                type: 'success',
+                title: 'Factura eliminada',
+                description: `"${fileName}" movido a la papelera`,
+                action: {
+                    label: 'Ver papelera',
+                    onClick: () => window.location.href = '/dashboard/papelera'
+                }
+            });
+        } catch (err) {
+            console.error('Error in handleDeleteInvoice:', err);
+            addToast({
+                type: 'error',
+                title: 'Error',
+                description: 'No se pudo eliminar la factura'
+            });
+        }
+    };
+
     const exportToExcel = async () => {
         if (results.length === 0) return;
 
@@ -558,6 +667,9 @@ export default function GastosPage() {
             link.download = `asiento_contable_${clientName}_${new Date().toISOString().split('T')[0]}.xlsx`;
             link.click();
             URL.revokeObjectURL(url);
+
+            // Track para feedback después de exportar Excel
+            trackAction('gastos', 'excel_export');
         } catch (err) {
             console.error('Error generating Excel:', err);
             addToast({
@@ -657,9 +769,6 @@ export default function GastosPage() {
                         </span>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] self-center bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 shadow-sm">Multi-Doc Enabled v2.5</span>
-                </div>
             </div>
 
             {/* Error */}
@@ -668,6 +777,31 @@ export default function GastosPage() {
                     <AlertCircle className="w-5 h-5 text-red-500" />
                     <span className="text-red-700 text-sm font-medium">{error}</span>
                     <button onClick={() => setError(null)} className="ml-auto"><X className="w-4 h-4 text-red-500" /></button>
+                </div>
+            )}
+
+            {/* Header de Empresa Destacado */}
+            {selectedClientId && selectedClient && (
+                <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                            <Building2 className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white">
+                                {selectedClient.name}
+                            </h3>
+                            <p className="text-zinc-400 text-sm">
+                                NIT: {selectedClient.nit || 'No registrado'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-zinc-400">
+                            <FileText className="w-5 h-5" />
+                            <span className="text-sm font-medium">{results.length} documentos procesados</span>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -718,27 +852,10 @@ export default function GastosPage() {
 
                     {/* Upload Area */}
                     <div className="bg-white rounded-2xl p-8 border border-zinc-100 shadow-xl relative overflow-hidden">
-                        <div className="flex p-1 bg-zinc-100 rounded-2xl mb-6">
-                            <button
-                                onClick={() => setInputMode('FILE')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${inputMode === 'FILE' ? 'bg-white text-emerald-600 shadow-md' : 'text-zinc-400'
-                                    }`}
-                            >
-                                <Upload className="w-4 h-4" /> Archivo
-                            </button>
-                            <button
-                                onClick={() => setInputMode('TEXT')}
-                                className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all ${inputMode === 'TEXT' ? 'bg-white text-emerald-600 shadow-md' : 'text-zinc-400'
-                                    }`}
-                            >
-                                <Type className="w-4 h-4" /> Texto
-                            </button>
-                        </div>
-
                         <div
                             className={`rounded-2xl border-2 border-dashed transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center p-6 ${processing ? 'border-emerald-600 bg-emerald-50/10' : 'border-zinc-200 hover:border-emerald-600 hover:bg-zinc-50/50'
                                 }`}
-                            style={{ minHeight: '320px' }}
+                            style={{ minHeight: '280px' }}
                             onDrop={handleDrop}
                             onDragOver={e => e.preventDefault()}
                         >
@@ -757,61 +874,39 @@ export default function GastosPage() {
                                     <p className="text-[10px] text-zinc-400 mt-4 px-6 font-bold uppercase tracking-wider text-center">IA Analizando documentos para: {selectedClient?.name || 'General'}</p>
                                 </div>
                             ) : (
-                                <>
-                                    {inputMode === 'FILE' ? (
-                                        <div className="flex flex-col items-center text-center cursor-pointer group w-full" onClick={() => fileInputRef.current?.click()}>
-                                            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.jpg,.png,.jpeg,.csv,.xlsx,.xls,.txt" multiple />
-                                            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
-                                                <Upload className="w-8 h-8" />
-                                            </div>
-                                            <h3 className="text-lg font-black text-zinc-900 mb-1">Cargar Soportes</h3>
-                                            <p className="text-[10px] text-zinc-400 mb-2 font-bold uppercase tracking-wider">Arrastra múltiples archivos aquí</p>
-                                            <p className="text-[9px] text-zinc-300 mb-4 font-medium">JPG, PNG, PDF • Máx. 10MB por archivo</p>
-                                            <div className="flex gap-2">
-                                                <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-emerald-600 transition-colors"><FileText className="w-4 h-4" /></div>
-                                                <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-emerald-400 transition-colors"><ImageIcon className="w-4 h-4" /></div>
-                                                <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-zinc-900 transition-colors"><FileSpreadsheet className="w-4 h-4" /></div>
-                                            </div>
+                                <div className="flex flex-col items-center text-center cursor-pointer group w-full" onClick={() => fileInputRef.current?.click()}>
+                                    <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,.jpg,.png,.jpeg" multiple />
+                                    <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-sm">
+                                        <Upload className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-lg font-black text-zinc-900 mb-1">Cargar Archivos</h3>
+                                    <p className="text-[10px] text-zinc-400 mb-2 font-bold uppercase tracking-wider">Arrastra múltiples archivos aquí</p>
+                                    <p className="text-[9px] text-zinc-300 mb-4 font-medium">Facturas, Extractos, Tirillas POS • JPG, PNG, PDF • Máx. 10MB</p>
+                                    <div className="flex gap-2">
+                                        <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-emerald-600 transition-colors"><FileText className="w-4 h-4" /></div>
+                                        <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-100 text-zinc-400 group-hover:text-emerald-400 transition-colors"><ImageIcon className="w-4 h-4" /></div>
+                                    </div>
 
-                                            {/* File list */}
-                                            {files.length > 0 && (
-                                                <div className="mt-4 w-full space-y-1 max-h-24 overflow-y-auto">
-                                                    {files.map((file, i) => (
-                                                        <div key={i} className="flex items-center gap-2 text-xs bg-zinc-50 px-3 py-2 rounded-xl">
-                                                            <FileText className="w-3 h-3 text-zinc-400" />
-                                                            <span className="truncate flex-1 font-medium">{file.name}</span>
-                                                            <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}>
-                                                                <X className="w-3 h-3 text-zinc-400 hover:text-red-500" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
+                                    {/* File list */}
+                                    {files.length > 0 && (
+                                        <div className="mt-4 w-full space-y-1 max-h-24 overflow-y-auto">
+                                            {files.map((file, i) => (
+                                                <div key={i} className="flex items-center gap-2 text-xs bg-zinc-50 px-3 py-2 rounded-xl">
+                                                    <FileText className="w-3 h-3 text-zinc-400" />
+                                                    <span className="truncate flex-1 font-medium">{file.name}</span>
+                                                    <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}>
+                                                        <X className="w-3 h-3 text-zinc-400 hover:text-red-500" />
+                                                    </button>
                                                 </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="w-full h-full flex flex-col">
-                                            <textarea
-                                                className="w-full flex-1 bg-zinc-50 rounded-2xl p-4 text-sm font-bold text-zinc-700 focus:outline-none focus:bg-white focus:border-emerald-600 resize-none border border-zinc-100 transition-all mb-4"
-                                                placeholder="Pega texto de múltiples facturas aquí..."
-                                                value={textInput}
-                                                onChange={(e) => setTextInput(e.target.value)}
-                                                style={{ minHeight: '200px' }}
-                                            ></textarea>
-                                            <button
-                                                onClick={handleProcess}
-                                                disabled={!textInput.trim()}
-                                                className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-black shadow-lg disabled:opacity-30 transition-all"
-                                            >
-                                                Procesar Texto <ArrowRight className="w-4 h-4" />
-                                            </button>
+                                            ))}
                                         </div>
                                     )}
-                                </>
+                                </div>
                             )}
                         </div>
 
-                        {/* Process Button for FILE mode */}
-                        {inputMode === 'FILE' && !processing && files.length > 0 && (
+                        {/* Process Button */}
+                        {!processing && files.length > 0 && (
                             <button
                                 onClick={handleProcess}
                                 className="w-full mt-4 bg-emerald-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-emerald-700 shadow-lg transition-all"
@@ -922,72 +1017,85 @@ export default function GastosPage() {
                                             map.set(key, {
                                                 nit: result.nit || 'S/N',
                                                 entity: result.entity,
-                                                total: 0,
-                                                subtotal: 0,
-                                                iva: 0,
-                                                tax_inc: 0,
-                                                tip: 0,
-                                                // AIU (Colombian construction/service invoicing)
-                                                aiu: undefined as { administracion: number; imprevistos: number; utilidad: number; base_gravable: number } | undefined,
-                                                retentions: {
-                                                    reteFuente: 0,
-                                                    reteIca: 0,
-                                                    reteIva: 0
-                                                },
                                                 currency: result.currency || 'COP',
-                                                items: [] as (OCRItem & { fileName: string })[],
                                                 invoiceCount: 0,
+                                                invoices: [] as InvoiceData[],
+                                                totals: {
+                                                    subtotal: 0,
+                                                    iva: 0,
+                                                    tax_inc: 0,
+                                                    tip: 0,
+                                                    aiu: undefined as { administracion: number; imprevistos: number; utilidad: number; base_gravable: number } | undefined,
+                                                    retentions: {
+                                                        reteFuente: 0,
+                                                        reteIca: 0,
+                                                        reteIva: 0
+                                                    },
+                                                    total: 0
+                                                },
                                                 validation: result.validation // Store first invoice's validation
                                             });
                                         }
                                         const entry = map.get(key)!;
-                                        entry.total += result.total;
-                                        entry.subtotal += result.subtotal || 0;
-                                        entry.iva += result.iva || 0;
-                                        entry.tax_inc += result.tax_inc || 0;
-                                        entry.tip += result.tip || 0;
+
+                                        // Add individual invoice to the array
+                                        entry.invoices.push({
+                                            id: result.id,
+                                            invoiceNumber: result.invoiceNumber,
+                                            date: result.date,
+                                            fileName: result.fileName,
+                                            items: result.items,
+                                            subtotal: result.subtotal || 0,
+                                            iva: result.iva || 0,
+                                            iva_rate: result.iva_rate,
+                                            tax_inc: result.tax_inc || 0,
+                                            tax_inc_rate: result.tax_inc_rate,
+                                            tip: result.tip || 0,
+                                            aiu: result.aiu,
+                                            retentions: {
+                                                reteFuente: result.retentions?.reteFuente || 0,
+                                                reteIca: result.retentions?.reteIca || 0,
+                                                reteIva: result.retentions?.reteIva || 0
+                                            },
+                                            total: result.total,
+                                            validation: result.validation
+                                        });
+
+                                        // Update consolidated totals
+                                        entry.invoiceCount += 1;
+                                        entry.totals.total += result.total;
+                                        entry.totals.subtotal += result.subtotal || 0;
+                                        entry.totals.iva += result.iva || 0;
+                                        entry.totals.tax_inc += result.tax_inc || 0;
+                                        entry.totals.tip += result.tip || 0;
 
                                         if (result.retentions) {
-                                            entry.retentions.reteFuente += result.retentions.reteFuente || 0;
-                                            entry.retentions.reteIca += result.retentions.reteIca || 0;
-                                            entry.retentions.reteIva += result.retentions.reteIva || 0;
+                                            entry.totals.retentions.reteFuente += result.retentions.reteFuente || 0;
+                                            entry.totals.retentions.reteIca += result.retentions.reteIca || 0;
+                                            entry.totals.retentions.reteIva += result.retentions.reteIva || 0;
                                         }
 
                                         // Aggregate AIU (Colombian construction/service invoicing)
                                         if (result.aiu && (result.aiu.administracion > 0 || result.aiu.imprevistos > 0 || result.aiu.utilidad > 0)) {
-                                            if (!entry.aiu) {
-                                                entry.aiu = { administracion: 0, imprevistos: 0, utilidad: 0, base_gravable: 0 };
+                                            if (!entry.totals.aiu) {
+                                                entry.totals.aiu = { administracion: 0, imprevistos: 0, utilidad: 0, base_gravable: 0 };
                                             }
-                                            entry.aiu.administracion += result.aiu.administracion || 0;
-                                            entry.aiu.imprevistos += result.aiu.imprevistos || 0;
-                                            entry.aiu.utilidad += result.aiu.utilidad || 0;
-                                            entry.aiu.base_gravable += result.aiu.base_gravable || 0;
+                                            entry.totals.aiu.administracion += result.aiu.administracion || 0;
+                                            entry.totals.aiu.imprevistos += result.aiu.imprevistos || 0;
+                                            entry.totals.aiu.utilidad += result.aiu.utilidad || 0;
+                                            entry.totals.aiu.base_gravable = (entry.totals.aiu.base_gravable || 0) + (result.aiu.base_gravable || 0);
                                         }
 
-                                        entry.invoiceCount += 1;
-                                        entry.items.push(...result.items.map(item => ({ ...item, fileName: result.fileName })));
                                         return map;
-                                    }, new Map<string, {
-                                        nit: string,
-                                        entity: string,
-                                        total: number,
-                                        subtotal: number,
-                                        iva: number,
-                                        tax_inc: number,
-                                        tip: number,
-                                        aiu?: { administracion: number; imprevistos: number; utilidad: number; base_gravable: number },
-                                        retentions: { reteFuente: number, reteIca: number, reteIva: number },
-                                        currency: string,
-                                        items: (OCRItem & { fileName: string })[],
-                                        invoiceCount: number,
-                                        validation?: ValidationResult
-                                    }>())
+                                    }, new Map<string, GroupedInvoiceData>())
                                 ).map(([key, group], idx) => (
                                     <InvoiceGroup
                                         key={idx}
                                         group={group}
                                         formatCurrency={formatCurrency}
                                         onDelete={openDeleteGroupModal}
+                                        onDeleteInvoice={handleDeleteInvoice}
+                                        onDeleteItem={handleDeleteItem}
                                     />
                                 ))}
                             </div>
@@ -1046,73 +1154,226 @@ export default function GastosPage() {
                 </div>
             )}
 
-            {/* Clear Confirmation Modal */}
-            {showClearConfirm && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-                    <div className="bg-white rounded-xl w-full max-w-md p-8 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-                                <Trash2 className="w-6 h-6 text-red-600" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black text-zinc-900">¿Limpiar Datos?</h3>
-                                <p className="text-sm text-zinc-500">{results.length} registros serán eliminados</p>
-                            </div>
-                        </div>
+            {/* Clear Confirmation Modal - Enhanced Security */}
+            {showClearConfirm && (() => {
+                // Calculate unique vendors/providers
+                const uniqueVendors = new Set(results.map(r => r.entity)).size;
+                const confirmPhrase = 'BORRAR TODO';
+                const isConfirmValid = clearConfirmText.toUpperCase() === confirmPhrase;
 
-                        <p className="text-zinc-600 mb-4">
-                            Esta acción eliminará <strong>permanentemente</strong> todos los registros OCR de la carpeta actual.
-                            Esta acción no se puede deshacer.
-                        </p>
+                return (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                        <div className="bg-white rounded-xl w-full max-w-md p-8 shadow-2xl">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                                    <Trash2 className="w-6 h-6 text-red-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-zinc-900">Eliminar Todos los Datos</h3>
+                                    <p className="text-sm text-zinc-500">Acción irreversible</p>
+                                </div>
+                            </div>
 
-                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6">
-                            <p className="text-sm text-amber-700 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4" />
-                                Esto eliminará {formatCurrency(totalAmountCOP)} en registros
+                            <p className="text-zinc-600 mb-4">
+                                Esta acción eliminará <strong className="text-red-600">permanentemente</strong> todos los registros OCR de la carpeta actual, incluyendo:
                             </p>
-                        </div>
 
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowClearConfirm(false)}
-                                disabled={clearing}
-                                className="flex-1 py-3 rounded-xl border border-zinc-200 font-bold text-zinc-600 hover:bg-zinc-50 transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmClear}
-                                disabled={clearing}
-                                className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2"
-                            >
-                                {clearing ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Eliminando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Trash2 className="w-5 h-5" />
-                                        Sí, Eliminar Todo
-                                    </>
-                                )}
-                            </button>
+                            {/* Summary of what will be deleted */}
+                            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-4 space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-600">Proveedores:</span>
+                                    <span className="font-bold text-zinc-900">{uniqueVendors}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-600">Facturas/Documentos:</span>
+                                    <span className="font-bold text-zinc-900">{results.length}</span>
+                                </div>
+                                <div className="flex justify-between text-sm border-t border-zinc-200 pt-2 mt-2">
+                                    <span className="text-zinc-600">Monto total:</span>
+                                    <span className="font-black text-red-600">{formatCurrency(totalAmountCOP)}</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-5">
+                                <p className="text-sm text-red-700 flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                    <span>Esta acción <strong>NO se puede deshacer</strong>. Los datos se eliminarán permanentemente.</span>
+                                </p>
+                            </div>
+
+                            {/* Confirmation input */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                    Para confirmar, escribe <span className="font-black text-red-600 bg-red-50 px-2 py-0.5 rounded">{confirmPhrase}</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={clearConfirmText}
+                                    onChange={(e) => setClearConfirmText(e.target.value)}
+                                    placeholder="Escribe aquí para confirmar..."
+                                    className="w-full px-4 py-3 border-2 border-zinc-200 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all text-center font-bold uppercase tracking-wider"
+                                    disabled={clearing}
+                                    autoComplete="off"
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowClearConfirm(false);
+                                        setClearConfirmText('');
+                                    }}
+                                    disabled={clearing}
+                                    className="flex-1 py-3 rounded-xl border border-zinc-200 font-bold text-zinc-600 hover:bg-zinc-50 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (isConfirmValid) {
+                                            confirmClear();
+                                            setClearConfirmText('');
+                                        }
+                                    }}
+                                    disabled={clearing || !isConfirmValid}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                                        isConfirmValid
+                                            ? 'bg-red-600 text-white hover:bg-red-700'
+                                            : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+                                    }`}
+                                >
+                                    {clearing ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            Eliminando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 className="w-5 h-5" />
+                                            Eliminar Todo
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
-            {/* Delete Group Confirmation Modal */}
-            <DeleteConfirmationModal
-                isOpen={deleteModal.isOpen}
-                onClose={() => setDeleteModal({ isOpen: false, entity: '', count: 0 })}
-                onConfirm={handleDeleteGroup}
-                title="Eliminar Documentos"
-                description={`¿Estás seguro de que deseas eliminar todos los documentos de "${deleteModal.entity}"? Podrás restaurarlos desde la papelera durante los próximos 30 días.`}
-                itemName={deleteModal.entity}
-                itemCount={deleteModal.count}
-                isRecoverable={true}
-            />
+            {/* Delete Group Confirmation Modal - Enhanced */}
+            {deleteModal.isOpen && (() => {
+                const confirmPhrase = 'ELIMINAR';
+                const isConfirmValid = deleteConfirmText.toUpperCase() === confirmPhrase;
+                // Get individual invoices for this vendor
+                const vendorInvoices = results.filter(r => r.entity === deleteModal.entity);
+
+                return (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+                        <div className="bg-white rounded-xl w-full max-w-md p-8 shadow-2xl">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                                    <Trash2 className="w-6 h-6 text-red-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-zinc-900">Eliminar Proveedor</h3>
+                                    <p className="text-sm text-zinc-500">{deleteModal.entity}</p>
+                                </div>
+                            </div>
+
+                            <p className="text-zinc-600 mb-4">
+                                Se eliminarán <strong className="text-red-600">todas las facturas</strong> de este proveedor:
+                            </p>
+
+                            {/* Summary of invoices to delete */}
+                            <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 mb-4 max-h-48 overflow-y-auto">
+                                <div className="space-y-2">
+                                    {vendorInvoices.map((invoice, idx) => (
+                                        <div key={idx} className="flex justify-between text-sm py-1 border-b border-zinc-100 last:border-0">
+                                            <div className="flex flex-col">
+                                                <span className="text-zinc-700 font-medium truncate max-w-[180px]">
+                                                    {invoice.invoiceNumber || invoice.fileName}
+                                                </span>
+                                                <span className="text-[10px] text-zinc-400">{invoice.date}</span>
+                                            </div>
+                                            <span className="font-bold text-zinc-900">{formatCurrency(invoice.total)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-between text-sm border-t-2 border-zinc-300 pt-3 mt-3">
+                                    <span className="font-bold text-zinc-700">Total ({deleteModal.count} facturas)</span>
+                                    <span className="font-black text-red-600">{formatCurrency(deleteModal.totalAmount)}</span>
+                                </div>
+                            </div>
+
+                            {/* Recoverable notice */}
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-5">
+                                <p className="text-sm text-emerald-700 flex items-center gap-2">
+                                    <RefreshCw className="w-4 h-4 shrink-0" />
+                                    <span>Podrás restaurar desde la <strong>papelera</strong> en los próximos 30 días</span>
+                                </p>
+                            </div>
+
+                            {/* Confirmation input */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-zinc-700 mb-2">
+                                    Para confirmar, escribe <span className="font-black text-red-600 bg-red-50 px-2 py-0.5 rounded">{confirmPhrase}</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmText}
+                                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                    placeholder="Escribe aquí para confirmar..."
+                                    className="w-full px-4 py-3 border-2 border-zinc-200 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-100 outline-none transition-all text-center font-bold uppercase tracking-wider"
+                                    disabled={deletingGroup}
+                                    autoComplete="off"
+                                />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setDeleteModal({ isOpen: false, entity: '', count: 0, totalAmount: 0 });
+                                        setDeleteConfirmText('');
+                                    }}
+                                    disabled={deletingGroup}
+                                    className="flex-1 py-3 rounded-xl border border-zinc-200 font-bold text-zinc-600 hover:bg-zinc-50 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (isConfirmValid) {
+                                            setDeletingGroup(true);
+                                            await handleDeleteGroup();
+                                            setDeletingGroup(false);
+                                            setDeleteModal({ isOpen: false, entity: '', count: 0, totalAmount: 0 });
+                                            setDeleteConfirmText('');
+                                        }
+                                    }}
+                                    disabled={deletingGroup || !isConfirmValid}
+                                    className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                                        isConfirmValid
+                                            ? 'bg-red-600 text-white hover:bg-red-700'
+                                            : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+                                    }`}
+                                >
+                                    {deletingGroup ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            Eliminando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 className="w-5 h-5" />
+                                            Eliminar Facturas
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

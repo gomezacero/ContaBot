@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ToastProvider } from '@/components/ui/Toast';
+import { FeedbackProvider } from '@/components/feedback';
+import { ClientProvider, useClient } from '@/lib/context/ClientContext';
 import {
     LayoutDashboard,
     ScanLine,
@@ -15,11 +17,33 @@ import {
     Menu,
     X,
     ChevronDown,
-    Trash2
+    Trash2,
+    Building2
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
+}
+
+// Componente para mostrar el cliente activo en el header
+function ActiveClientIndicator() {
+    const { selectedClient, isAuthenticated } = useClient();
+
+    if (!isAuthenticated || !selectedClient) return null;
+
+    return (
+        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100">
+            <Building2 className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm font-semibold text-zinc-700 max-w-[200px] truncate">
+                {selectedClient.name}
+            </span>
+            {selectedClient.nit && (
+                <span className="text-xs text-zinc-400 font-mono">
+                    {selectedClient.nit}
+                </span>
+            )}
+        </div>
+    );
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -100,6 +124,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     return (
         <ToastProvider>
+        <FeedbackProvider>
+        <ClientProvider>
         <div className="min-h-screen bg-[#fafafa]">
             {/* Navigation Header */}
             <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-100">
@@ -131,6 +157,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        {/* Active Client Indicator */}
+                        <ActiveClientIndicator />
+
                         {/* User Menu */}
                         <div className="relative">
                             <button
@@ -248,6 +277,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 {children}
             </main>
         </div>
+        </ClientProvider>
+        </FeedbackProvider>
         </ToastProvider>
     );
 }

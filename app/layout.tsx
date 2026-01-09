@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -29,6 +31,8 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={`${plusJakartaSans.variable} font-sans antialiased`} suppressHydrationWarning>
         {children}
+        <Analytics />
+        <GoogleAnalytics />
       </body>
     </html>
   );
