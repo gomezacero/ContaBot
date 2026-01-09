@@ -44,9 +44,21 @@ export async function migrateLocalDataToSupabase(
                     has_gmf: client.has_gmf,
                     requires_exogena: client.requires_exogena,
                     has_patrimony_tax: client.has_patrimony_tax,
+                    // Impuestos especiales 2026
+                    has_carbon_tax: client.has_carbon_tax || false,
+                    has_beverage_tax: client.has_beverage_tax || false,
+                    has_fuel_tax: client.has_fuel_tax || false,
+                    has_plastic_tax: client.has_plastic_tax || false,
+                    // Obligaciones especiales
+                    requires_rub: client.requires_rub || false,
+                    requires_transfer_pricing: client.requires_transfer_pricing || false,
+                    requires_country_report: client.requires_country_report || false,
+                    // Alertas
                     alert_days: client.alert_days,
                     email_alert: client.email_alert,
-                    whatsapp_alert: client.whatsapp_alert
+                    whatsapp_alert: client.whatsapp_alert,
+                    target_emails: client.target_emails || [],
+                    target_phone: client.target_phone || null
                 });
 
             if (error) {

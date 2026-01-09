@@ -53,10 +53,39 @@ export interface Database {
                     user_id: string
                     name: string
                     nit: string | null
+                    // Contacto
+                    email: string | null
+                    phone: string | null
+                    address: string | null
+                    city: string | null
+                    department: string | null
+                    // Clasificación tributaria
                     classification: 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE' | null
                     tax_regime: string | null
                     iva_periodicity: 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE' | null
                     is_retention_agent: boolean
+                    // Impuestos adicionales
+                    has_gmf: boolean | null
+                    requires_exogena: boolean | null
+                    has_patrimony_tax: boolean | null
+                    // Impuestos especiales 2026
+                    has_carbon_tax: boolean | null
+                    has_beverage_tax: boolean | null
+                    has_fuel_tax: boolean | null
+                    has_plastic_tax: boolean | null
+                    // Obligaciones especiales
+                    requires_rub: boolean | null
+                    requires_transfer_pricing: boolean | null
+                    requires_country_report: boolean | null
+                    // Alertas
+                    alert_days: number[] | null
+                    email_alert: boolean | null
+                    whatsapp_alert: boolean | null
+                    target_emails: string[] | null
+                    target_phone: string | null
+                    // Soft delete
+                    deleted_at: string | null
+                    deleted_by: string | null
                     created_at: string
                 }
                 Insert: {
@@ -64,10 +93,32 @@ export interface Database {
                     user_id: string
                     name: string
                     nit?: string | null
+                    email?: string | null
+                    phone?: string | null
+                    address?: string | null
+                    city?: string | null
+                    department?: string | null
                     classification?: 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE' | null
                     tax_regime?: string | null
                     iva_periodicity?: 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE' | null
                     is_retention_agent?: boolean
+                    has_gmf?: boolean | null
+                    requires_exogena?: boolean | null
+                    has_patrimony_tax?: boolean | null
+                    has_carbon_tax?: boolean | null
+                    has_beverage_tax?: boolean | null
+                    has_fuel_tax?: boolean | null
+                    has_plastic_tax?: boolean | null
+                    requires_rub?: boolean | null
+                    requires_transfer_pricing?: boolean | null
+                    requires_country_report?: boolean | null
+                    alert_days?: number[] | null
+                    email_alert?: boolean | null
+                    whatsapp_alert?: boolean | null
+                    target_emails?: string[] | null
+                    target_phone?: string | null
+                    deleted_at?: string | null
+                    deleted_by?: string | null
                     created_at?: string
                 }
                 Update: {
@@ -75,10 +126,32 @@ export interface Database {
                     user_id?: string
                     name?: string
                     nit?: string | null
+                    email?: string | null
+                    phone?: string | null
+                    address?: string | null
+                    city?: string | null
+                    department?: string | null
                     classification?: 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE' | null
                     tax_regime?: string | null
                     iva_periodicity?: 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE' | null
                     is_retention_agent?: boolean
+                    has_gmf?: boolean | null
+                    requires_exogena?: boolean | null
+                    has_patrimony_tax?: boolean | null
+                    has_carbon_tax?: boolean | null
+                    has_beverage_tax?: boolean | null
+                    has_fuel_tax?: boolean | null
+                    has_plastic_tax?: boolean | null
+                    requires_rub?: boolean | null
+                    requires_transfer_pricing?: boolean | null
+                    requires_country_report?: boolean | null
+                    alert_days?: number[] | null
+                    email_alert?: boolean | null
+                    whatsapp_alert?: boolean | null
+                    target_emails?: string[] | null
+                    target_phone?: string | null
+                    deleted_at?: string | null
+                    deleted_by?: string | null
                     created_at?: string
                 }
             }

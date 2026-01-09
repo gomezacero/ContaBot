@@ -15,16 +15,28 @@ export interface LocalClient {
     id: string;
     name: string;
     nit: string;
-    classification: 'NATURAL' | 'JURIDICA';
+    classification: 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE';
     tax_regime: string;
     iva_periodicity: string;
     is_retention_agent: boolean;
     has_gmf: boolean;
     requires_exogena: boolean;
     has_patrimony_tax: boolean;
+    // Impuestos especiales 2026
+    has_carbon_tax?: boolean;
+    has_beverage_tax?: boolean;
+    has_fuel_tax?: boolean;
+    has_plastic_tax?: boolean;
+    // Obligaciones especiales
+    requires_rub?: boolean;
+    requires_transfer_pricing?: boolean;
+    requires_country_report?: boolean;
+    // Alertas
     alert_days: number[];
     email_alert: boolean;
     whatsapp_alert: boolean;
+    target_emails?: string[];
+    target_phone?: string;
     created_at: string;
 }
 

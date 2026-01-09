@@ -63,10 +63,16 @@ export default function DashboardPage() {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // 1. Fetch Clients Count
+                // 1. Fetch Clients Count con todos los campos tributarios
                 const { count: clientsCount, data: clientsData } = await supabase
                     .from('clients')
-                    .select('nit, classification, tax_regime, iva_periodicity, is_retention_agent', { count: 'exact' });
+                    .select(`
+                        nit, classification, tax_regime, iva_periodicity, is_retention_agent,
+                        has_gmf, requires_exogena, has_patrimony_tax,
+                        has_carbon_tax, has_beverage_tax, has_fuel_tax, has_plastic_tax,
+                        requires_rub, requires_transfer_pricing, requires_country_report
+                    `, { count: 'exact' })
+                    .is('deleted_at', null);
 
                 // 2. Fetch Employees Count
                 const { count: employeesCount } = await supabase
@@ -87,7 +93,7 @@ export default function DashboardPage() {
                     .select('*', { count: 'exact' })
                     .gte('created_at', startOfMonth.toISOString());
 
-                // 4. Calculate Tax Alerts
+                // 4. Calculate Tax Alerts con todos los impuestos 2026
                 let totalAlerts = 0;
                 if (clientsData) {
                     clientsData.forEach(client => {
@@ -97,9 +103,18 @@ export default function DashboardPage() {
                             taxRegime: (client.tax_regime as any) === 'SIMPLE' ? 'SIMPLE' : 'ORDINARIO',
                             ivaPeriodicity: (client.iva_periodicity as any) || 'CUATRIMESTRAL',
                             isRetentionAgent: client.is_retention_agent || false,
-                            hasGmf: false,
-                            requiresExogena: false,
-                            hasPatrimonyTax: false
+                            hasGmf: client.has_gmf || false,
+                            requiresExogena: client.requires_exogena || false,
+                            hasPatrimonyTax: client.has_patrimony_tax || false,
+                            // Impuestos especiales 2026
+                            hasCarbonTax: client.has_carbon_tax || false,
+                            hasBeverageTax: client.has_beverage_tax || false,
+                            hasFuelTax: client.has_fuel_tax || false,
+                            hasPlasticTax: client.has_plastic_tax || false,
+                            // Obligaciones especiales
+                            requiresRUB: client.requires_rub || false,
+                            requiresTransferPricing: client.requires_transfer_pricing || false,
+                            requiresCountryReport: client.requires_country_report || false
                         };
 
                         if (!config.nit) return;

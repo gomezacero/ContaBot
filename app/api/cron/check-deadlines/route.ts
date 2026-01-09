@@ -76,7 +76,16 @@ export async function GET(request: Request) {
                     isRetentionAgent: client.is_retention_agent,
                     hasGmf: client.has_gmf,
                     requiresExogena: client.requires_exogena,
-                    hasPatrimonyTax: client.has_patrimony_tax
+                    hasPatrimonyTax: client.has_patrimony_tax,
+                    // Impuestos especiales 2026
+                    hasCarbonTax: client.has_carbon_tax,
+                    hasBeverageTax: client.has_beverage_tax,
+                    hasFuelTax: client.has_fuel_tax,
+                    hasPlasticTax: client.has_plastic_tax,
+                    // Obligaciones especiales
+                    requiresRUB: client.requires_rub,
+                    requiresTransferPricing: client.requires_transfer_pricing,
+                    requiresCountryReport: client.requires_country_report
                 };
 
                 // Obtener todos los eventos próximos (hasta 30 días)

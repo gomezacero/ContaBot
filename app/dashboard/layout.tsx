@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { ToastProvider } from '@/components/ui/Toast';
+import { ToastProvider, useToast } from '@/components/ui/Toast';
 import { FeedbackProvider } from '@/components/feedback';
 import { ClientProvider, useClient } from '@/lib/context/ClientContext';
+import { ClientEditModal } from '@/components/client/ClientEditModal';
 import {
     LayoutDashboard,
     ScanLine,
@@ -18,7 +19,8 @@ import {
     X,
     ChevronDown,
     Trash2,
-    Building2
+    Building2,
+    Pencil
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -27,22 +29,47 @@ interface DashboardLayoutProps {
 
 // Componente para mostrar el cliente activo en el header
 function ActiveClientIndicator() {
-    const { selectedClient, isAuthenticated } = useClient();
+    const { selectedClient, isAuthenticated, refreshClients } = useClient();
+    const [showEditModal, setShowEditModal] = useState(false);
+    const { addToast } = useToast();
 
     if (!isAuthenticated || !selectedClient) return null;
 
+    const handleSave = () => {
+        refreshClients();
+        addToast({
+            type: 'success',
+            title: 'Guardado',
+            description: 'Los datos de la empresa fueron actualizados'
+        });
+    };
+
     return (
-        <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-50 rounded-xl border border-zinc-100">
-            <Building2 className="w-4 h-4 text-emerald-600" />
-            <span className="text-sm font-semibold text-zinc-700 max-w-[200px] truncate">
-                {selectedClient.name}
-            </span>
-            {selectedClient.nit && (
-                <span className="text-xs text-zinc-400 font-mono">
-                    {selectedClient.nit}
+        <>
+            <button
+                onClick={() => setShowEditModal(true)}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 transition-colors cursor-pointer group"
+            >
+                <Building2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-semibold text-zinc-700 max-w-[200px] truncate">
+                    {selectedClient.name}
                 </span>
+                {selectedClient.nit && (
+                    <span className="text-xs text-zinc-400 font-mono">
+                        {selectedClient.nit}
+                    </span>
+                )}
+                <Pencil className="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </button>
+
+            {showEditModal && (
+                <ClientEditModal
+                    clientId={selectedClient.id}
+                    onClose={() => setShowEditModal(false)}
+                    onSave={handleSave}
+                />
             )}
-        </div>
+        </>
     );
 }
 

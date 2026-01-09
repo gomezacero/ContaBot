@@ -317,6 +317,50 @@ const {
 - `ORDINARIO` - Régimen Ordinario (General)
 - `SIMPLE` - Régimen Simple de Tributación (RST)
 
+### Modal de Edición de Cliente (2026-01-09)
+
+Modal accesible desde el header para editar toda la configuración tributaria del cliente.
+
+**Archivos:**
+- `components/client/ClientEditModal.tsx` - Modal con 6 secciones colapsables
+- `app/dashboard/layout.tsx` - ActiveClientIndicator clickeable con icono Pencil
+
+**Flujo de Datos:**
+```
+ClientEditModal → Supabase DB → calendario/page.tsx → getTaxDeadlines() → TaxEvent[]
+                             → dashboard/page.tsx → Alertas pendientes
+                             → cron/check-deadlines → Email alerts
+```
+
+**Secciones del Modal:**
+1. Información Básica (name, nit, classification)
+2. Contacto (email, phone, address, city, department)
+3. Configuración Tributaria (tax_regime, iva_periodicity, is_retention_agent, has_gmf, requires_exogena, has_patrimony_tax)
+4. Impuestos Especiales 2026 (has_carbon_tax, has_beverage_tax, has_fuel_tax, has_plastic_tax)
+5. Obligaciones Especiales (requires_rub, requires_transfer_pricing, requires_country_report)
+6. Alertas (alert_days, email_alert, target_emails, whatsapp_alert, target_phone)
+
+**Campos de Impuestos 2026 en TaxClientConfig:**
+```typescript
+interface TaxClientConfig {
+    // ... campos básicos
+    hasCarbonTax?: boolean;       // Impuesto al Carbono (bimestral)
+    hasBeverageTax?: boolean;     // Bebidas Ultraprocesadas (bimestral)
+    hasFuelTax?: boolean;         // Gasolina/ACPM (mensual)
+    hasPlasticTax?: boolean;      // Plásticos un solo uso (anual Feb)
+    requiresRUB?: boolean;        // Registro Único Beneficiarios (anual Abr)
+    requiresTransferPricing?: boolean;  // Precios Transferencia (Sep)
+    requiresCountryReport?: boolean;    // Informe País por País (Dic)
+}
+```
+
+**Archivos Actualizados para Integración Completa:**
+- `app/api/cron/check-deadlines/route.ts` - Incluye campos 2026 en TaxClientConfig
+- `app/dashboard/page.tsx` - Query y cálculo de alertas con campos 2026
+- `lib/local-storage.ts` - LocalClient interface con campos 2026
+- `lib/migrate-local-data.ts` - Migración preserva campos 2026
+- `types/database.ts` - Schema completo de clients table
+
 ## Pending Migrations
 
 Run these if database is out of sync:
