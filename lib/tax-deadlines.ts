@@ -6,7 +6,7 @@ import { TaxEvent } from '@/types/payroll';
 export interface TaxClientConfig {
     nit: string;
     classification: 'NATURAL' | 'JURIDICA' | 'GRAN_CONTRIBUYENTE';
-    taxRegime: 'ORDINARIO' | 'SIMPLE' | 'ESPECIAL';
+    taxRegime: 'ORDINARIO' | 'SIMPLE';
     ivaPeriodicity: 'BIMESTRAL' | 'CUATRIMESTRAL' | 'NONE';
     isRetentionAgent: boolean;
     hasGmf: boolean;
@@ -132,8 +132,8 @@ const IVA_BIMESTRAL_2025 = {
     p4: { month: '09', days: ['09', '10', '11', '12', '15', '16', '17', '18', '19', '22'], year: 2025 },
     // P5 (Sep-Oct) → Noviembre 2025 (NIT 1-0)
     p5: { month: '11', days: ['11', '12', '13', '14', '17', '18', '19', '20', '21', '24'], year: 2025 },
-    // P6 (Nov-Dic) → Enero 2026 (NIT 1-0) ← VIGENTE PARA 2026
-    p6: { month: '01', days: ['13', '14', '15', '16', '19', '20', '21', '22', '23', '26'], year: 2026 },
+    // P6 (Nov-Dic 2024) → Enero 2025 (NIT 1-0) - Calendario 2025 (AG 2024)
+    p6: { month: '01', days: ['13', '14', '15', '16', '17', '20', '21', '22', '23', '24'], year: 2025 },
 };
 
 // IVA Cuatrimestral 2025
@@ -142,8 +142,8 @@ const IVA_CUATRIMESTRAL_2025 = {
     p1: { month: '05', days: ['12', '13', '14', '15', '16', '19', '20', '21', '22', '23'], year: 2025 },
     // P2 (May-Ago) → Septiembre 2025 (NIT 1-0)
     p2: { month: '09', days: ['09', '10', '11', '12', '15', '16', '17', '18', '19', '22'], year: 2025 },
-    // P3 (Sep-Dic) → Enero 2026 (NIT 1-0) ← VIGENTE PARA 2026
-    p3: { month: '01', days: ['13', '14', '15', '16', '19', '20', '21', '22', '23', '26'], year: 2026 },
+    // P3 (Sep-Dic 2024) → Enero 2025 (NIT 1-0) - Calendario 2025 (AG 2024)
+    p3: { month: '01', days: ['13', '14', '15', '16', '17', '20', '21', '22', '23', '24'], year: 2025 },
 };
 
 // Retencion en la Fuente 2025 (12 meses)
@@ -242,6 +242,25 @@ const EXOGENA_2025 = {
     grandes: { month: '04', days: ['22', '23', '24', '25', '28', '29', '30', '02', '05', '06'], year: 2025 },
     juridicas: { month: '05', days: ['06', '07', '08', '09', '12', '13', '14', '15', '16', '19'], year: 2025 },
     naturales: { month: '05', days: ['19', '20', '21', '22', '23', '26', '27', '28', '29', '30'], year: 2025 },
+};
+
+// ==========================================
+// IVA Nov-Dic 2025 → Enero 2026 (Año Gravable 2025)
+// Estas fechas corresponden al último bimestre del AG 2025 que vence en enero 2026
+// ==========================================
+
+// IVA Bimestral - Período 6 (Nov-Dic 2025) → Enero 2026 según Calendario DIAN 2026
+const IVA_BIMESTRAL_AG2025_P6 = {
+    month: '01',
+    days: ['13', '14', '15', '16', '19', '20', '21', '22', '23', '26'],
+    year: 2026
+};
+
+// IVA Cuatrimestral - Período 3 (Sep-Dic 2025) → Enero 2026 según Calendario DIAN 2026
+const IVA_CUATRIMESTRAL_AG2025_P3 = {
+    month: '01',
+    days: ['13', '14', '15', '16', '19', '20', '21', '22', '23', '26'],
+    year: 2026
 };
 
 // ==========================================
@@ -878,51 +897,81 @@ function getTaxDeadlines2025(client: TaxClientConfig): TaxEvent[] {
         }
     }
 
-    // ========== IVA 2025 ==========
+    // ========== IVA 2025 (Año Gravable 2024) ==========
+    // Períodos 1-5 corresponden a bimestres de 2024 con vencimiento en 2025
+    // Período 6 (Nov-Dic 2024) vence en enero 2025
     if (client.taxRegime !== 'SIMPLE') {
         if (client.ivaPeriodicity === 'BIMESTRAL') {
             const periods = [
-                { key: 'p1', name: 'Ene-Feb 2025', ...IVA_BIMESTRAL_2025.p1 },
-                { key: 'p2', name: 'Mar-Abr 2025', ...IVA_BIMESTRAL_2025.p2 },
-                { key: 'p3', name: 'May-Jun 2025', ...IVA_BIMESTRAL_2025.p3 },
-                { key: 'p4', name: 'Jul-Ago 2025', ...IVA_BIMESTRAL_2025.p4 },
-                { key: 'p5', name: 'Sep-Oct 2025', ...IVA_BIMESTRAL_2025.p5 },
-                { key: 'p6', name: 'Nov-Dic 2025', ...IVA_BIMESTRAL_2025.p6 },
+                { key: 'p1', name: 'Ene-Feb 2024', ...IVA_BIMESTRAL_2025.p1, anoGravable: 2024 },
+                { key: 'p2', name: 'Mar-Abr 2024', ...IVA_BIMESTRAL_2025.p2, anoGravable: 2024 },
+                { key: 'p3', name: 'May-Jun 2024', ...IVA_BIMESTRAL_2025.p3, anoGravable: 2024 },
+                { key: 'p4', name: 'Jul-Ago 2024', ...IVA_BIMESTRAL_2025.p4, anoGravable: 2024 },
+                { key: 'p5', name: 'Sep-Oct 2024', ...IVA_BIMESTRAL_2025.p5, anoGravable: 2024 },
+                { key: 'p6', name: 'Nov-Dic 2024', ...IVA_BIMESTRAL_2025.p6, anoGravable: 2024 },
             ];
             periods.forEach((p, idx) => {
                 const dateStr = `${p.year}-${p.month}-${p.days[lastDigit]}`;
                 if (isStillValid(dateStr)) {
                     events.push({
                         id: `2025-iva-bim-${idx + 1}`,
-                        title: `IVA Bim ${p.name} (AG 2024)`,
+                        title: `IVA Bim ${p.name}`,
                         date: dateStr,
                         type: 'IVA',
                         status: 'PENDING',
-                        description: `Declaracion y pago IVA Bimestre ${p.name} - Año Gravable 2024`,
+                        description: `Declaracion y pago IVA Bimestre ${p.name} - Año Gravable ${p.anoGravable}`,
                     });
                 }
             });
+
+            // IVA Nov-Dic 2025 (AG 2025) → Vence Enero 2026
+            const p6_2025 = IVA_BIMESTRAL_AG2025_P6;
+            const dateStrP6_2025 = `${p6_2025.year}-${p6_2025.month}-${p6_2025.days[lastDigit]}`;
+            if (isStillValid(dateStrP6_2025)) {
+                events.push({
+                    id: '2025-iva-bim-ag2025-p6',
+                    title: 'IVA Bim Nov-Dic 2025',
+                    date: dateStrP6_2025,
+                    type: 'IVA',
+                    status: 'PENDING',
+                    description: 'Declaracion y pago IVA Bimestre Nov-Dic 2025 - Año Gravable 2025',
+                });
+            }
         }
 
         if (client.ivaPeriodicity === 'CUATRIMESTRAL') {
             const periods = [
-                { key: 'p1', name: 'Ene-Abr 2025', ...IVA_CUATRIMESTRAL_2025.p1 },
-                { key: 'p2', name: 'May-Ago 2025', ...IVA_CUATRIMESTRAL_2025.p2 },
-                { key: 'p3', name: 'Sep-Dic 2025', ...IVA_CUATRIMESTRAL_2025.p3 },
+                { key: 'p1', name: 'Ene-Abr 2024', ...IVA_CUATRIMESTRAL_2025.p1, anoGravable: 2024 },
+                { key: 'p2', name: 'May-Ago 2024', ...IVA_CUATRIMESTRAL_2025.p2, anoGravable: 2024 },
+                { key: 'p3', name: 'Sep-Dic 2024', ...IVA_CUATRIMESTRAL_2025.p3, anoGravable: 2024 },
             ];
             periods.forEach((p, idx) => {
                 const dateStr = `${p.year}-${p.month}-${p.days[lastDigit]}`;
                 if (isStillValid(dateStr)) {
                     events.push({
                         id: `2025-iva-cuat-${idx + 1}`,
-                        title: `IVA Cuat ${p.name} (AG 2024)`,
+                        title: `IVA Cuat ${p.name}`,
                         date: dateStr,
                         type: 'IVA',
                         status: 'PENDING',
-                        description: `Declaracion y pago IVA Cuatrimestre ${p.name} - Año Gravable 2024`,
+                        description: `Declaracion y pago IVA Cuatrimestre ${p.name} - Año Gravable ${p.anoGravable}`,
                     });
                 }
             });
+
+            // IVA Sep-Dic 2025 (AG 2025) → Vence Enero 2026
+            const p3_2025 = IVA_CUATRIMESTRAL_AG2025_P3;
+            const dateStrP3_2025 = `${p3_2025.year}-${p3_2025.month}-${p3_2025.days[lastDigit]}`;
+            if (isStillValid(dateStrP3_2025)) {
+                events.push({
+                    id: '2025-iva-cuat-ag2025-p3',
+                    title: 'IVA Cuat Sep-Dic 2025',
+                    date: dateStrP3_2025,
+                    type: 'IVA',
+                    status: 'PENDING',
+                    description: 'Declaracion y pago IVA Cuatrimestre Sep-Dic 2025 - Año Gravable 2025',
+                });
+            }
         }
     }
 

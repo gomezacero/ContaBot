@@ -27,12 +27,13 @@ import {
     UserCircle2,
     Layers,
     ShieldCheck,
-    CalendarPlus,
     Calendar as CalendarIcon,
     Users,
     CloudUpload
 } from 'lucide-react';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
+import { useFeedback } from '@/components/feedback';
+import { useClient } from '@/lib/context/ClientContext';
 import {
     getLocalClients,
     addLocalClient,
@@ -84,15 +85,40 @@ export default function CalendarioPage() {
     const supabase = createClient();
     const { isAuthenticated, isLoading: authLoading } = useAuthStatus();
     const isGuest = !isAuthenticated;
+    const { trackAction } = useFeedback();
+
+    // Global client context for sync - calendario has extended DBClient with more fields
+    const {
+        selectedClientId: globalSelectedClientId,
+        setSelectedClientId: setGlobalSelectedClientId,
+        refreshClients: refreshGlobalClients
+    } = useClient();
 
     // View state - key change from original
     const [view, setView] = useState<'dashboard' | 'client_detail' | 'add_client'>('dashboard');
 
+    // Extended client data specific to calendario (more fields than basic ClientInfo)
     const [clients, setClients] = useState<DBClient[]>([]);
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
-    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+    const [selectedClientId, setSelectedClientIdLocal] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Sync local selectedClientId with global context
+    const setSelectedClientId = useCallback((id: string | null) => {
+        setSelectedClientIdLocal(id);
+        // Also update global context so header shows the selected client
+        if (isAuthenticated) {
+            setGlobalSelectedClientId(id);
+        }
+    }, [isAuthenticated, setGlobalSelectedClientId]);
+
+    // Sync from global on mount (if user selected client in another module)
+    useEffect(() => {
+        if (isAuthenticated && globalSelectedClientId && !selectedClientId) {
+            setSelectedClientIdLocal(globalSelectedClientId);
+        }
+    }, [isAuthenticated, globalSelectedClientId, selectedClientId]);
 
     // Delete confirmation state
     const [deleteTarget, setDeleteTarget] = useState<DBClient | null>(null);
@@ -357,8 +383,15 @@ export default function CalendarioPage() {
             }
 
             await loadClients();
+            // Also refresh global clients so other modules see the new/updated client
+            if (isAuthenticated) {
+                await refreshGlobalClients();
+            }
             setView('dashboard');
             resetForm();
+
+            // Track para feedback después de guardar cliente exitosamente
+            trackAction('calendario', 'save_client');
         } catch (err) {
             console.error('Error saving client:', err);
             setError('Error guardando calendario');
@@ -395,6 +428,10 @@ export default function CalendarioPage() {
             if (selectedClientId === deleteTarget.id) {
                 setSelectedClientId(null);
                 setView('dashboard');
+            }
+            // Also refresh global clients so other modules see the deletion
+            if (isAuthenticated) {
+                await refreshGlobalClients();
             }
             setDeleteTarget(null);
             setDeleteConfirmText('');
@@ -487,7 +524,7 @@ export default function CalendarioPage() {
         setEditConfig({
             ...editConfig,
             classification: 'NATURAL',
-            taxRegime: 'SIMPLIFICADO',
+            taxRegime: 'ORDINARIO',
             ivaPeriodicity: 'NONE'
         });
     };
@@ -720,11 +757,6 @@ export default function CalendarioPage() {
                                     >
                                         <option value="ORDINARIO">Régimen Ordinario</option>
                                         <option value="SIMPLE">Régimen SIMPLE (RST)</option>
-                                        {editConfig.classification === 'NATURAL' ? (
-                                            <option value="SIMPLIFICADO">Régimen Simplificado</option>
-                                        ) : (
-                                            <option value="ESPECIAL">Régimen Especial (ESAL)</option>
-                                        )}
                                     </select>
                                 </div>
 
@@ -1049,7 +1081,6 @@ export default function CalendarioPage() {
                                             <tr>
                                                 <th className="px-6 py-4 font-bold">Fecha</th>
                                                 <th className="px-6 py-4 font-bold">Obligación</th>
-                                                <th className="px-6 py-4 font-bold text-center">Sync</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-zinc-100">
@@ -1088,14 +1119,11 @@ export default function CalendarioPage() {
                                                             </div>
                                                             <p className="text-xs text-zinc-500 truncate max-w-xs">{evt.description}</p>
                                                         </td>
-                                                        <td className="px-6 py-4 text-center">
-                                                            <CalendarPlus className="w-5 h-5 text-zinc-200 inline-block" />
-                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td colSpan={3} className="px-6 py-10 text-center text-zinc-500 italic">
+                                                    <td colSpan={2} className="px-6 py-10 text-center text-zinc-500 italic">
                                                         No hay obligaciones pendientes registradas.
                                                     </td>
                                                 </tr>

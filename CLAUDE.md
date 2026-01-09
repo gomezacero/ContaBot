@@ -185,12 +185,137 @@ Allows accountants to calculate payroll/liquidations using historical SMMLV valu
 - **COP Format Rule**: Interprets Colombian peso thousands separators correctly
 
 **Files:**
-- `app/api/ocr/route.ts` - EXTRACTION_PROMPT rules 11-13
+- `app/api/ocr/route.ts` - EXTRACTION_PROMPT rules 11-16
 - `lib/services/ocr-validation-service.ts` - Calculation validation
 - `lib/services/excel-export-service.ts` - Accounting Excel export
 
+### Digitador OCR - Nested Accordion UI (2026-01-09)
+
+Estructura jerárquica Proveedor → Facturas → Items para mejor organización de documentos.
+
+**Arquitectura de Componentes:**
+
+```
+app/dashboard/gastos/
+├── page.tsx                      # Página principal, lógica de agrupación
+├── types.ts                      # OCRResult, OCRItem interfaces
+└── components/
+    ├── InvoiceGroup.tsx          # Acordeón de proveedor (nivel 1)
+    ├── InvoiceCard.tsx           # Acordeón de factura individual (nivel 2)
+    ├── ValidationBadge.tsx       # Badge de errores/alertas de validación
+    └── ValidationDetails.tsx     # Detalles expandidos de validación
+```
+
+**Interfaces Principales:**
+
+```typescript
+// InvoiceData - Factura individual dentro de un grupo
+interface InvoiceData {
+    id?: string;                  // ID de base de datos (requerido para eliminación)
+    invoiceNumber: string;
+    date: string;
+    fileName: string;
+    items: OCRItem[];
+    subtotal: number;
+    iva: number;
+    iva_rate?: number;
+    tax_inc: number;              // Impoconsumo
+    tip: number;                  // Propina/servicio
+    aiu?: { administracion, imprevistos, utilidad, base_gravable };
+    retentions: { reteFuente, reteIca, reteIva };
+    total: number;
+    validation?: ValidationResult;
+}
+
+// GroupedInvoiceData - Proveedor con sus facturas
+interface GroupedInvoiceData {
+    nit: string;
+    entity: string;
+    currency: string;
+    invoiceCount: number;
+    invoices: InvoiceData[];      // Array de facturas individuales
+    totals: { subtotal, iva, tax_inc, tip, aiu?, retentions, total };
+    validation?: ValidationResult;
+}
+```
+
+**Funciones de Eliminación:**
+
+- `handleDeleteGroup(entity)` - Elimina todas las facturas del proveedor
+- `handleDeleteInvoice(invoiceId, fileName)` - Elimina una factura específica
+- `handleDeleteItem(invoiceId, fileName, itemIndex)` - Elimina un item específico
+
+**Flujo de Datos:**
+
+1. OCR procesa documento → API retorna `OCRResult`
+2. Se inserta en DB y se recupera `id` generado
+3. Estado local mantiene `results: OCRResult[]` con IDs
+4. Agrupación en render: `results.reduce()` → `Map<string, GroupedInvoiceData>`
+5. Render: `InvoiceGroup` → `InvoiceCard` → Items table
+
+**Modales de Confirmación con Seguridad:**
+
+- "Limpiar Todo": Requiere escribir "BORRAR TODO" para confirmar
+- "Eliminar Proveedor": Muestra lista de facturas, requiere "ELIMINAR"
+
 ### Soft Delete System
 All deletions use soft-delete with `deleted_at` timestamp. Papelera (recycle bin) available at `/dashboard/papelera`.
+
+### Global Client Context & Analytics (2026-01-09)
+
+Sistema de contexto global para sincronización de cliente seleccionado entre módulos + Analytics.
+
+**Archivos:**
+- `lib/context/ClientContext.tsx` - Provider global para estado de cliente
+- `app/dashboard/layout.tsx` - ActiveClientIndicator en header
+- `components/analytics/GoogleAnalytics.tsx` - Google Analytics (G-GWMZ2X99PG)
+- `next.config.ts` - CSP actualizado para analytics
+
+**Uso del ClientContext:**
+```typescript
+import { useClient } from '@/lib/context/ClientContext';
+
+const {
+    clients,              // Lista de clientes
+    selectedClientId,     // ID del cliente activo
+    selectedClient,       // Objeto completo del cliente activo
+    setSelectedClientId,  // Cambiar cliente (persiste en localStorage)
+    refreshClients,       // Recargar lista desde Supabase
+    isLoading,
+    isAuthenticated
+} = useClient();
+```
+
+**Registro con user_type:**
+- `app/register/page.tsx` - Campo `userType`: 'contador' | 'firma' | 'empresa'
+- `types/database.ts` - Actualizado tipo `user_type` en profiles
+
+### Calendario Tributario - Correcciones (2026-01-09)
+
+**Problema resuelto:** Conflicto entre calendarios 2025/2026 - las fechas de IVA mostraban año incorrecto.
+
+**Archivos modificados:**
+- `lib/tax-deadlines.ts`:
+  - Corregido `IVA_BIMESTRAL_2025.p6` y `IVA_CUATRIMESTRAL_2025.p3` (año 2025, no 2026)
+  - Agregadas constantes `IVA_BIMESTRAL_AG2025_P6` e `IVA_CUATRIMESTRAL_AG2025_P3` para vencimientos enero 2026
+  - Tipo `TaxClientConfig.taxRegime` ahora solo acepta `'ORDINARIO' | 'SIMPLE'`
+  - Etiquetas de año gravable clarificadas en descripciones
+
+- `app/dashboard/calendario/page.tsx`:
+  - Eliminada columna "Sync" de la tabla de eventos
+  - Eliminada opción "ESPECIAL" del select de régimen tributario
+  - Solo quedan: Régimen Ordinario y Régimen SIMPLE (RST)
+
+**Fechas corregidas para NIT terminado en 9:**
+| Período | Año Gravable | Fecha Vencimiento |
+|---------|--------------|-------------------|
+| IVA Nov-Dic 2024 | AG 2024 | 23 enero 2025 |
+| IVA Nov-Dic 2025 | AG 2025 | 23 enero 2026 |
+| IVA Nov-Dic 2026 | AG 2026 | 25 enero 2027 |
+
+**Regímenes Tributarios válidos:**
+- `ORDINARIO` - Régimen Ordinario (General)
+- `SIMPLE` - Régimen Simple de Tributación (RST)
 
 ## Pending Migrations
 

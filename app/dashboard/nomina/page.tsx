@@ -13,7 +13,7 @@ import {
     TipoPrimaAnticipada
 } from '@/types/payroll';
 import { calculatePayroll, formatCurrency, createDefaultEmployee, calculateLiquidation } from '@/lib/calculations';
-import { generatePayrollPDF, generateLiquidationPDF } from '@/lib/pdf-generator';
+import { generatePayrollPDF, generateLiquidationPDF, generatePayrollPDFBlob, generateLiquidationPDFBlob } from '@/lib/pdf-generator';
 import { SMMLV_2026, PARAMETROS_NOMINA, AnoBase } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -40,23 +40,23 @@ import {
     User,
     Eye,
     X,
-    Star,
-    MessageSquare,
-    Send,
-    ThumbsUp,
-    HelpCircle, // Added
+    HelpCircle,
     Settings,
     MinusCircle,
     ListMinus,
     Gift,
     Palmtree,
     PiggyBank,
-    Percent
+    Percent,
+    UserPlus
 } from 'lucide-react';
 import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
 import { Tooltip } from '@/components/ui/Tooltip';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import { useToast } from '@/components/ui/Toast';
+import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
+import { useFeedback } from '@/components/feedback';
+import { useClient } from '@/lib/context/ClientContext';
 
 interface DBEmployee {
     id: string;
@@ -88,11 +88,6 @@ interface DBEmployee {
     };
 }
 
-interface DBClient {
-    id: string;
-    name: string;
-    nit: string | null;
-}
 
 // Convert DB employee to PayrollInput
 function dbToPayrollInput(emp: DBEmployee): PayrollInput {
@@ -214,10 +209,12 @@ const ResultRow: React.FC<{ label: string; value: number; isBold?: boolean; colo
 
 export default function NominaPage() {
     const supabase = createClient();
+    const { isAuthenticated } = useAuthStatus();
+
+    // Client state from global context
+    const { clients, selectedClientId, setSelectedClientId, refreshClients, isLoading: loadingClients } = useClient();
 
     // State
-    const [clients, setClients] = useState<DBClient[]>([]);
-    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [dbEmployees, setDbEmployees] = useState<DBEmployee[]>([]);
     const [localEmployees, setLocalEmployees] = useState<PayrollInput[]>([createDefaultEmployee(1)]);
     const [activeEmployeeId, setActiveEmployeeId] = useState<string>('');
@@ -240,13 +237,9 @@ export default function NominaPage() {
     const [anticipos, setAnticipos] = useState<AnticiposPrestaciones>({ ...DEFAULT_ANTICIPOS });
     const [deduccionesPersonalizadas, setDeduccionesPersonalizadas] = useState<DeduccionPersonalizada[]>([]);
 
-    // Preview and Feedback states
+    // Preview state
     const [showPreviewModal, setShowPreviewModal] = useState<'nomina' | 'liquidacion' | null>(null);
-    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-    const [feedbackRating, setFeedbackRating] = useState(0);
-    const [feedbackComment, setFeedbackComment] = useState('');
-    const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-    const [submittingFeedback, setSubmittingFeedback] = useState(false);
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
     // Delete modal state
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; employeeId: string; employeeName: string }>({
@@ -255,6 +248,7 @@ export default function NominaPage() {
         employeeName: ''
     });
     const { addToast } = useToast();
+    const { trackAction } = useFeedback();
 
     // Determine which employees to show
     const employees = selectedClientId
@@ -366,22 +360,6 @@ export default function NominaPage() {
             }
         }
     }, [activeEmployee?.id]); // Solo cuando cambia el ID del empleado
-
-    // Load clients on mount
-    useEffect(() => {
-        const loadClients = async () => {
-            try {
-                const { data, error } = await supabase.from('clients').select('id, name, nit').order('name');
-                if (error) throw error;
-                setClients(data || []);
-            } catch {
-                console.error('Error loading clients');
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadClients();
-    }, [supabase]);
 
     // Load employees when client changes
     useEffect(() => {
@@ -692,7 +670,9 @@ export default function NominaPage() {
                 .single();
 
             if (error) throw error;
-            setClients([...clients, data]);
+
+            // Refresh clients from context and select the new one
+            await refreshClients();
             setSelectedClientId(data.id);
             setShowClientModal(false);
             setNewClientName('');
@@ -704,35 +684,7 @@ export default function NominaPage() {
         }
     };
 
-    // Handle feedback submission
-    const handleSubmitFeedback = async () => {
-        if (feedbackRating === 0) return;
-        setSubmittingFeedback(true);
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-
-            await supabase.from('module_feedback').insert({
-                user_id: user?.id || null,
-                module_name: 'nomina',
-                rating: feedbackRating,
-                comment: feedbackComment.trim() || null,
-            });
-
-            setFeedbackSubmitted(true);
-            setTimeout(() => {
-                setShowFeedbackModal(false);
-                setFeedbackSubmitted(false);
-                setFeedbackRating(0);
-                setFeedbackComment('');
-            }, 2000);
-        } catch {
-            setError('Error enviando feedback');
-        } finally {
-            setSubmittingFeedback(false);
-        }
-    };
-
-    if (loading && clients.length === 0) {
+    if ((loading || loadingClients) && clients.length === 0) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -766,7 +718,12 @@ export default function NominaPage() {
                         onChange={(e) => setSelectedClientId(e.target.value || null)}
                         className="px-3 py-2 border border-zinc-200 rounded-lg text-sm font-medium bg-zinc-50 focus:ring-2 focus:ring-emerald-500 outline-none min-w-[200px]"
                     >
-                        <option value="">📝 Modo Demo (Local)</option>
+                        {!isAuthenticated && (
+                            <option value="">📝 Modo Demo (Local)</option>
+                        )}
+                        {isAuthenticated && clients.length === 0 && (
+                            <option value="" disabled>Sin clientes - Crea uno primero</option>
+                        )}
                         {clients.map(client => (
                             <option key={client.id} value={client.id}>
                                 🏢 {client.name}
@@ -788,6 +745,32 @@ export default function NominaPage() {
                     <AlertCircle className="w-5 h-5" />
                     <span className="font-medium">{error}</span>
                     <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">✕</button>
+                </div>
+            )}
+
+            {/* Header de Empresa Destacado */}
+            {selectedClientId && (
+                <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md">
+                            <Building2 className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white">
+                                {clients.find(c => c.id === selectedClientId)?.name || 'Empresa'}
+                            </h3>
+                            <p className="text-zinc-400 text-sm">
+                                NIT: {clients.find(c => c.id === selectedClientId)?.nit || 'No registrado'}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleAddEmployee}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-md"
+                    >
+                        <UserPlus className="w-5 h-5" />
+                        <span className="hidden sm:inline">Agregar Empleado</span>
+                    </button>
                 </div>
             )}
 
@@ -839,34 +822,34 @@ export default function NominaPage() {
                 </div>
 
                 {/* Tab Switcher - Right Side (mismo ancho que panel derecho: 1/3 - gap) */}
-                <div className="hidden lg:flex items-center gap-1 ml-4 flex-shrink-0 bg-zinc-50 p-1.5 rounded-xl w-[calc(33.333%-24px)]">
+                <div className="hidden lg:flex items-center gap-1.5 ml-4 flex-shrink-0 bg-zinc-100 p-1.5 rounded-xl w-[calc(33.333%-24px)] border border-zinc-200">
                     <button
                         onClick={() => setActiveTab('nomina')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'nomina' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-zinc-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
                     >
                         <DollarSign className="w-4 h-4" />
                         Nómina
                     </button>
                     <button
                         onClick={() => setActiveTab('liquidacion')}
-                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${activeTab === 'liquidacion' ? 'bg-amber-500 text-white shadow-md' : 'bg-white text-zinc-500 hover:bg-amber-50 hover:text-amber-600'}`}
                     >
                         <Wallet className="w-4 h-4" />
                         Liquidación
                     </button>
                 </div>
                 {/* Tab Switcher - Mobile */}
-                <div className="flex lg:hidden items-center gap-1 ml-4 flex-shrink-0 bg-zinc-50 p-1 rounded-xl">
+                <div className="flex lg:hidden items-center gap-1.5 ml-4 flex-shrink-0 bg-zinc-100 p-1 rounded-xl border border-zinc-200">
                     <button
                         onClick={() => setActiveTab('nomina')}
-                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'nomina' ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'nomina' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-zinc-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
                     >
                         <DollarSign className="w-4 h-4" />
                         Nómina
                     </button>
                     <button
                         onClick={() => setActiveTab('liquidacion')}
-                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'liquidacion' ? 'bg-white text-amber-700 shadow-sm' : 'text-zinc-400 hover:text-zinc-600'}`}
+                        className={`px-3 py-2 rounded-lg text-sm font-bold transition-all duration-300 flex items-center gap-2 ${activeTab === 'liquidacion' ? 'bg-amber-500 text-white shadow-md' : 'bg-white text-zinc-500 hover:bg-amber-50 hover:text-amber-600'}`}
                     >
                         <Wallet className="w-4 h-4" />
                         Liquidación
@@ -880,12 +863,131 @@ export default function NominaPage() {
                 <div className="lg:col-span-2 lg:h-full lg:overflow-y-auto lg:pr-3 space-y-4 scrollbar-thin">
                     {activeEmployee && (
                         <>
+                            {/* PARÁMETROS BASE DE CÁLCULO - Indicador Compacto */}
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                                        <Calendar className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-emerald-800">Base {anoBase}</span>
+                                            {anoBase !== 2026 && (
+                                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">Año anterior</span>
+                                            )}
+                                        </div>
+                                        <span className="text-sm text-emerald-600">
+                                            SMMLV ${smmlvOverride.toLocaleString('es-CO')} · Aux. ${auxOverride.toLocaleString('es-CO')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Tooltip content="Para liquidaciones de empleados que iniciaron en años anteriores, ajuste los parámetros según la regla de los últimos 6 meses trabajados." />
+                                    <button
+                                        onClick={() => {
+                                            const section = document.getElementById('parametros-base-section');
+                                            if (section) {
+                                                section.classList.toggle('hidden');
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors"
+                                    >
+                                        Modificar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Panel expandible de parámetros */}
+                            <div id="parametros-base-section" className="hidden bg-white border border-emerald-200 rounded-xl p-4 space-y-4 -mt-2">
+                                <div className="grid grid-cols-3 gap-4">
+                                    {/* Selector de Año */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Año Base</label>
+                                        <select
+                                            className="w-full bg-zinc-50 border border-emerald-200 rounded-lg py-2 px-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                            value={anoBase}
+                                            onChange={(e) => {
+                                                const year = Number(e.target.value) as AnoBase;
+                                                setAnoBase(year);
+                                                const params = PARAMETROS_NOMINA[year];
+                                                setSmmlvOverride(params.smmlv);
+                                                setAuxOverride(params.auxTransporte);
+                                            }}
+                                        >
+                                            <option value={2025}>2025</option>
+                                            <option value={2026}>2026 (Actual)</option>
+                                        </select>
+                                    </div>
+
+                                    {/* SMMLV Editable */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">SMMLV</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>
+                                            <input
+                                                type="text"
+                                                value={smmlvOverride.toLocaleString('es-CO')}
+                                                onChange={(e) => {
+                                                    const v = e.target.value.replace(/\D/g, '');
+                                                    setSmmlvOverride(Number(v) || 0);
+                                                }}
+                                                className="w-full bg-zinc-50 border border-emerald-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Auxilio Transporte Editable */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Aux. Transporte</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>
+                                            <input
+                                                type="text"
+                                                value={auxOverride.toLocaleString('es-CO')}
+                                                onChange={(e) => {
+                                                    const v = e.target.value.replace(/\D/g, '');
+                                                    setAuxOverride(Number(v) || 0);
+                                                }}
+                                                className="w-full bg-zinc-50 border border-emerald-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-zinc-500">
+                                    <strong>Regla 6 meses:</strong> Para liquidaciones, use el SMMLV del año en que el empleado trabajó los últimos 6 meses antes de retirarse.
+                                </p>
+                            </div>
+
                             {/* I. DATOS GENERALES */}
                             <Section title="I. Datos Generales y Periodo" icon={<Calendar className="w-4 h-4" />} isOpen={openSections.has('section1')} onToggle={() => toggleSection('section1')}>
                                 <div className="grid grid-cols-2 gap-4">
+                                    {/* Datos del Empleador (auto-llenados desde cliente) */}
+                                    {selectedClientId && (
+                                        <>
+                                            <div className="col-span-1">
+                                                <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">Empleador</label>
+                                                <input
+                                                    type="text"
+                                                    value={clients.find(c => c.id === selectedClientId)?.name || ''}
+                                                    disabled
+                                                    className="w-full p-2 bg-zinc-100 border border-zinc-200 rounded-lg text-sm text-zinc-600 cursor-not-allowed"
+                                                />
+                                            </div>
+                                            <div className="col-span-1">
+                                                <label className="block text-xs font-semibold text-zinc-400 uppercase mb-1">NIT Empleador</label>
+                                                <input
+                                                    type="text"
+                                                    value={clients.find(c => c.id === selectedClientId)?.nit || 'No registrado'}
+                                                    disabled
+                                                    className="w-full p-2 bg-zinc-100 border border-zinc-200 rounded-lg text-sm text-zinc-600 cursor-not-allowed"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                     <Input label="Inicio Periodo" type="date" value={activeEmployee.startDate} onChange={v => handleInputChange('startDate', v)} />
                                     <Input label="Fin Periodo" type="date" value={activeEmployee.endDate} onChange={v => handleInputChange('endDate', v)} />
                                     <Input label="Nombre Empleado" type="text" value={activeEmployee.name} onChange={v => handleInputChange('name', v)} placeholder="" />
+                                    <Input label="Cédula Empleado" type="text" value={activeEmployee.documentNumber} onChange={v => handleInputChange('documentNumber', v)} placeholder="Número de identificación" />
                                     <Input label="Salario Básico" type="money" value={activeEmployee.baseSalary} onChange={v => handleInputChange('baseSalary', v)} />
                                     <div className="col-span-1">
                                         <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Tipo Contrato</label>
@@ -907,84 +1009,6 @@ export default function NominaPage() {
                                     </div>
                                 </div>
                             </Section>
-
-                            {/* PARÁMETROS BASE DE CÁLCULO */}
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Settings className="w-4 h-4 text-emerald-600" />
-                                    <h3 className="text-sm font-semibold text-emerald-800">Parámetros Base de Cálculo</h3>
-                                    <Tooltip content="Para liquidaciones de empleados que iniciaron en años anteriores, seleccione el año base correspondiente. Los valores de SMMLV y Auxilio se ajustarán automáticamente." />
-                                </div>
-                                <p className="text-xs text-emerald-600 mb-3">
-                                    Útil para liquidar empleados con la base salarial de años anteriores (regla de los últimos 6 meses).
-                                </p>
-
-                                <div className="grid grid-cols-3 gap-4">
-                                    {/* Selector de Año */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Año Base</label>
-                                        <select
-                                            className="w-full bg-white border border-emerald-200 rounded-lg py-2 px-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                            value={anoBase}
-                                            onChange={(e) => {
-                                                const year = Number(e.target.value) as AnoBase;
-                                                setAnoBase(year);
-                                                const params = PARAMETROS_NOMINA[year];
-                                                setSmmlvOverride(params.smmlv);
-                                                setAuxOverride(params.auxTransporte);
-                                            }}
-                                        >
-                                            <option value={2024}>2024</option>
-                                            <option value={2025}>2025</option>
-                                            <option value={2026}>2026 (Actual)</option>
-                                        </select>
-                                    </div>
-
-                                    {/* SMMLV Editable */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">SMMLV</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>
-                                            <input
-                                                type="text"
-                                                value={smmlvOverride.toLocaleString('es-CO')}
-                                                onChange={(e) => {
-                                                    const v = e.target.value.replace(/\D/g, '');
-                                                    setSmmlvOverride(Number(v) || 0);
-                                                }}
-                                                className="w-full bg-white border border-emerald-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Auxilio Transporte Editable */}
-                                    <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Aux. Transporte</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>
-                                            <input
-                                                type="text"
-                                                value={auxOverride.toLocaleString('es-CO')}
-                                                onChange={(e) => {
-                                                    const v = e.target.value.replace(/\D/g, '');
-                                                    setAuxOverride(Number(v) || 0);
-                                                }}
-                                                className="w-full bg-white border border-emerald-200 rounded-lg py-2 pl-6 pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Indicador visual del año seleccionado */}
-                                {anoBase !== 2026 && (
-                                    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg mt-2">
-                                        <AlertCircle className="w-4 h-4 text-amber-600" />
-                                        <span className="text-xs text-amber-700">
-                                            Usando valores del año <strong>{anoBase}</strong>. Los cálculos de nómina y liquidación usarán estos parámetros.
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
 
                             {/* II. SEGURIDAD SOCIAL */}
                             <Section title="II. Seguridad Social y Configuración" icon={<UserCog className="w-4 h-4" />} isOpen={openSections.has('section2')} onToggle={() => toggleSection('section2')}>
@@ -1459,7 +1483,21 @@ export default function NominaPage() {
                                     <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide">Acciones de Nómina</p>
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => setShowPreviewModal('nomina')}
+                                            onClick={() => {
+                                                if (activeEmployee && result) {
+                                                    const selectedClient = clients.find(c => c.id === selectedClientId);
+                                                    const blob = generatePayrollPDFBlob({
+                                                        employee: activeEmployee,
+                                                        result,
+                                                        companyName: selectedClient?.name,
+                                                        companyNit: selectedClient?.nit || undefined,
+                                                        periodDescription: `Período: ${activeEmployee.startDate || '2025-01-01'} - ${activeEmployee.endDate || '2025-01-30'}`
+                                                    });
+                                                    const url = URL.createObjectURL(blob);
+                                                    setPdfPreviewUrl(url);
+                                                    setShowPreviewModal('nomina');
+                                                }
+                                            }}
                                             className="flex-1 flex items-center justify-center gap-2 bg-zinc-50 text-zinc-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-zinc-100 transition-colors"
                                         >
                                             <Eye className="w-4 h-4" />
@@ -1476,6 +1514,8 @@ export default function NominaPage() {
                                                         companyNit: selectedClient?.nit || undefined,
                                                         periodDescription: `Período: ${activeEmployee.startDate || '2025-01-01'} - ${activeEmployee.endDate || '2025-01-30'}`
                                                     });
+                                                    // Track para feedback
+                                                    trackAction('nomina', 'pdf_download');
                                                 }
                                             }}
                                             className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white px-4 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
@@ -1734,7 +1774,21 @@ export default function NominaPage() {
                                         <p className="text-xs font-bold text-amber-600 uppercase tracking-wide">Acciones de Liquidación</p>
                                         <div className="flex gap-2">
                                             <button
-                                                onClick={() => setShowPreviewModal('liquidacion')}
+                                                onClick={() => {
+                                                    if (activeEmployee && result && liquidationResult) {
+                                                        const selectedClient = clients.find(c => c.id === selectedClientId);
+                                                        const blob = generateLiquidationPDFBlob({
+                                                            employee: activeEmployee,
+                                                            result,
+                                                            liquidationResult,
+                                                            companyName: selectedClient?.name,
+                                                            companyNit: selectedClient?.nit || undefined,
+                                                        });
+                                                        const url = URL.createObjectURL(blob);
+                                                        setPdfPreviewUrl(url);
+                                                        setShowPreviewModal('liquidacion');
+                                                    }
+                                                }}
                                                 className="flex-1 flex items-center justify-center gap-2 bg-amber-50 text-amber-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-amber-100 transition-colors"
                                             >
                                                 <Eye className="w-4 h-4" />
@@ -1833,10 +1887,10 @@ export default function NominaPage() {
                 </div>
             )}
 
-            {/* PDF Preview Modal */}
-            {showPreviewModal && activeEmployee && result && (
+            {/* PDF Preview Modal - Real PDF Embedded */}
+            {showPreviewModal && pdfPreviewUrl && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-                    <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+                    <div className="bg-white rounded-2xl max-w-4xl w-full h-[90vh] overflow-hidden shadow-2xl flex flex-col">
                         {/* Header */}
                         <div className={`p-4 flex items-center justify-between ${showPreviewModal === 'nomina' ? 'bg-zinc-900' : 'bg-amber-600'} text-white`}>
                             <div className="flex items-center gap-3">
@@ -1845,262 +1899,109 @@ export default function NominaPage() {
                                     {showPreviewModal === 'nomina' ? 'Vista Previa - Comprobante de Nómina' : 'Vista Previa - Liquidación de Prestaciones'}
                                 </h2>
                             </div>
-                            <button onClick={() => setShowPreviewModal(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                            <button
+                                onClick={() => {
+                                    if (pdfPreviewUrl) {
+                                        URL.revokeObjectURL(pdfPreviewUrl);
+                                        setPdfPreviewUrl(null);
+                                    }
+                                    setShowPreviewModal(null);
+                                }}
+                                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                            >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6 bg-zinc-100">
-                            <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto" style={{ fontFamily: 'system-ui, sans-serif' }}>
-                                {showPreviewModal === 'nomina' ? (
-                                    <>
-                                        {/* Nómina Preview */}
-                                        <div className="text-center border-b-2 border-zinc-900 pb-4 mb-4">
-                                            <h1 className="text-xl font-bold text-zinc-900">COMPROBANTE DE NÓMINA</h1>
-                                            <p className="text-sm text-zinc-600">Período: {activeEmployee.startDate} - {activeEmployee.endDate}</p>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                                            <div className="bg-zinc-50 p-3 rounded">
-                                                <p className="text-xs text-zinc-500 font-bold">EMPRESA</p>
-                                                <p className="font-medium">{clients.find(c => c.id === selectedClientId)?.name || 'ContaBot S.A.S'}</p>
-                                                <p className="text-zinc-600">NIT: {clients.find(c => c.id === selectedClientId)?.nit || '900.123.456-7'}</p>
-                                            </div>
-                                            <div className="bg-zinc-50 p-3 rounded">
-                                                <p className="text-xs text-zinc-500 font-bold">EMPLEADO</p>
-                                                <p className="font-medium">{activeEmployee.name}</p>
-                                                <p className="text-zinc-600">CC: {activeEmployee.documentNumber || 'N/A'}</p>
-                                            </div>
-                                        </div>
-
-                                        <table className="w-full text-sm mb-4">
-                                            <thead>
-                                                <tr className="bg-emerald-600 text-white">
-                                                    <th className="text-left p-2 rounded-tl">Concepto</th>
-                                                    <th className="text-right p-2 rounded-tr">Valor</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr className="border-b"><td className="p-2">Salario Base</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.baseSalary)}</td></tr>
-                                                <tr className="border-b bg-zinc-50"><td className="p-2">Auxilio de Transporte</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.transportAid)}</td></tr>
-                                                {(result.monthly.salaryData.overtime ?? 0) > 0 && <tr className="border-b"><td className="p-2">Horas Extra</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.overtime ?? 0)}</td></tr>}
-                                                <tr className="bg-emerald-50 font-bold"><td className="p-2">TOTAL DEVENGADO</td><td className="text-right p-2">{formatCurrency(result.monthly.salaryData.totalAccrued)}</td></tr>
-                                            </tbody>
-                                        </table>
-
-                                        <table className="w-full text-sm mb-4">
-                                            <thead>
-                                                <tr className="bg-red-600 text-white">
-                                                    <th className="text-left p-2 rounded-tl">Deducciones</th>
-                                                    <th className="text-right p-2 rounded-tr">Valor</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr className="border-b"><td className="p-2">Salud (4%)</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.health)}</td></tr>
-                                                <tr className="border-b bg-zinc-50"><td className="p-2">Pensión (4%)</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.pension)}</td></tr>
-                                                {result.monthly.employeeDeductions.solidarityFund > 0 && <tr className="border-b"><td className="p-2">Fondo Solidaridad</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.solidarityFund)}</td></tr>}
-                                                <tr className="bg-red-50 font-bold"><td className="p-2">TOTAL DEDUCCIONES</td><td className="text-right p-2">{formatCurrency(result.monthly.employeeDeductions.totalDeductions)}</td></tr>
-                                            </tbody>
-                                        </table>
-
-                                        <div className="bg-emerald-600 text-white p-4 rounded-lg flex justify-between items-center">
-                                            <span className="font-bold">NETO A PAGAR</span>
-                                            <span className="text-2xl font-bold">{formatCurrency(result.monthly.netPay)}</span>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        {/* Liquidación Preview */}
-                                        <div className="text-center border-b-2 border-amber-600 pb-4 mb-4">
-                                            <h1 className="text-xl font-bold text-zinc-900">LIQUIDACIÓN DE PRESTACIONES SOCIALES</h1>
-                                            <p className="text-sm text-zinc-500 italic">(Colombia – Código Sustantivo del Trabajo)</p>
-                                        </div>
-
-                                        <div className="bg-zinc-100 p-3 rounded mb-4 text-sm">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <p><span className="text-zinc-500">Trabajador:</span> <strong>{activeEmployee.name}</strong></p>
-                                                <p><span className="text-zinc-500">Documento:</span> {activeEmployee.documentNumber || 'N/A'}</p>
-                                                <p><span className="text-zinc-500">Fecha ingreso:</span> {activeEmployee.startDate}</p>
-                                                <p><span className="text-zinc-500">Fecha retiro:</span> {activeEmployee.endDate}</p>
-                                                <p><span className="text-zinc-500">Días laborados:</span> <strong>{liquidationResult?.daysWorked}</strong></p>
-                                                <p><span className="text-zinc-500">Salario base:</span> {formatCurrency(activeEmployee.baseSalary)}</p>
-                                            </div>
-                                        </div>
-
-                                        <table className="w-full text-sm mb-4">
-                                            <thead>
-                                                <tr className="bg-zinc-200">
-                                                    <th className="text-left p-2">Concepto</th>
-                                                    <th className="text-right p-2">Valor</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr className="border-b"><td className="p-2">Cesantías</td><td className="text-right p-2">{formatCurrency(liquidationResult?.cesantias || 0)}</td></tr>
-                                                <tr className="border-b bg-zinc-50"><td className="p-2">Intereses de Cesantías (12%)</td><td className="text-right p-2">{formatCurrency(liquidationResult?.interesesCesantias || 0)}</td></tr>
-                                                <tr className="border-b"><td className="p-2">Prima de Servicios</td><td className="text-right p-2">{formatCurrency(liquidationResult?.prima || 0)}</td></tr>
-                                                <tr className="border-b bg-zinc-50"><td className="p-2">Vacaciones</td><td className="text-right p-2">{formatCurrency(liquidationResult?.vacaciones || 0)}</td></tr>
-                                                <tr className="bg-amber-50 font-bold"><td className="p-2">TOTAL PRESTACIONES</td><td className="text-right p-2">{formatCurrency(liquidationResult?.totalPrestaciones || 0)}</td></tr>
-                                            </tbody>
-                                        </table>
-
-                                        {liquidationResult && liquidationResult.deductions.total > 0 && (
-                                            <div className="bg-red-50 p-3 rounded mb-4 text-sm">
-                                                <p className="font-bold text-red-700 mb-2">Descuentos:</p>
-                                                {liquidationResult.deductions.loans > 0 && <p className="flex justify-between"><span>Préstamos</span><span>-{formatCurrency(liquidationResult.deductions.loans)}</span></p>}
-                                                {liquidationResult.deductions.retefuente > 0 && <p className="flex justify-between"><span>Retención Fuente</span><span>-{formatCurrency(liquidationResult.deductions.retefuente)}</span></p>}
-                                                <p className="flex justify-between font-bold border-t mt-2 pt-2"><span>Total Descuentos</span><span>-{formatCurrency(liquidationResult.deductions.total)}</span></p>
-                                            </div>
-                                        )}
-
-                                        <div className="bg-green-100 border-2 border-green-500 p-4 rounded-lg flex justify-between items-center">
-                                            <span className="font-bold text-green-800">NETO A PAGAR AL TRABAJADOR</span>
-                                            <span className="text-2xl font-bold text-green-700">{formatCurrency(liquidationResult?.netToPay || 0)}</span>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                        {/* PDF Viewer - Using object tag with fallback */}
+                        <div className="flex-1 bg-zinc-100 relative">
+                            <object
+                                data={pdfPreviewUrl}
+                                type="application/pdf"
+                                className="w-full h-full"
+                            >
+                                {/* Fallback if browser blocks embedded PDF */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                                    <FileText className="w-16 h-16 text-zinc-400 mb-4" />
+                                    <h3 className="text-lg font-bold text-zinc-700 mb-2">
+                                        El visor de PDF no está disponible
+                                    </h3>
+                                    <p className="text-zinc-500 mb-6 max-w-md">
+                                        Tu navegador bloquea la vista previa embebida. Puedes abrir el PDF en una nueva pestaña o descargarlo directamente.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => window.open(pdfPreviewUrl, '_blank')}
+                                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                            Abrir en nueva pestaña
+                                        </button>
+                                    </div>
+                                </div>
+                            </object>
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 bg-zinc-50 border-t flex justify-end gap-3">
+                        <div className="p-4 bg-zinc-50 border-t flex justify-between items-center">
                             <button
-                                onClick={() => setShowPreviewModal(null)}
-                                className="px-4 py-2 text-zinc-600 hover:bg-zinc-200 rounded-lg font-medium transition-colors"
+                                onClick={() => window.open(pdfPreviewUrl, '_blank')}
+                                className="px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg font-medium transition-colors flex items-center gap-2"
                             >
-                                Cerrar
+                                <Eye className="w-4 h-4" />
+                                Abrir en nueva pestaña
                             </button>
-                            <button
-                                onClick={() => {
-                                    const selectedClient = clients.find(c => c.id === selectedClientId);
-                                    if (showPreviewModal === 'nomina') {
-                                        generatePayrollPDF({
-                                            employee: activeEmployee,
-                                            result,
-                                            companyName: selectedClient?.name,
-                                            companyNit: selectedClient?.nit || undefined,
-                                            periodDescription: `Período: ${activeEmployee.startDate} - ${activeEmployee.endDate}`
-                                        });
-                                    } else if (liquidationResult) {
-                                        generateLiquidationPDF({
-                                            employee: activeEmployee,
-                                            result,
-                                            liquidationResult,
-                                            companyName: selectedClient?.name,
-                                            companyNit: selectedClient?.nit || undefined,
-                                        });
-                                    }
-                                    setShowPreviewModal(null);
-                                }}
-                                className={`px-6 py-2 text-white rounded-lg font-bold flex items-center gap-2 ${showPreviewModal === 'nomina' ? 'bg-zinc-900 hover:bg-emerald-800' : 'bg-amber-600 hover:bg-amber-700'}`}
-                            >
-                                <Download className="w-4 h-4" />
-                                Descargar PDF
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        if (pdfPreviewUrl) {
+                                            URL.revokeObjectURL(pdfPreviewUrl);
+                                            setPdfPreviewUrl(null);
+                                        }
+                                        setShowPreviewModal(null);
+                                    }}
+                                    className="px-4 py-2 text-zinc-600 hover:bg-zinc-200 rounded-lg font-medium transition-colors"
+                                >
+                                    Cerrar
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const selectedClient = clients.find(c => c.id === selectedClientId);
+                                        if (showPreviewModal === 'nomina' && activeEmployee && result) {
+                                            generatePayrollPDF({
+                                                employee: activeEmployee,
+                                                result,
+                                                companyName: selectedClient?.name,
+                                                companyNit: selectedClient?.nit || undefined,
+                                                periodDescription: `Período: ${activeEmployee.startDate} - ${activeEmployee.endDate}`
+                                            });
+                                            trackAction('nomina', 'pdf_download');
+                                        } else if (liquidationResult && result) {
+                                            generateLiquidationPDF({
+                                                employee: activeEmployee,
+                                                result,
+                                                liquidationResult,
+                                                companyName: selectedClient?.name,
+                                                companyNit: selectedClient?.nit || undefined,
+                                            });
+                                            trackAction('nomina', 'pdf_download');
+                                        }
+                                        if (pdfPreviewUrl) {
+                                            URL.revokeObjectURL(pdfPreviewUrl);
+                                            setPdfPreviewUrl(null);
+                                        }
+                                        setShowPreviewModal(null);
+                                    }}
+                                    className={`px-6 py-2 text-white rounded-lg font-bold flex items-center gap-2 ${showPreviewModal === 'nomina' ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-amber-600 hover:bg-amber-700'}`}
+                                >
+                                    <Download className="w-4 h-4" />
+                                    Descargar PDF
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* Feedback Modal */}
-            {showFeedbackModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-                        {feedbackSubmitted ? (
-                            <div className="text-center py-8">
-                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <ThumbsUp className="w-8 h-8 text-green-600" />
-                                </div>
-                                <h2 className="text-xl font-bold text-zinc-900 mb-2">¡Gracias por tu feedback!</h2>
-                                <p className="text-zinc-600">Tu opinión nos ayuda a mejorar ContaBot.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-emerald-100 rounded-xl">
-                                            <MessageSquare className="w-5 h-5 text-emerald-600" />
-                                        </div>
-                                        <h2 className="text-lg font-bold text-zinc-900">Califica el módulo de Nómina</h2>
-                                    </div>
-                                    <button onClick={() => setShowFeedbackModal(false)} className="p-1 hover:bg-zinc-100 rounded-lg">
-                                        <X className="w-5 h-5 text-zinc-400" />
-                                    </button>
-                                </div>
-
-                                <div className="space-y-5">
-                                    {/* Star Rating */}
-                                    <div>
-                                        <p className="text-sm text-zinc-600 mb-3">¿Qué tan útil te parece este módulo?</p>
-                                        <div className="flex justify-center gap-2">
-                                            {[1, 2, 3, 4, 5].map((star) => (
-                                                <button
-                                                    key={star}
-                                                    onClick={() => setFeedbackRating(star)}
-                                                    className="p-1 transition-transform hover:scale-110"
-                                                >
-                                                    <Star
-                                                        className={`w-10 h-10 ${star <= feedbackRating ? 'fill-yellow-400 text-yellow-400' : 'text-zinc-300'}`}
-                                                    />
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <p className="text-center text-sm text-zinc-500 mt-2">
-                                            {feedbackRating === 0 && 'Selecciona una calificación'}
-                                            {feedbackRating === 1 && 'Muy malo'}
-                                            {feedbackRating === 2 && 'Malo'}
-                                            {feedbackRating === 3 && 'Regular'}
-                                            {feedbackRating === 4 && 'Bueno'}
-                                            {feedbackRating === 5 && '¡Excelente!'}
-                                        </p>
-                                    </div>
-
-                                    {/* Comment */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-zinc-700 mb-2">
-                                            Comentarios (opcional)
-                                        </label>
-                                        <textarea
-                                            value={feedbackComment}
-                                            onChange={(e) => setFeedbackComment(e.target.value)}
-                                            placeholder="¿Qué podríamos mejorar? ¿Qué te gustaría ver?"
-                                            className="w-full px-4 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-                                            rows={3}
-                                        />
-                                    </div>
-
-                                    {/* Submit Button */}
-                                    <button
-                                        onClick={handleSubmitFeedback}
-                                        disabled={feedbackRating === 0 || submittingFeedback}
-                                        className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {submittingFeedback ? (
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                        ) : (
-                                            <>
-                                                <Send className="w-4 h-4" />
-                                                Enviar Feedback
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Floating Feedback Button */}
-            <button
-                onClick={() => setShowFeedbackModal(true)}
-                className="fixed bottom-6 right-6 bg-emerald-600 text-white p-4 rounded-full shadow-lg hover:bg-emerald-700 transition-all hover:scale-105 z-40 flex items-center gap-2 group"
-            >
-                <MessageSquare className="w-5 h-5" />
-                <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap font-medium">
-                    Calificar módulo
-                </span>
-            </button>
 
             {/* Delete Employee Confirmation Modal */}
             <DeleteConfirmationModal

@@ -26,6 +26,7 @@ export interface OCRItem {
 }
 
 export interface OCRResult {
+    id?: string; // Database ID (set when loaded from DB)
     entity: string;
     nit?: string;
     date: string;

@@ -12,7 +12,8 @@ interface PayrollPDFData {
     liquidationResult?: LiquidationResult;
 }
 
-export function generatePayrollPDF(data: PayrollPDFData): void {
+// Internal function that creates the PDF document
+function generatePayrollPDFDoc(data: PayrollPDFData): jsPDF {
     const { employee, result, companyName, companyNit, periodDescription } = data;
     const doc = new jsPDF();
 
@@ -189,7 +190,16 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
 
     yPos = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
 
-    // ===== SIGNATURES =====
+    // ===== SIGNATURES (with page break check) =====
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const signatureHeight = 50; // Height needed for signatures + footer
+
+    // Check if we need a new page for signatures
+    if (yPos + signatureHeight > pageHeight - 20) {
+        doc.addPage();
+        yPos = 30;
+    }
+
     const signWidth = (pageWidth - margin * 2 - 20) / 2;
 
     doc.setDrawColor(150, 150, 150);
@@ -209,13 +219,24 @@ export function generatePayrollPDF(data: PayrollPDFData): void {
     doc.setTextColor(120, 120, 120);
     doc.text('Generado con Contabio - www.contabio.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 6, { align: 'center' });
 
-    // Save the PDF
-    const fileName = `nomina_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    return doc;
+}
+
+// Generate Payroll PDF and save
+export function generatePayrollPDF(data: PayrollPDFData): void {
+    const doc = generatePayrollPDFDoc(data);
+    const fileName = `nomina_${data.employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
 }
 
-// Generate PDF for liquidation (Colombian format)
-export function generateLiquidationPDF(data: PayrollPDFData): void {
+// Generate Payroll PDF as Blob (for preview)
+export function generatePayrollPDFBlob(data: PayrollPDFData): Blob {
+    const doc = generatePayrollPDFDoc(data);
+    return doc.output('blob');
+}
+
+// Internal function that creates the Liquidation PDF document
+function generateLiquidationPDFDoc(data: PayrollPDFData): jsPDF {
     const { employee, result, liquidationResult: liquidation } = data;
     const doc = new jsPDF();
 
@@ -579,7 +600,16 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // ===== 7. FIRMAS =====
+    // ===== 7. FIRMAS (with page break check) =====
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const signatureHeight = 55; // Height needed for section header + signature boxes + footer
+
+    // Check if we need a new page for signatures
+    if (yPos + signatureHeight > pageHeight - 15) {
+        doc.addPage();
+        yPos = 20;
+    }
+
     sectionHeader('7', 'FIRMAS');
     yPos += 5;
 
@@ -614,7 +644,18 @@ export function generateLiquidationPDF(data: PayrollPDFData): void {
     doc.setTextColor(120, 120, 120);
     doc.text('Generado con Contabio - www.contabio.co', pageWidth / 2, doc.internal.pageSize.getHeight() - 4, { align: 'center' });
 
-    // Save the PDF
-    const fileName = `liquidacion_${employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    return doc;
+}
+
+// Generate Liquidation PDF and save
+export function generateLiquidationPDF(data: PayrollPDFData): void {
+    const doc = generateLiquidationPDFDoc(data);
+    const fileName = `liquidacion_${data.employee.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
+}
+
+// Generate Liquidation PDF as Blob (for preview)
+export function generateLiquidationPDFBlob(data: PayrollPDFData): Blob {
+    const doc = generateLiquidationPDFDoc(data);
+    return doc.output('blob');
 }

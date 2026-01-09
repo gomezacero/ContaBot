@@ -15,6 +15,7 @@ export interface Database {
                     name: string
                     phone: string | null
                     occupation: 'INDEPENDENT' | 'OUTSOURCING' | 'INHOUSE' | null
+                    user_type: 'contador' | 'firma' | 'empresa' | null
                     role: string
                     firm_name: string | null
                     membership_type: string
@@ -26,6 +27,7 @@ export interface Database {
                     name: string
                     phone?: string | null
                     occupation?: 'INDEPENDENT' | 'OUTSOURCING' | 'INHOUSE' | null
+                    user_type?: 'contador' | 'firma' | 'empresa' | null
                     role?: string
                     firm_name?: string | null
                     membership_type?: string
@@ -37,6 +39,7 @@ export interface Database {
                     name?: string
                     phone?: string | null
                     occupation?: 'INDEPENDENT' | 'OUTSOURCING' | 'INHOUSE' | null
+                    user_type?: 'contador' | 'firma' | 'empresa' | null
                     role?: string
                     firm_name?: string | null
                     membership_type?: string
