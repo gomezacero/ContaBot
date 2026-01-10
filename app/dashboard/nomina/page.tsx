@@ -1228,21 +1228,21 @@ export default function NominaPage() {
                             {/* III. HORAS EXTRAS */}
                             <Section title="III. Horas Extras y Variables" icon={<DollarSign className="w-4 h-4" />} isOpen={openSections.has('section3')} onToggle={() => toggleSection('section3')}>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <Input label="H.E. Diurna (1.25)" type="number" value={activeEmployee.hedHours} onChange={v => handleInputChange('hedHours', v)} />
-                                    <Input label="H.E. Nocturna (1.75)" type="number" value={activeEmployee.henHours} onChange={v => handleInputChange('henHours', v)} />
-                                    <Input label="Recargo Noct. (0.35)" type="number" value={activeEmployee.rnHours} onChange={v => handleInputChange('rnHours', v)} />
-                                    <Input label="H.E.D Festiva (2.00)" type="number" value={activeEmployee.heddfHours} onChange={v => handleInputChange('heddfHours', v)} />
-                                    <Input label="H.E.N Festiva (2.50)" type="number" value={activeEmployee.hendfHours} onChange={v => handleInputChange('hendfHours', v)} />
+                                    <Input label="H.E. Diurna (1.25)" type="number" value={activeEmployee.hedHours ?? 0} onChange={v => handleInputChange('hedHours', v)} />
+                                    <Input label="H.E. Nocturna (1.75)" type="number" value={activeEmployee.henHours ?? 0} onChange={v => handleInputChange('henHours', v)} />
+                                    <Input label="Recargo Noct. (0.35)" type="number" value={activeEmployee.rnHours ?? 0} onChange={v => handleInputChange('rnHours', v)} />
+                                    <Input label="H.E.D Festiva (2.00)" type="number" value={activeEmployee.heddfHours ?? 0} onChange={v => handleInputChange('heddfHours', v)} />
+                                    <Input label="H.E.N Festiva (2.50)" type="number" value={activeEmployee.hendfHours ?? 0} onChange={v => handleInputChange('hendfHours', v)} />
                                     <div className="col-span-2 sm:col-span-3 h-px bg-zinc-100 my-2"></div>
-                                    <Input label="Comisiones" type="money" value={activeEmployee.commissions} onChange={v => handleInputChange('commissions', v)} />
-                                    <Input label="Bonif. Salariales" type="money" value={activeEmployee.salaryBonuses} onChange={v => handleInputChange('salaryBonuses', v)} />
+                                    <Input label="Comisiones" type="money" value={activeEmployee.commissions ?? 0} onChange={v => handleInputChange('commissions', v)} />
+                                    <Input label="Bonif. Salariales" type="money" value={activeEmployee.salaryBonuses ?? 0} onChange={v => handleInputChange('salaryBonuses', v)} />
                                 </div>
                             </Section>
 
                             {/* IV. NO SALARIAL */}
                             <Section title="IV. Pagos No Salariales" icon={<Briefcase className="w-4 h-4" />} isOpen={openSections.has('section4')} onToggle={() => toggleSection('section4')}>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Input label="Bonos No Salariales" type="money" value={activeEmployee.nonSalaryBonuses} onChange={v => handleInputChange('nonSalaryBonuses', v)} />
+                                    <Input label="Bonos No Salariales" type="money" value={activeEmployee.nonSalaryBonuses ?? 0} onChange={v => handleInputChange('nonSalaryBonuses', v)} />
                                 </div>
                             </Section>
 
@@ -1250,8 +1250,8 @@ export default function NominaPage() {
                             <Section title="V. Deducciones y Retenciones" icon={<TrendingDown className="w-4 h-4" />} isOpen={openSections.has('section5')} onToggle={() => toggleSection('section5')}>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <Input label="Préstamos Empresa" type="money" value={activeEmployee.loans} onChange={v => handleInputChange('loans', v)} />
-                                        <Input label="Otras Deducciones" type="money" value={activeEmployee.otherDeductions} onChange={v => handleInputChange('otherDeductions', v)} />
+                                        <Input label="Préstamos Empresa" type="money" value={activeEmployee.loans ?? 0} onChange={v => handleInputChange('loans', v)} />
+                                        <Input label="Otras Deducciones" type="money" value={activeEmployee.otherDeductions ?? 0} onChange={v => handleInputChange('otherDeductions', v)} />
                                     </div>
 
                                     {/* Toggle Deducciones Retefuente */}
