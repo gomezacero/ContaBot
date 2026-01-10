@@ -179,7 +179,10 @@ function LoginForm() {
             </div>
 
             <p className="text-center text-xs text-zinc-400 mt-6">
-                Al iniciar sesión, aceptas nuestros Términos de Servicio y Política de Privacidad.
+                Al iniciar sesión, aceptas nuestros{' '}
+                <Link href="/terminos" className="text-emerald-600 hover:underline">Términos y Condiciones</Link>
+                {' '}y{' '}
+                <Link href="/privacidad" className="text-emerald-600 hover:underline">Política de Privacidad</Link>.
             </p>
         </div>
     );
