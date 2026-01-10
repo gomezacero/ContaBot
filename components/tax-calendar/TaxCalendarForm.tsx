@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Loader2, Calendar, Lock, AlertCircle, Mail, MessageCircle, Sparkles } from 'lucide-react';
 
 interface TaxCalendarFormProps {
-    onSubmit: (data: any) => Promise<void>;
+    onSubmit: (data: Record<string, unknown>) => Promise<void>;
     onCancel: () => void;
     isLoading: boolean;
     isGuest?: boolean;
@@ -25,6 +25,28 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
     const [touched, setTouched] = useState({ name: false, nit: false });
     const [submitAttempted, setSubmitAttempted] = useState(false);
 
+    // Validar formato de NIT colombiano (solo números, 9-10 dígitos sin DV o con DV)
+    const validateNit = (nit: string): { valid: boolean; message?: string } => {
+        const cleanNit = nit.replace(/[.\-\s]/g, ''); // Remover puntos, guiones, espacios
+        if (!cleanNit) return { valid: false, message: 'Campo requerido' };
+        if (!/^\d+$/.test(cleanNit)) return { valid: false, message: 'Solo se permiten números' };
+        if (cleanNit.length < 6 || cleanNit.length > 11) {
+            return { valid: false, message: 'NIT debe tener entre 6 y 11 dígitos' };
+        }
+        return { valid: true };
+    };
+
+    // Validar nombre (mínimo 2 caracteres, sin caracteres peligrosos)
+    const validateName = (name: string): { valid: boolean; message?: string } => {
+        const trimmed = name.trim();
+        if (!trimmed) return { valid: false, message: 'Campo requerido' };
+        if (trimmed.length < 2) return { valid: false, message: 'Mínimo 2 caracteres' };
+        if (trimmed.length > 200) return { valid: false, message: 'Máximo 200 caracteres' };
+        // Prevenir inyección de caracteres peligrosos
+        if (/[<>{}]/.test(trimmed)) return { valid: false, message: 'Caracteres no permitidos' };
+        return { valid: true };
+    };
+
     const toggleAlertDay = (day: number) => {
         setFormData(prev => ({
             ...prev,
@@ -36,12 +58,21 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
 
     const handleSubmit = () => {
         setSubmitAttempted(true);
-        if (!formData.name || !formData.nit) return;
-        onSubmit(formData);
+        const nameValidation = validateName(formData.name);
+        const nitValidation = validateNit(formData.nit);
+        if (!nameValidation.valid || !nitValidation.valid) return;
+        // Sanitizar datos antes de enviar
+        onSubmit({
+            ...formData,
+            name: formData.name.trim(),
+            nit: formData.nit.replace(/[.\-\s]/g, ''), // Limpiar formato
+        });
     };
 
-    const showNameError = (touched.name || submitAttempted) && !formData.name;
-    const showNitError = (touched.nit || submitAttempted) && !formData.nit;
+    const nameValidation = validateName(formData.name);
+    const nitValidation = validateNit(formData.nit);
+    const showNameError = (touched.name || submitAttempted) && !nameValidation.valid;
+    const showNitError = (touched.nit || submitAttempted) && !nitValidation.valid;
 
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -103,7 +134,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             />
                             {showNameError && (
                                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" /> Campo requerido
+                                    <AlertCircle className="w-3 h-3" /> {nameValidation.message}
                                 </p>
                             )}
                         </div>
@@ -122,7 +153,7 @@ export const TaxCalendarForm: React.FC<TaxCalendarFormProps> = ({ onSubmit, onCa
                             />
                             {showNitError && (
                                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3" /> Campo requerido
+                                    <AlertCircle className="w-3 h-3" /> {nitValidation.message}
                                 </p>
                             )}
                         </div>

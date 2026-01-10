@@ -13,6 +13,11 @@ import {
     getUserMembershipType,
 } from '@/lib/services/usage-service';
 import { validateOCRResult } from '@/lib/services/ocr-validation-service';
+import {
+    checkRateLimit,
+    getRateLimitIdentifier,
+    getRateLimitHeaders,
+} from '@/lib/rate-limiter';
 
 // Configuración para permitir archivos más grandes
 export const runtime = 'nodejs';
@@ -362,6 +367,23 @@ export async function POST(request: NextRequest) {
         // ===== VERIFICACIÓN DE AUTENTICACIÓN =====
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
+
+        // ===== RATE LIMITING =====
+        const rateLimitId = getRateLimitIdentifier(request, user?.id);
+        const rateLimitResult = checkRateLimit(rateLimitId, 'ocr');
+
+        if (!rateLimitResult.allowed) {
+            const headers = getRateLimitHeaders(rateLimitResult, 'ocr');
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Demasiadas solicitudes. Por favor espera antes de intentar de nuevo.',
+                    code: 'RATE_LIMITED',
+                    retryAfter: rateLimitResult.retryAfter,
+                },
+                { status: 429, headers }
+            );
+        }
 
         if (!user) {
             return NextResponse.json(

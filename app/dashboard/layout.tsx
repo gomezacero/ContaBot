@@ -22,6 +22,7 @@ import {
     Building2,
     Pencil
 } from 'lucide-react';
+import Footer from '@/components/Footer';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -78,7 +79,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const router = useRouter();
     const supabase = createClient();
 
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<{ email?: string; profile?: { name?: string } } | null>(null);
     const [loading, setLoading] = useState(true);
     const [menuOpen, setMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -114,7 +115,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         getUser();
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _session) => {
             if (event === 'SIGNED_OUT') {
                 router.push('/login');
             }
@@ -131,7 +132,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     // Close user menu when clicking outside
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
+        const handleClickOutside = (_e: MouseEvent) => {
             if (userMenuOpen) {
                 setUserMenuOpen(false);
             }
@@ -153,7 +154,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <ToastProvider>
         <FeedbackProvider>
         <ClientProvider>
-        <div className="min-h-screen bg-[#fafafa]">
+        <div className="min-h-screen bg-[#fafafa] flex flex-col">
             {/* Navigation Header */}
             <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-100">
                 <div className="container mx-auto px-6 h-20 flex items-center justify-between max-w-7xl">
@@ -300,9 +301,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </header>
 
             {/* Main Content */}
-            <main className="container mx-auto px-6 max-w-7xl py-8">
+            <main className="container mx-auto px-6 max-w-7xl py-8 flex-1">
                 {children}
             </main>
+
+            {/* Footer */}
+            <Footer variant="minimal" />
         </div>
         </ClientProvider>
         </FeedbackProvider>
