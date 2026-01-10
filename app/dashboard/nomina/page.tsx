@@ -1171,10 +1171,10 @@ export default function NominaPage() {
                                             </div>
                                         </>
                                     )}
-                                    <Input label="Inicio Periodo" type="date" value={activeEmployee.startDate} onChange={v => handleInputChange('startDate', v)} />
-                                    <Input label="Fin Periodo" type="date" value={activeEmployee.endDate} onChange={v => handleInputChange('endDate', v)} />
+                                    <Input label="Inicio Periodo" type="date" value={activeEmployee.startDate || ''} onChange={v => handleInputChange('startDate', v)} />
+                                    <Input label="Fin Periodo" type="date" value={activeEmployee.endDate || ''} onChange={v => handleInputChange('endDate', v)} />
                                     <Input label="Nombre Empleado" type="text" value={activeEmployee.name} onChange={v => handleInputChange('name', v)} placeholder="" />
-                                    <Input label="Cédula Empleado" type="text" value={activeEmployee.documentNumber} onChange={v => handleInputChange('documentNumber', v)} placeholder="Número de identificación" />
+                                    <Input label="Cédula Empleado" type="text" value={activeEmployee.documentNumber || ''} onChange={v => handleInputChange('documentNumber', v)} placeholder="Número de identificación" />
                                     <Input label="Salario Básico" type="money" value={activeEmployee.baseSalary} onChange={v => handleInputChange('baseSalary', v)} />
                                     <div className="col-span-1">
                                         <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Tipo Contrato</label>
