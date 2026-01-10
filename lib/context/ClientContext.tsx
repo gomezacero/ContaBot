@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getLocalClients } from '@/lib/local-storage';
 
 // Tipo de cliente simplificado para el contexto
 export interface ClientInfo {
@@ -42,8 +43,13 @@ export function ClientProvider({ children }: ClientProviderProps) {
 
             if (!user) {
                 setIsAuthenticated(false);
-                setClients([]);
-                setSelectedClientIdState(null);
+                // Load local clients for guest users
+                const localClients = getLocalClients();
+                setClients(localClients.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    nit: c.nit || null,
+                })));
                 setIsLoading(false);
                 return;
             }
@@ -93,7 +99,13 @@ export function ClientProvider({ children }: ClientProviderProps) {
                 loadClients();
             } else if (event === 'SIGNED_OUT') {
                 setIsAuthenticated(false);
-                setClients([]);
+                // Load local clients for guest mode
+                const localClients = getLocalClients();
+                setClients(localClients.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    nit: c.nit || null,
+                })));
                 setSelectedClientIdState(null);
                 if (typeof window !== 'undefined') {
                     localStorage.removeItem(STORAGE_KEY);

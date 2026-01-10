@@ -49,18 +49,18 @@ function ActiveClientIndicator() {
         <>
             <button
                 onClick={() => setShowEditModal(true)}
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 transition-colors cursor-pointer group"
+                className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl border border-zinc-100 transition-colors cursor-pointer group"
             >
-                <Building2 className="w-4 h-4 text-emerald-600" />
-                <span className="text-sm font-semibold text-zinc-700 max-w-[200px] truncate">
+                <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-xs sm:text-sm font-semibold text-zinc-700 max-w-[80px] sm:max-w-[200px] truncate">
                     {selectedClient.name}
                 </span>
                 {selectedClient.nit && (
-                    <span className="text-xs text-zinc-400 font-mono">
+                    <span className="hidden sm:inline text-xs text-zinc-400 font-mono">
                         {selectedClient.nit}
                     </span>
                 )}
-                <Pencil className="w-3.5 h-3.5 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 sm:text-zinc-400 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0" />
             </button>
 
             {showEditModal && (
@@ -115,9 +115,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         getUser();
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, _session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_OUT') {
-                router.push('/login');
+                setUser(null);
+                // No redirect - allow guest mode in dashboard
+            } else if (event === 'SIGNED_IN' && session?.user) {
+                // Refresh user data on sign in
+                getUser();
             }
         });
 
@@ -126,8 +130,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
-        router.push('/');
-        router.refresh();
+        // Stay in dashboard as guest - onAuthStateChange will set user to null
     };
 
     // Close user menu when clicking outside
@@ -157,13 +160,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="min-h-screen bg-[#fafafa] flex flex-col">
             {/* Navigation Header */}
             <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-zinc-100">
-                <div className="container mx-auto px-6 h-20 flex items-center justify-between max-w-7xl">
-                    <div className="flex items-center gap-12">
-                        <Link href="/dashboard" className="flex items-center gap-3 cursor-pointer group">
-                            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
-                                <span className="text-white font-black text-xl">C</span>
+                <div className="container mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between max-w-7xl">
+                    <div className="flex items-center gap-4 sm:gap-8 lg:gap-12">
+                        <Link href="/dashboard" className="flex items-center gap-2 sm:gap-3 cursor-pointer group">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform">
+                                <span className="text-white font-black text-lg sm:text-xl">C</span>
                             </div>
-                            <span className="text-2xl font-extrabold tracking-tight text-zinc-900">Contabio</span>
+                            <span className="hidden xs:inline text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-900">Contabio</span>
                         </Link>
 
                         {/* Desktop Nav */}
@@ -184,7 +187,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         </nav>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         {/* Active Client Indicator */}
                         <ActiveClientIndicator />
 
@@ -195,9 +198,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                                     e.stopPropagation();
                                     setUserMenuOpen(!userMenuOpen);
                                 }}
-                                className="flex items-center gap-2 hover:bg-zinc-100 rounded-xl px-3 py-2 transition-colors"
+                                className="flex items-center gap-1 sm:gap-2 hover:bg-zinc-100 rounded-xl px-2 sm:px-3 py-2 transition-colors"
                             >
-                                <div className={`w-10 h-10 ${isGuest ? 'bg-zinc-400' : 'bg-emerald-600'} text-white rounded-full flex items-center justify-center font-bold`}>
+                                <div className={`w-8 h-8 sm:w-10 sm:h-10 ${isGuest ? 'bg-zinc-400' : 'bg-emerald-600'} text-white rounded-full flex items-center justify-center font-bold text-sm sm:text-base`}>
                                     {isGuest ? 'I' : (user?.profile?.name?.[0]?.toUpperCase() || 'U')}
                                 </div>
                                 <span className="hidden md:block text-sm font-semibold text-zinc-700">
@@ -279,7 +282,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
                 {/* Mobile Nav */}
                 {menuOpen && (
-                    <nav className="lg:hidden bg-white border-t border-zinc-100 px-6 py-4 animate-fade-in">
+                    <nav className="lg:hidden bg-white border-t border-zinc-100 px-4 sm:px-6 py-4 animate-fade-in">
                         {navItems.map((item) => {
                             const isActive = pathname.startsWith(item.href);
                             const Icon = item.icon;
@@ -301,7 +304,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </header>
 
             {/* Main Content */}
-            <main className="container mx-auto px-6 max-w-7xl py-8 flex-1">
+            <main className="container mx-auto px-4 sm:px-6 max-w-7xl py-4 sm:py-6 lg:py-8 flex-1">
                 {children}
             </main>
 
