@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import Footer from '@/components/Footer';
 
 // Mapeo de mensajes de error de Supabase a español
 const ERROR_MESSAGES: Record<string, string> = {
@@ -178,12 +179,7 @@ function LoginForm() {
                 </div>
             </div>
 
-            <p className="text-center text-xs text-zinc-400 mt-6">
-                Al iniciar sesión, aceptas nuestros{' '}
-                <Link href="/terminos" className="text-emerald-600 hover:underline">Términos y Condiciones</Link>
-                {' '}y{' '}
-                <Link href="/privacidad" className="text-emerald-600 hover:underline">Política de Privacidad</Link>.
-            </p>
+            <Footer variant="compact" />
         </div>
     );
 }

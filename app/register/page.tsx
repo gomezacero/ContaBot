@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Mail, Lock, ArrowRight, Eye, EyeOff, User, Phone, Building2, CheckCircle2 } from 'lucide-react';
+import Footer from '@/components/Footer';
 
 export default function RegisterPage() {
     const supabase = createClient();
@@ -22,6 +23,7 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -89,6 +91,13 @@ export default function RegisterPage() {
         // Validar nombre
         if (formData.name.trim().length < 2) {
             setError('Por favor ingresa tu nombre completo');
+            setLoading(false);
+            return;
+        }
+
+        // Validar aceptación de términos
+        if (!acceptedTerms) {
+            setError('Debes aceptar los Términos y Condiciones y la Política de Privacidad');
             setLoading(false);
             return;
         }
@@ -374,9 +383,38 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
+                        {/* Terms acceptance checkbox */}
+                        <div className="flex items-start gap-3 mt-4">
+                            <input
+                                type="checkbox"
+                                id="terms"
+                                checked={acceptedTerms}
+                                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                className="mt-1 w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            />
+                            <label htmlFor="terms" className="text-sm text-zinc-600 cursor-pointer">
+                                Acepto los{' '}
+                                <Link
+                                    href="/terminos"
+                                    target="_blank"
+                                    className="text-emerald-600 hover:underline font-semibold"
+                                >
+                                    Términos y Condiciones
+                                </Link>
+                                {' '}y la{' '}
+                                <Link
+                                    href="/privacidad"
+                                    target="_blank"
+                                    className="text-emerald-600 hover:underline font-semibold"
+                                >
+                                    Política de Privacidad
+                                </Link>
+                            </label>
+                        </div>
+
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || !acceptedTerms}
                             className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
                         >
                             {loading ? (
@@ -398,6 +436,8 @@ export default function RegisterPage() {
                         </p>
                     </div>
                 </div>
+
+                <Footer variant="compact" />
             </div>
         </div>
     );
