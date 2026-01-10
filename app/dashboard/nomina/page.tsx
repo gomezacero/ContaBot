@@ -1293,31 +1293,31 @@ export default function NominaPage() {
                                                     label="Intereses Vivienda (max 100 UVT)"
                                                     type="money"
                                                     value={activeEmployee.deductionsParameters?.housingInterest || 0}
-                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, housingInterest: v })}
+                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, housingInterest: Number(v) })}
                                                 />
                                                 <Input
                                                     label="Medicina Prepagada (max 16 UVT)"
                                                     type="money"
                                                     value={activeEmployee.deductionsParameters?.prepaidMedicine || 0}
-                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, prepaidMedicine: v })}
+                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, prepaidMedicine: Number(v) })}
                                                 />
                                                 <Input
                                                     label="Aporte Vol. Pensión RAIS"
                                                     type="money"
                                                     value={activeEmployee.deductionsParameters?.voluntaryPension || 0}
-                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, voluntaryPension: v })}
+                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, voluntaryPension: Number(v) })}
                                                 />
                                                 <Input
                                                     label="Aporte Vol. Renta Exenta (max 316 UVT)"
                                                     type="money"
                                                     value={activeEmployee.deductionsParameters?.voluntaryPensionExempt || 0}
-                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, voluntaryPensionExempt: v })}
+                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, voluntaryPensionExempt: Number(v) })}
                                                 />
                                                 <Input
                                                     label="AFC (Ahorro Fomento Construcción)"
                                                     type="money"
                                                     value={activeEmployee.deductionsParameters?.afc || 0}
-                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, afc: v })}
+                                                    onChange={v => handleInputChange('deductionsParameters', { ...activeEmployee.deductionsParameters, afc: Number(v) })}
                                                 />
                                                 <div className="flex items-center pt-5">
                                                     <Toggle
