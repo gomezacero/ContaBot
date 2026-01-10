@@ -10,7 +10,8 @@ import {
     LiquidationAdvancesInput,
     DEFAULT_ANTICIPOS,
     PrimaAnticipada,
-    TipoPrimaAnticipada
+    TipoPrimaAnticipada,
+    DeductionsParameters
 } from '@/types/payroll';
 import { calculatePayroll, formatCurrency, createDefaultEmployee, calculateLiquidation } from '@/lib/calculations';
 import { generatePayrollPDF, generateLiquidationPDF, generatePayrollPDFBlob, generateLiquidationPDFBlob } from '@/lib/pdf-generator';
@@ -615,7 +616,7 @@ export default function NominaPage() {
     };
 
     // Handle input change for active employee
-    const handleInputChange = (field: keyof PayrollInput, value: string | number | boolean) => {
+    const handleInputChange = (field: keyof PayrollInput, value: string | number | boolean | DeductionsParameters) => {
         // Case 1: Supabase client - update DB state
         if (selectedClientId && !isLocalClientId(selectedClientId)) {
             const dbField = fieldMapping[field] || field;
