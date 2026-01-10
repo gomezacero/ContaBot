@@ -12,20 +12,24 @@ import {
     Bell,
     Loader2
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getTaxDeadlines, getUpcomingEvents, TaxClientConfig } from '@/lib/tax-deadlines';
+import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
+
+const DEFAULT_STATS = {
+    activeClients: 0,
+    processedPayrolls: 0,
+    processedDocuments: 0,
+    pendingAlerts: 0,
+    documentsTrend: 0
+};
 
 export default function DashboardPage() {
     const supabase = createClient();
+    const { isAuthenticated, isLoading: authLoading } = useAuthStatus();
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState({
-        activeClients: 0,
-        processedPayrolls: 0,
-        processedDocuments: 0,
-        pendingAlerts: 0,
-        documentsTrend: 0
-    });
+    const [stats, setStats] = useState(DEFAULT_STATS);
 
     const modules = [
         {
@@ -61,6 +65,16 @@ export default function DashboardPage() {
     ];
 
     useEffect(() => {
+        // Reset stats when user logs out
+        if (!isAuthenticated && !authLoading) {
+            setStats(DEFAULT_STATS);
+            setLoading(false);
+            return;
+        }
+
+        // Wait for auth to resolve
+        if (authLoading) return;
+
         const fetchDashboardData = async () => {
             try {
                 // 1. Fetch Clients Count con todos los campos tributarios
@@ -141,7 +155,7 @@ export default function DashboardPage() {
         };
 
         fetchDashboardData();
-    }, [supabase]);
+    }, [supabase, isAuthenticated, authLoading]);
 
     const quickStats = [
         { label: 'Clientes Activos', value: stats.activeClients.toString(), icon: Users, trend: 'Total registrados' },
@@ -149,7 +163,7 @@ export default function DashboardPage() {
         { label: 'Alertas Pendientes', value: stats.pendingAlerts.toString(), icon: Bell, trend: 'Próximos 30 días' },
     ];
 
-    if (loading) {
+    if (loading || authLoading) {
         return (
             <div className="flex items-center justify-center min-h-[600px]">
                 <Loader2 className="w-10 h-10 animate-spin text-emerald-600" />

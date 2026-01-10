@@ -36,8 +36,16 @@ import type { InvoiceData } from './components/InvoiceCard';
 import { useToast } from '@/components/ui/Toast';
 import { useFeedback } from '@/components/feedback';
 import { useClient } from '@/lib/context/ClientContext';
+import { addLocalClient, getLocalClients } from '@/lib/local-storage';
+import Link from 'next/link';
 
 // Interfaces removed as they are now imported from ./types
+
+// Guest user limits
+const GUEST_LIMITS = {
+    MAX_CLIENTS: 1,
+    MAX_INVOICES: 3,
+};
 
 // TRM (Tasa Representativa del Mercado) for USD to COP conversion
 interface TRMData {
@@ -175,20 +183,61 @@ export default function GastosPage() {
     const handleCreateFolder = async () => {
         if (!newFolderName.trim()) return;
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (isAuthenticated) {
+                // Authenticated user: save to Supabase
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
 
-            const { data, error } = await supabase
-                .from('clients')
-                .insert({ user_id: user.id, name: newFolderName, nit: newFolderNit || null })
-                .select()
-                .single();
+                const { data, error } = await supabase
+                    .from('clients')
+                    .insert({ user_id: user.id, name: newFolderName, nit: newFolderNit || null })
+                    .select()
+                    .single();
 
-            if (error) throw error;
+                if (error) throw error;
 
-            // Refresh clients from context and select the new one
-            await refreshClients();
-            setSelectedClientId(data.id);
+                // Refresh clients from context and select the new one
+                await refreshClients();
+                setSelectedClientId(data.id);
+            } else {
+                // Guest user: check limits first
+                if (clients.length >= GUEST_LIMITS.MAX_CLIENTS) {
+                    addToast({
+                        type: 'warning',
+                        title: 'Límite de invitado',
+                        description: 'Solo puedes crear 1 carpeta. Regístrate para más.'
+                    });
+                    setShowNewFolderModal(false);
+                    return;
+                }
+
+                // Guest user: save to localStorage
+                const newClient = addLocalClient({
+                    name: newFolderName,
+                    nit: newFolderNit || '',
+                    classification: 'JURIDICA',
+                    tax_regime: 'ORDINARIO',
+                    iva_periodicity: 'BIMESTRAL',
+                    is_retention_agent: false,
+                    has_gmf: false,
+                    requires_exogena: false,
+                    has_patrimony_tax: false,
+                    alert_days: [7, 3, 1],
+                    email_alert: false,
+                    whatsapp_alert: false,
+                });
+
+                // Refresh clients from context and select the new one
+                await refreshClients();
+                setSelectedClientId(newClient.id);
+
+                addToast({
+                    type: 'success',
+                    title: 'Carpeta creada',
+                    description: 'Datos guardados localmente. Regístrate para sincronizar.'
+                });
+            }
+
             setNewFolderName('');
             setNewFolderNit('');
             setShowNewFolderModal(false);
@@ -274,6 +323,20 @@ export default function GastosPage() {
     // Process documents
     const handleProcess = async () => {
         if (files.length === 0) return;
+
+        // Check guest invoice limit
+        if (isGuest) {
+            const totalAfterProcess = results.length + files.length;
+            if (results.length >= GUEST_LIMITS.MAX_INVOICES) {
+                setError('Has alcanzado el límite de 3 facturas en modo invitado. Regístrate para continuar.');
+                return;
+            }
+            if (totalAfterProcess > GUEST_LIMITS.MAX_INVOICES) {
+                const canProcess = GUEST_LIMITS.MAX_INVOICES - results.length;
+                setError(`Solo puedes procesar ${canProcess} factura(s) más. Regístrate para procesar sin límites.`);
+                return;
+            }
+        }
 
         setProcessing(true);
         setError(null);
@@ -738,34 +801,61 @@ export default function GastosPage() {
 
             {/* GUEST BANNER */}
             {isGuest && (
-                <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center shrink-0">
-                            <Bell className="w-6 h-6 text-emerald-600 animate-bounce" />
+                <div className="bg-emerald-50 border border-emerald-100 p-4 sm:p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6 shadow-sm">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl sm:rounded-2xl shadow-sm flex items-center justify-center shrink-0">
+                            <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 animate-bounce" />
                         </div>
                         <div>
-                            <h4 className="text-lg font-bold text-emerald-900 leading-tight">Organiza tus soportes por cliente</h4>
-                            <p className="text-sm text-emerald-700/80">Regístrate para crear carpetas de clientes permanentes, guardar el historial de extracciones y exportar lotes de facturas directamente a tu software.</p>
+                            <h4 className="text-base sm:text-lg font-bold text-emerald-900 leading-tight">Organiza tus soportes por cliente</h4>
+                            <p className="text-xs sm:text-sm text-emerald-700/80">Regístrate para crear carpetas permanentes y guardar el historial de extracciones.</p>
                         </div>
                     </div>
                     <div className="flex gap-3 shrink-0">
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest self-center mr-2">Acceso Invitado</span>
+                        <span className="text-[9px] sm:text-[10px] font-black text-emerald-400 uppercase tracking-widest self-center">Acceso Invitado</span>
                     </div>
                 </div>
             )}
 
+            {/* GUEST LIMITS BANNER */}
+            {isGuest && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                        <div>
+                            <p className="text-sm font-bold text-amber-800">
+                                {results.length}/{GUEST_LIMITS.MAX_INVOICES} facturas procesadas
+                                {clients.length > 0 && ` · ${clients.length}/${GUEST_LIMITS.MAX_CLIENTS} carpeta`}
+                            </p>
+                            <p className="text-xs text-amber-600">
+                                {results.length >= GUEST_LIMITS.MAX_INVOICES
+                                    ? 'Límite alcanzado. Regístrate para continuar.'
+                                    : `Te quedan ${GUEST_LIMITS.MAX_INVOICES - results.length} facturas en modo invitado.`
+                                }
+                            </p>
+                        </div>
+                    </div>
+                    <Link
+                        href="/register"
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors shrink-0"
+                    >
+                        Crear Cuenta Gratis
+                    </Link>
+                </div>
+            )}
+
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 pb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 pb-4 sm:pb-6">
                 <div>
-                    <h2 className="text-3xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
-                        <ScanLine className="w-8 h-8 text-emerald-600" />
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-zinc-900 tracking-tight flex items-center gap-2 sm:gap-3">
+                        <ScanLine className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-600 shrink-0" />
                         Digitador Inteligente
                     </h2>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className="text-zinc-500 font-medium">Carpeta actual:</span>
-                        <span className="bg-zinc-900 text-white px-3 py-0.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-xs sm:text-sm text-zinc-500 font-medium">Carpeta:</span>
+                        <span className="bg-zinc-900 text-white px-2 sm:px-3 py-0.5 rounded-full text-[10px] sm:text-xs font-bold flex items-center gap-1 sm:gap-2 shadow-sm">
                             <Folder className="w-3 h-3 text-emerald-600" />
-                            {selectedClient?.name || 'General'}
+                            <span className="max-w-[120px] sm:max-w-none truncate">{selectedClient?.name || 'General'}</span>
                         </span>
                     </div>
                 </div>
@@ -782,37 +872,35 @@ export default function GastosPage() {
 
             {/* Header de Empresa Destacado */}
             {selectedClientId && selectedClient && (
-                <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                            <Building2 className="w-6 h-6 text-white" />
+                <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md shrink-0">
+                            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-white">
+                        <div className="min-w-0">
+                            <h3 className="text-base sm:text-lg font-bold text-white truncate">
                                 {selectedClient.name}
                             </h3>
-                            <p className="text-zinc-400 text-sm">
+                            <p className="text-zinc-400 text-xs sm:text-sm">
                                 NIT: {selectedClient.nit || 'No registrado'}
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-zinc-400">
-                            <FileText className="w-5 h-5" />
-                            <span className="text-sm font-medium">{results.length} documentos procesados</span>
-                        </div>
+                    <div className="flex items-center gap-2 text-zinc-400 w-full sm:w-auto justify-end">
+                        <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium">{results.length} docs</span>
                     </div>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8 items-start">
 
                 {/* LEFT COLUMN: Folders & Upload */}
-                <div className="lg:col-span-4 space-y-6">
+                <div className="lg:col-span-4 space-y-4 sm:space-y-6">
 
                     {/* Folder Manager */}
                     <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-                        <div className="bg-zinc-50/80 px-8 py-5 border-b border-zinc-100 flex items-center justify-between">
+                        <div className="bg-zinc-50/80 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-b border-zinc-100 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <Layers className="w-5 h-5 text-zinc-900" />
                                 <span className="text-xs font-black text-zinc-500 uppercase tracking-widest">Carpetas de Cliente</span>
@@ -851,7 +939,7 @@ export default function GastosPage() {
                     </div>
 
                     {/* Upload Area */}
-                    <div className="bg-white rounded-2xl p-8 border border-zinc-100 shadow-xl relative overflow-hidden">
+                    <div className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 border border-zinc-100 shadow-xl relative overflow-hidden">
                         <div
                             className={`rounded-2xl border-2 border-dashed transition-all duration-300 relative overflow-hidden flex flex-col items-center justify-center p-6 ${processing ? 'border-emerald-600 bg-emerald-50/10' : 'border-zinc-200 hover:border-emerald-600 hover:bg-zinc-50/50'
                                 }`}
@@ -960,41 +1048,42 @@ export default function GastosPage() {
                 {/* RIGHT COLUMN: Results Table */}
                 <div className="lg:col-span-8">
                     {results.length === 0 ? (
-                        <div className="bg-white rounded-2xl border-2 border-dashed border-zinc-200 p-20 text-center flex flex-col items-center justify-center opacity-60 min-h-[500px] shadow-sm">
-                            <div className="w-20 h-20 bg-zinc-50 rounded-2xl flex items-center justify-center mb-8">
-                                <DatabaseZap className="w-10 h-10 text-zinc-200" />
+                        <div className="bg-white rounded-2xl border-2 border-dashed border-zinc-200 p-8 sm:p-12 lg:p-20 text-center flex flex-col items-center justify-center opacity-60 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] shadow-sm">
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-zinc-50 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 lg:mb-8">
+                                <DatabaseZap className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-zinc-200" />
                             </div>
-                            <h3 className="text-xl font-black text-zinc-900 mb-2 uppercase tracking-widest">Consolidación Lista</h3>
-                            <p className="text-zinc-400 max-w-sm font-bold text-sm leading-relaxed">Carga varios archivos para que Contabio cree un único archivo de exportación estructurado para tu contabilidad.</p>
+                            <h3 className="text-base sm:text-lg lg:text-xl font-black text-zinc-900 mb-2 uppercase tracking-wider sm:tracking-widest">Consolidación Lista</h3>
+                            <p className="text-zinc-400 max-w-sm font-bold text-xs sm:text-sm leading-relaxed px-4">Carga varios archivos para que Contabio cree un único archivo de exportación estructurado.</p>
                         </div>
                     ) : (
                         <div className="space-y-6 animate-fade-in">
 
                             {/* Header Info Block */}
-                            <div className="bg-white rounded-2xl p-6 border border-zinc-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-                                        <Files className="w-5 h-5" />
+                            <div className="bg-white rounded-2xl p-4 sm:p-6 border border-zinc-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="flex items-center gap-3 sm:gap-4">
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+                                        <Files className="w-4 h-4 sm:w-5 sm:h-5" />
                                     </div>
                                     <div>
                                         <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Lote Procesado:</p>
                                         <p className="font-black text-zinc-900 text-sm">{results.length} Facturas</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
                                     <button
                                         onClick={handleClearClick}
-                                        className="flex items-center gap-1 text-zinc-400 hover:text-red-500 text-xs font-bold transition-colors px-3 py-2"
+                                        className="flex items-center justify-center gap-1 text-zinc-400 hover:text-red-500 text-xs font-bold transition-colors px-3 py-2 border border-zinc-200 rounded-xl sm:border-0"
                                     >
                                         <Trash2 className="w-4 h-4" />
-                                        Limpiar Todo
+                                        <span className="sm:hidden">Limpiar</span>
+                                        <span className="hidden sm:inline">Limpiar Todo</span>
                                     </button>
-                                    <div className="flex items-center gap-4 bg-zinc-50 px-6 py-2 rounded-2xl border border-zinc-100">
-                                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Acumulado:</span>
+                                    <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4 bg-zinc-50 px-3 sm:px-6 py-2 rounded-xl sm:rounded-2xl border border-zinc-100">
+                                        <span className="text-[9px] sm:text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total:</span>
                                         <div className="flex flex-col items-end">
-                                            <span className="font-black text-zinc-900 text-lg">{formatCurrency(totalAmountCOP)}</span>
+                                            <span className="font-black text-zinc-900 text-sm sm:text-lg">{formatCurrency(totalAmountCOP)}</span>
                                             {hasUSDInvoices && trm && (
-                                                <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                                <span className="text-[9px] sm:text-[10px] text-zinc-500 flex items-center gap-1">
                                                     <DollarSign className="w-3 h-3" />
                                                     {formatUSD(totalUSD)} × TRM {trm.rate.toLocaleString('es-CO')}
                                                 </span>
@@ -1101,13 +1190,14 @@ export default function GastosPage() {
                             </div>
 
                             {/* Footer Floating Action Button for Export */}
-                            <div className="fixed bottom-8 right-8 z-40">
+                            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 z-40">
                                 <button
                                     onClick={exportToExcel}
-                                    className="bg-zinc-900 hover:bg-zinc-950 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 transition-all hover:scale-105"
+                                    className="bg-zinc-900 hover:bg-zinc-950 text-white px-4 sm:px-6 lg:px-8 py-3 sm:py-4 rounded-full font-black text-[10px] sm:text-xs uppercase tracking-wider sm:tracking-[0.2em] shadow-2xl flex items-center gap-2 sm:gap-3 transition-all hover:scale-105"
                                 >
-                                    <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
-                                    Exportar Asiento ({totalItems} Líneas)
+                                    <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                                    <span className="hidden sm:inline">Exportar Asiento ({totalItems} Líneas)</span>
+                                    <span className="inline sm:hidden">Excel ({totalItems})</span>
                                 </button>
                             </div>
                         </div>
@@ -1119,16 +1209,16 @@ export default function GastosPage() {
             {showNewFolderModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowNewFolderModal(false)}></div>
-                    <div className="bg-white rounded-2xl p-10 w-full max-w-md relative z-10 shadow-2xl border border-zinc-100 animate-fade-in">
-                        <h3 className="text-2xl font-black text-zinc-900 mb-6 flex items-center gap-3">
-                            <Folder className="w-7 h-7 text-emerald-600" /> Nueva Carpeta
+                    <div className="bg-white rounded-2xl p-6 sm:p-8 lg:p-10 w-full max-w-md relative z-10 shadow-2xl border border-zinc-100 animate-fade-in mx-4">
+                        <h3 className="text-xl sm:text-2xl font-black text-zinc-900 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+                            <Folder className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-600" /> Nueva Carpeta
                         </h3>
-                        <div className="space-y-4 mb-8">
+                        <div className="space-y-4 mb-6 sm:mb-8">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">Nombre del Cliente / Proyecto</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                                     placeholder="Ej: Inversiones ABC"
                                     value={newFolderName}
                                     onChange={e => setNewFolderName(e.target.value)}
@@ -1139,7 +1229,7 @@ export default function GastosPage() {
                                 <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest ml-1">NIT / Cédula (Opcional)</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                                    className="w-full bg-zinc-50 border border-zinc-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
                                     placeholder="900.123.456"
                                     value={newFolderNit}
                                     onChange={e => setNewFolderNit(e.target.value)}
@@ -1147,8 +1237,8 @@ export default function GastosPage() {
                             </div>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-zinc-400 hover:bg-zinc-50 transition-colors">Cancelar</button>
-                            <button onClick={handleCreateFolder} className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Crear Carpeta</button>
+                            <button onClick={() => setShowNewFolderModal(false)} className="flex-1 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-xs font-black uppercase tracking-widest text-zinc-400 hover:bg-zinc-50 transition-colors">Cancelar</button>
+                            <button onClick={handleCreateFolder} className="flex-1 bg-emerald-600 text-white py-3 sm:py-4 rounded-xl sm:rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">Crear</button>
                         </div>
                     </div>
                 </div>

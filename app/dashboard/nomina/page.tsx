@@ -174,7 +174,7 @@ const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date
     <div className="flex flex-col gap-1">
         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{label}</label>
         <div className="relative">
-            {type === 'money' && <span className="absolute left-3 top-2.5 text-zinc-400 text-xs">$</span>}
+            {type === 'money' && <span className="absolute left-3 top-2.5 sm:top-2.5 text-zinc-400 text-xs">$</span>}
             <input
                 type={type === 'money' ? 'text' : type}
                 value={type === 'money' ? (value ? Number(value).toLocaleString('es-CO') : '') : (value ?? '')}
@@ -183,7 +183,7 @@ const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date
                     const v = type === 'money' ? e.target.value.replace(/\D/g, '') : e.target.value;
                     onChange(type === 'number' || type === 'money' ? Number(v) : v);
                 }}
-                className={`w-full bg-white border border-zinc-200 rounded-lg py-2 ${type === 'money' ? 'pl-6' : 'pl-3'} pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500`}
+                className={`w-full bg-white border border-zinc-200 rounded-lg py-2.5 sm:py-2 ${type === 'money' ? 'pl-6' : 'pl-3'} pr-3 text-sm font-medium text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500`}
             />
         </div>
     </div>
@@ -366,6 +366,7 @@ export default function NominaPage() {
         if (!selectedClientId) {
             setDbEmployees([]);
             if (localEmployees.length > 0) setActiveEmployeeId(localEmployees[0].id);
+            setLoading(false);
             return;
         }
 
@@ -693,30 +694,30 @@ export default function NominaPage() {
     }
 
     return (
-        <div className="animate-fade-in space-y-6">
+        <div className="animate-fade-in space-y-4 sm:space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl">
-                        <Calculator className="w-6 h-6" />
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-3 bg-emerald-100 text-emerald-700 rounded-xl sm:rounded-2xl">
+                        <Calculator className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-zinc-900">Calculadora Pro 2025</h1>
-                        <p className="text-sm text-zinc-500">Control total de variables para liquidaciones complejas.</p>
+                        <h1 className="text-xl sm:text-2xl font-bold text-zinc-900">Calculadora Pro 2025</h1>
+                        <p className="text-xs sm:text-sm text-zinc-500 hidden sm:block">Control total de variables para liquidaciones complejas.</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-zinc-100">
+                <div className="flex items-center gap-2 sm:gap-3 bg-white p-2 rounded-xl shadow-sm border border-zinc-100 w-full md:w-auto">
                     {saved && (
                         <div className="flex items-center gap-1 text-green-600 text-xs font-bold animate-fade-in px-2">
                             <CheckCircle2 className="w-4 h-4" />
-                            Guardado
+                            <span className="hidden sm:inline">Guardado</span>
                         </div>
                     )}
                     <select
                         value={selectedClientId || ''}
                         onChange={(e) => setSelectedClientId(e.target.value || null)}
-                        className="px-3 py-2 border border-zinc-200 rounded-lg text-sm font-medium bg-zinc-50 focus:ring-2 focus:ring-emerald-500 outline-none min-w-[200px]"
+                        className="flex-1 md:flex-none px-2 sm:px-3 py-2 border border-zinc-200 rounded-lg text-sm font-medium bg-zinc-50 focus:ring-2 focus:ring-emerald-500 outline-none min-w-0 sm:min-w-[200px]"
                     >
                         {!isAuthenticated && (
                             <option value="">📝 Modo Demo (Local)</option>
@@ -732,7 +733,7 @@ export default function NominaPage() {
                     </select>
                     <button
                         onClick={() => setShowClientModal(true)}
-                        className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                        className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shrink-0"
                         title="Agregar Cliente"
                     >
                         <Plus className="w-5 h-5" />
@@ -750,26 +751,26 @@ export default function NominaPage() {
 
             {/* Header de Empresa Destacado */}
             {selectedClientId && (
-                <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl p-4 flex items-center justify-between shadow-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                            <Building2 className="w-6 h-6 text-white" />
+                <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md shrink-0">
+                            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                         </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-white">
+                        <div className="min-w-0">
+                            <h3 className="text-base sm:text-lg font-bold text-white truncate">
                                 {clients.find(c => c.id === selectedClientId)?.name || 'Empresa'}
                             </h3>
-                            <p className="text-zinc-400 text-sm">
+                            <p className="text-zinc-400 text-xs sm:text-sm">
                                 NIT: {clients.find(c => c.id === selectedClientId)?.nit || 'No registrado'}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={handleAddEmployee}
-                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold transition-colors shadow-md"
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold transition-colors shadow-md text-sm w-full sm:w-auto justify-center"
                     >
-                        <UserPlus className="w-5 h-5" />
-                        <span className="hidden sm:inline">Agregar Empleado</span>
+                        <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span>Agregar Empleado</span>
                     </button>
                 </div>
             )}
@@ -857,10 +858,10 @@ export default function NominaPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start max-w-[1800px] mx-auto lg:h-[calc(100vh-180px)]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 items-start max-w-[1800px] mx-auto lg:h-[calc(100vh-180px)]">
 
                 {/* LEFT PANEL: FORM INPUTS (2/3) - Scroll independiente */}
-                <div className="lg:col-span-2 lg:h-full lg:overflow-y-auto lg:pr-3 space-y-4 scrollbar-thin">
+                <div className="lg:col-span-2 lg:h-full lg:overflow-y-auto lg:pr-3 space-y-3 sm:space-y-4 scrollbar-thin">
                     {activeEmployee && (
                         <>
                             {/* PARÁMETROS BASE DE CÁLCULO - Indicador Compacto */}
@@ -899,7 +900,7 @@ export default function NominaPage() {
 
                             {/* Panel expandible de parámetros */}
                             <div id="parametros-base-section" className="hidden bg-white border border-emerald-200 rounded-xl p-4 space-y-4 -mt-2">
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     {/* Selector de Año */}
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Año Base</label>
@@ -960,7 +961,7 @@ export default function NominaPage() {
 
                             {/* I. DATOS GENERALES */}
                             <Section title="I. Datos Generales y Periodo" icon={<Calendar className="w-4 h-4" />} isOpen={openSections.has('section1')} onToggle={() => toggleSection('section1')}>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* Datos del Empleador (auto-llenados desde cliente) */}
                                     {selectedClientId && (
                                         <>
@@ -1012,7 +1013,7 @@ export default function NominaPage() {
 
                             {/* II. SEGURIDAD SOCIAL */}
                             <Section title="II. Seguridad Social y Configuración" icon={<UserCog className="w-4 h-4" />} isOpen={openSections.has('section2')} onToggle={() => toggleSection('section2')}>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="col-span-1">
                                         <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Riesgo ARL</label>
                                         <select
@@ -1040,13 +1041,13 @@ export default function NominaPage() {
 
                             {/* III. HORAS EXTRAS */}
                             <Section title="III. Horas Extras y Variables" icon={<DollarSign className="w-4 h-4" />} isOpen={openSections.has('section3')} onToggle={() => toggleSection('section3')}>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     <Input label="H.E. Diurna (1.25)" type="number" value={activeEmployee.hedHours} onChange={v => handleInputChange('hedHours', v)} />
                                     <Input label="H.E. Nocturna (1.75)" type="number" value={activeEmployee.henHours} onChange={v => handleInputChange('henHours', v)} />
                                     <Input label="Recargo Noct. (0.35)" type="number" value={activeEmployee.rnHours} onChange={v => handleInputChange('rnHours', v)} />
                                     <Input label="H.E.D Festiva (2.00)" type="number" value={activeEmployee.heddfHours} onChange={v => handleInputChange('heddfHours', v)} />
                                     <Input label="H.E.N Festiva (2.50)" type="number" value={activeEmployee.hendfHours} onChange={v => handleInputChange('hendfHours', v)} />
-                                    <div className="col-span-3 h-px bg-zinc-100 my-2"></div>
+                                    <div className="col-span-2 sm:col-span-3 h-px bg-zinc-100 my-2"></div>
                                     <Input label="Comisiones" type="money" value={activeEmployee.commissions} onChange={v => handleInputChange('commissions', v)} />
                                     <Input label="Bonif. Salariales" type="money" value={activeEmployee.salaryBonuses} onChange={v => handleInputChange('salaryBonuses', v)} />
                                 </div>
@@ -1054,7 +1055,7 @@ export default function NominaPage() {
 
                             {/* IV. NO SALARIAL */}
                             <Section title="IV. Pagos No Salariales" icon={<Briefcase className="w-4 h-4" />} isOpen={openSections.has('section4')} onToggle={() => toggleSection('section4')}>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Input label="Bonos No Salariales" type="money" value={activeEmployee.nonSalaryBonuses} onChange={v => handleInputChange('nonSalaryBonuses', v)} />
                                 </div>
                             </Section>
@@ -1062,7 +1063,7 @@ export default function NominaPage() {
                             {/* V. DEDUCCIONES */}
                             <Section title="V. Deducciones y Retenciones" icon={<TrendingDown className="w-4 h-4" />} isOpen={openSections.has('section5')} onToggle={() => toggleSection('section5')}>
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <Input label="Préstamos Empresa" type="money" value={activeEmployee.loans} onChange={v => handleInputChange('loans', v)} />
                                         <Input label="Otras Deducciones" type="money" value={activeEmployee.otherDeductions} onChange={v => handleInputChange('otherDeductions', v)} />
                                     </div>
@@ -1100,7 +1101,7 @@ export default function NominaPage() {
                                         <div className="bg-zinc-50 rounded-xl p-4 space-y-4 border border-zinc-200 animate-in slide-in-from-top-2">
                                             <p className="text-xs text-zinc-500 font-medium">Configure los beneficios tributarios para reducir la base de retención en la fuente (Art. 383 E.T.)</p>
 
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <Input
                                                     label="Intereses Vivienda (max 100 UVT)"
                                                     type="money"
@@ -1422,16 +1423,16 @@ export default function NominaPage() {
                                         <AnimatedCounter value={result.monthly.netPay} formatter={formatCurrency} />
                                     </h2>
 
-                                    <div className="grid grid-cols-2 gap-4 border-t border-emerald-700/50 pt-4">
+                                    <div className="grid grid-cols-2 gap-2 sm:gap-4 border-t border-emerald-700/50 pt-4">
                                         <div>
-                                            <p className="text-xs text-emerald-300">Total Devengado</p>
-                                            <p className="font-semibold">
+                                            <p className="text-[10px] sm:text-xs text-emerald-300">Total Devengado</p>
+                                            <p className="font-semibold text-sm sm:text-base">
                                                 <AnimatedCounter value={result.monthly.salaryData.totalAccrued} formatter={formatCurrency} />
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-emerald-300">Total Deducciones</p>
-                                            <p className="font-semibold">
+                                            <p className="text-[10px] sm:text-xs text-emerald-300">Total Deducciones</p>
+                                            <p className="font-semibold text-sm sm:text-base">
                                                 <AnimatedCounter value={result.monthly.employeeDeductions.totalDeductions} formatter={formatCurrency} />
                                             </p>
                                         </div>
@@ -1567,8 +1568,8 @@ export default function NominaPage() {
 
                                         <div className="p-5 space-y-4">
                                             {/* Indicadores: Días Trabajados + Base Liquidación */}
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="bg-amber-50 p-3 rounded-xl border border-amber-100 text-center">
+                                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                                                <div className="bg-amber-50 p-2 sm:p-3 rounded-xl border border-amber-100 text-center">
                                                     <div className="flex items-center justify-center gap-1 text-amber-600 mb-1">
                                                         <Calendar className="w-3.5 h-3.5" />
                                                         <span className="text-[10px] font-medium uppercase">Días Trabajados</span>
