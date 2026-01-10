@@ -257,7 +257,7 @@ export default function HomePage() {
                 <span className="text-gradient">más estrategia.</span>
               </h2>
               <p className="text-xl text-zinc-500 font-medium max-w-2xl mx-auto leading-relaxed">
-                Diseñamos herramientas que eliminan el "trabajo pesado" para que puedas enfocarte en lo que realmente aporta valor a tus clientes.
+                Diseñamos herramientas que eliminan el &quot;trabajo pesado&quot; para que puedas enfocarte en lo que realmente aporta valor a tus clientes.
               </p>
             </div>
 
@@ -414,12 +414,15 @@ export default function HomePage() {
 
             {/* Simplified Menu */}
             <div className="flex flex-col md:flex-row items-center gap-4 md:gap-10">
-              <a href="#" className="text-[11px] font-bold text-zinc-400 hover:text-emerald-600 transition-colors uppercase tracking-[0.15em]">
+              <Link href="/privacidad" className="text-[11px] font-bold text-zinc-400 hover:text-emerald-600 transition-colors uppercase tracking-[0.15em]">
                 Políticas de Privacidad
-              </a>
-              <a href="#" className="text-[11px] font-bold text-zinc-400 hover:text-emerald-600 transition-colors uppercase tracking-[0.15em]">
+              </Link>
+              <Link href="/terminos" className="text-[11px] font-bold text-zinc-400 hover:text-emerald-600 transition-colors uppercase tracking-[0.15em]">
                 Términos y Condiciones
-              </a>
+              </Link>
+              <Link href="/seguridad" className="text-[11px] font-bold text-zinc-400 hover:text-emerald-600 transition-colors uppercase tracking-[0.15em]">
+                Seguridad
+              </Link>
             </div>
           </div>
 
