@@ -6,6 +6,10 @@ import {
     getRateLimitHeaders,
 } from '@/lib/rate-limiter';
 
+// Ensure route works in Vercel production
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/trm
  * Returns current TRM (Tasa Representativa del Mercado) - USD to COP exchange rate

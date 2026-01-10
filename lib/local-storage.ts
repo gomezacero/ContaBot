@@ -3,6 +3,7 @@
 
 const STORAGE_KEYS = {
     CLIENTS: 'contabot_clients',
+    EMPLOYEES: 'contabot_employees',
     PAYROLL_PRESETS: 'contabot_payroll_presets',
     GUEST_BANNER_DISMISSED: 'contabot_guest_banner_dismissed',
     // Feedback system keys
@@ -95,6 +96,90 @@ export function deleteLocalClient(id: string): void {
 export function clearLocalClients(): void {
     if (!isLocalStorageAvailable()) return;
     localStorage.removeItem(STORAGE_KEYS.CLIENTS);
+}
+
+// ============ LOCAL EMPLOYEES ============
+// Employee type for localStorage (simplified for guest mode)
+export interface LocalEmployee {
+    id: string;
+    client_id: string;
+    name: string;
+    salary: number;
+    transport_aid: boolean;
+    risk_level: 'I' | 'II' | 'III' | 'IV' | 'V';
+    contract_type: 'INDEFINIDO' | 'FIJO' | 'OBRA_LABOR' | 'APRENDIZAJE';
+    payment_frequency: 'MENSUAL' | 'QUINCENAL';
+    worked_days: number;
+    extra_hours_day: number;
+    extra_hours_night: number;
+    extra_hours_sunday: number;
+    night_surcharge_hours: number;
+    commissions: number;
+    bonuses: number;
+    other_income: number;
+    loan_deduction: number;
+    other_deductions: number;
+    start_date?: string;
+    end_date?: string;
+    created_at: string;
+}
+
+// Helper to check if a client ID is local (not from Supabase)
+export function isLocalClientId(clientId: string | null): boolean {
+    return clientId?.startsWith('local_') ?? false;
+}
+
+export function getLocalEmployees(clientId?: string): LocalEmployee[] {
+    if (!isLocalStorageAvailable()) return [];
+    const data = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
+    const employees = safeJsonParse<LocalEmployee[]>(data, []);
+    if (clientId) {
+        return employees.filter(e => e.client_id === clientId);
+    }
+    return employees;
+}
+
+export function setLocalEmployees(employees: LocalEmployee[]): void {
+    if (!isLocalStorageAvailable()) return;
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+}
+
+export function addLocalEmployee(employee: Omit<LocalEmployee, 'id' | 'created_at'>): LocalEmployee {
+    const employees = getLocalEmployees();
+    const newEmployee: LocalEmployee = {
+        ...employee,
+        id: `local_emp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        created_at: new Date().toISOString(),
+    };
+    employees.push(newEmployee);
+    setLocalEmployees(employees);
+    return newEmployee;
+}
+
+export function updateLocalEmployee(id: string, updates: Partial<LocalEmployee>): void {
+    const employees = getLocalEmployees();
+    const index = employees.findIndex(e => e.id === id);
+    if (index !== -1) {
+        employees[index] = { ...employees[index], ...updates };
+        setLocalEmployees(employees);
+    }
+}
+
+export function deleteLocalEmployee(id: string): void {
+    const employees = getLocalEmployees();
+    setLocalEmployees(employees.filter(e => e.id !== id));
+}
+
+export function clearLocalEmployees(clientId?: string): void {
+    if (!isLocalStorageAvailable()) return;
+    if (clientId) {
+        // Solo eliminar empleados de un cliente específico
+        const employees = getLocalEmployees();
+        setLocalEmployees(employees.filter(e => e.client_id !== clientId));
+    } else {
+        // Eliminar todos los empleados locales
+        localStorage.removeItem(STORAGE_KEYS.EMPLOYEES);
+    }
 }
 
 // ============ GUEST BANNER ============

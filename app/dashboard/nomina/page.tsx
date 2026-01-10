@@ -57,6 +57,14 @@ import { useToast } from '@/components/ui/Toast';
 import { useAuthStatus } from '@/lib/hooks/useAuthStatus';
 import { useFeedback } from '@/components/feedback';
 import { useClient } from '@/lib/context/ClientContext';
+import {
+    isLocalClientId,
+    getLocalEmployees,
+    addLocalEmployee,
+    updateLocalEmployee,
+    deleteLocalEmployee,
+    LocalEmployee
+} from '@/lib/local-storage';
 
 interface DBEmployee {
     id: string;
@@ -170,7 +178,7 @@ const Section: React.FC<{ title: string; icon: React.ReactNode; isOpen: boolean;
     </div>
 );
 
-const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date'; value: any; onChange: (val: any) => void; placeholder?: string }> = ({ label, type, value, onChange, placeholder }) => (
+const Input: React.FC<{ label: string; type: 'text' | 'number' | 'money' | 'date'; value: string | number; onChange: (val: string | number) => void; placeholder?: string }> = ({ label, type, value, onChange, placeholder }) => (
     <div className="flex flex-col gap-1">
         <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{label}</label>
         <div className="relative">
@@ -251,7 +259,10 @@ export default function NominaPage() {
     const { trackAction } = useFeedback();
 
     // Determine which employees to show
-    const employees = selectedClientId
+    // - No client selected: in-memory localEmployees
+    // - Local client (guest mode): localEmployees (loaded from localStorage)
+    // - Supabase client: dbEmployees from database
+    const employees = selectedClientId && !isLocalClientId(selectedClientId)
         ? dbEmployees.map(dbToPayrollInput)
         : localEmployees;
 
@@ -361,15 +372,102 @@ export default function NominaPage() {
         }
     }, [activeEmployee?.id]); // Solo cuando cambia el ID del empleado
 
+    // Helper: Convert LocalEmployee to PayrollInput
+    const localEmployeeToPayrollInput = (emp: LocalEmployee, clientName?: string, clientNit?: string): PayrollInput => ({
+        id: emp.id,
+        employerType: 'JURIDICA',
+        companyName: clientName || '',
+        companyNit: clientNit || '',
+        name: emp.name ?? 'Empleado',
+        documentNumber: '',
+        jobTitle: '',
+        contractType: emp.contract_type || 'INDEFINIDO',
+        baseSalary: emp.salary || SMMLV_2026,
+        riskLevel: (emp.risk_level as RiskLevel) || RiskLevel.I,
+        isExempt: true,
+        includeTransportAid: emp.transport_aid ?? true,
+        startDate: emp.start_date || '2025-01-01',
+        endDate: emp.end_date || '2025-01-30',
+        enableDeductions: false,
+        deductionsParameters: {
+            housingInterest: 0,
+            prepaidMedicine: 0,
+            voluntaryPension: 0,
+            voluntaryPensionExempt: 0,
+            afc: 0,
+            hasDependents: false,
+        },
+        hedHours: emp.extra_hours_day || 0,
+        henHours: emp.extra_hours_night || 0,
+        rnHours: emp.night_surcharge_hours || 0,
+        domFestHours: emp.extra_hours_sunday || 0,
+        heddfHours: 0,
+        hendfHours: 0,
+        commissions: emp.commissions || 0,
+        salaryBonuses: emp.bonuses || 0,
+        nonSalaryBonuses: emp.other_income || 0,
+        loans: emp.loan_deduction || 0,
+        otherDeductions: emp.other_deductions || 0,
+        anoBase: 2026,
+        smmlvOverride: undefined,
+        auxTransporteOverride: undefined,
+        advancesData: undefined
+    });
+
     // Load employees when client changes
     useEffect(() => {
         if (!selectedClientId) {
+            // No client selected - use in-memory local employees
             setDbEmployees([]);
             if (localEmployees.length > 0) setActiveEmployeeId(localEmployees[0].id);
             setLoading(false);
             return;
         }
 
+        // Check if this is a LOCAL client (guest mode)
+        if (isLocalClientId(selectedClientId)) {
+            // Load employees from localStorage
+            const storedEmployees = getLocalEmployees(selectedClientId);
+            const selectedClient = clients.find(c => c.id === selectedClientId);
+
+            if (storedEmployees.length === 0) {
+                // Create default employee for new local client
+                const defaultEmp = {
+                    client_id: selectedClientId,
+                    name: 'Empleado 1',
+                    salary: SMMLV_2026,
+                    transport_aid: true,
+                    risk_level: 'I' as const,
+                    contract_type: 'INDEFINIDO' as const,
+                    payment_frequency: 'MENSUAL' as const,
+                    worked_days: 30,
+                    extra_hours_day: 0,
+                    extra_hours_night: 0,
+                    extra_hours_sunday: 0,
+                    night_surcharge_hours: 0,
+                    commissions: 0,
+                    bonuses: 0,
+                    other_income: 0,
+                    loan_deduction: 0,
+                    other_deductions: 0,
+                };
+                const savedEmp = addLocalEmployee(defaultEmp);
+                const payrollEmp = localEmployeeToPayrollInput(savedEmp, selectedClient?.name, selectedClient?.nit || undefined);
+                setLocalEmployees([payrollEmp]);
+                setActiveEmployeeId(savedEmp.id);
+            } else {
+                // Load existing local employees
+                const payrollEmps = storedEmployees.map(emp =>
+                    localEmployeeToPayrollInput(emp, selectedClient?.name, selectedClient?.nit || undefined)
+                );
+                setLocalEmployees(payrollEmps);
+                setActiveEmployeeId(storedEmployees[0].id);
+            }
+            setLoading(false);
+            return;
+        }
+
+        // SUPABASE client - load from database
         const loadEmployees = async () => {
             setLoading(true);
             try {
@@ -391,7 +489,7 @@ export default function NominaPage() {
         };
 
         loadEmployees();
-    }, [selectedClientId, supabase]);
+    }, [selectedClientId, supabase, clients]);
 
     // Set initial active employee
     useEffect(() => {
@@ -401,40 +499,86 @@ export default function NominaPage() {
     }, [employees, activeEmployeeId]);
 
     // Handle adding employee
+    const GUEST_EMPLOYEE_LIMIT = 3;
     const handleAddEmployee = async () => {
-        if (selectedClientId) {
-            setSaving(true);
-            try {
-                const { data, error } = await supabase
-                    .from('employees')
-                    .insert({
-                        client_id: selectedClientId,
-                        name: `Empleado ${dbEmployees.length + 1}`,
-                        base_salary: SMMLV_2026,
-                        risk_level: 'I',
-                        include_transport_aid: true,
-                        is_exempt: true,
-                        start_date: '2025-01-01',
-                        end_date: '2025-01-30',
-                    })
-                    .select(`*, clients (id, name, nit)`)
-                    .single();
-
-                if (error) throw error;
-                setDbEmployees([...dbEmployees, data]);
-                setActiveEmployeeId(data.id);
-                setSaved(true);
-                setTimeout(() => setSaved(false), 2000);
-            } catch {
-                setError('Error agregando empleado');
-            } finally {
-                setSaving(false);
+        // Case 1: No client selected - in-memory demo mode
+        if (!selectedClientId) {
+            if (localEmployees.length >= 10) {
+                addToast({ type: 'warning', title: 'Límite alcanzado', description: 'Máximo 10 empleados en modo demo' });
+                return;
             }
-        } else {
-            if (localEmployees.length >= 10) return;
             const newEmp = createDefaultEmployee(localEmployees.length + 1);
             setLocalEmployees([...localEmployees, newEmp]);
             setActiveEmployeeId(newEmp.id);
+            return;
+        }
+
+        // Case 2: Local client (guest mode) - save to localStorage
+        if (isLocalClientId(selectedClientId)) {
+            const existingEmps = getLocalEmployees(selectedClientId);
+            if (existingEmps.length >= GUEST_EMPLOYEE_LIMIT) {
+                addToast({
+                    type: 'warning',
+                    title: 'Límite de invitado',
+                    description: `Máximo ${GUEST_EMPLOYEE_LIMIT} empleados por empresa en modo invitado. Regístrate para más.`
+                });
+                return;
+            }
+            const selectedClient = clients.find(c => c.id === selectedClientId);
+            const newLocalEmp = {
+                client_id: selectedClientId,
+                name: `Empleado ${existingEmps.length + 1}`,
+                salary: SMMLV_2026,
+                transport_aid: true,
+                risk_level: 'I' as const,
+                contract_type: 'INDEFINIDO' as const,
+                payment_frequency: 'MENSUAL' as const,
+                worked_days: 30,
+                extra_hours_day: 0,
+                extra_hours_night: 0,
+                extra_hours_sunday: 0,
+                night_surcharge_hours: 0,
+                commissions: 0,
+                bonuses: 0,
+                other_income: 0,
+                loan_deduction: 0,
+                other_deductions: 0,
+            };
+            const savedEmp = addLocalEmployee(newLocalEmp);
+            const payrollEmp = localEmployeeToPayrollInput(savedEmp, selectedClient?.name, selectedClient?.nit || undefined);
+            setLocalEmployees([...localEmployees, payrollEmp]);
+            setActiveEmployeeId(savedEmp.id);
+            addToast({ type: 'success', title: 'Empleado agregado' });
+            return;
+        }
+
+        // Case 3: Supabase client - save to database
+        setSaving(true);
+        try {
+            const { data, error } = await supabase
+                .from('employees')
+                .insert({
+                    client_id: selectedClientId,
+                    name: `Empleado ${dbEmployees.length + 1}`,
+                    base_salary: SMMLV_2026,
+                    risk_level: 'I',
+                    include_transport_aid: true,
+                    is_exempt: true,
+                    start_date: '2025-01-01',
+                    end_date: '2025-01-30',
+                })
+                .select(`*, clients (id, name, nit)`)
+                .single();
+
+            if (error) throw error;
+            setDbEmployees([...dbEmployees, data]);
+            setActiveEmployeeId(data.id);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+        } catch {
+            setError('Error agregando empleado');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -451,11 +595,30 @@ export default function NominaPage() {
         contractType: 'contract_type',
     };
 
+    // Mapeo de PayrollInput field -> LocalEmployee field para localStorage
+    const localFieldMapping: Record<string, string> = {
+        baseSalary: 'salary',
+        includeTransportAid: 'transport_aid',
+        riskLevel: 'risk_level',
+        startDate: 'start_date',
+        endDate: 'end_date',
+        contractType: 'contract_type',
+        hedHours: 'extra_hours_day',
+        henHours: 'extra_hours_night',
+        domFestHours: 'extra_hours_sunday',
+        rnHours: 'night_surcharge_hours',
+        commissions: 'commissions',
+        salaryBonuses: 'bonuses',
+        nonSalaryBonuses: 'other_income',
+        loans: 'loan_deduction',
+        otherDeductions: 'other_deductions',
+    };
+
     // Handle input change for active employee
-    const handleInputChange = (field: keyof PayrollInput, value: any) => {
-        if (selectedClientId) {
+    const handleInputChange = (field: keyof PayrollInput, value: string | number | boolean) => {
+        // Case 1: Supabase client - update DB state
+        if (selectedClientId && !isLocalClientId(selectedClientId)) {
             const dbField = fieldMapping[field] || field;
-            // Asegurar que los valores numéricos sean números
             const processedValue = ['base_salary'].includes(dbField) ? Number(value) || 0 : value;
 
             setDbEmployees(prev => prev.map(emp =>
@@ -463,10 +626,19 @@ export default function NominaPage() {
                     ? { ...emp, [dbField]: processedValue }
                     : emp
             ));
-        } else {
-            setLocalEmployees(prev => prev.map(emp =>
-                emp.id === activeEmployeeId ? { ...emp, [field]: value } : emp
-            ));
+            return;
+        }
+
+        // Case 2: Local client (guest mode) or no client - update localStorage
+        setLocalEmployees(prev => prev.map(emp =>
+            emp.id === activeEmployeeId ? { ...emp, [field]: value } : emp
+        ));
+
+        // Persist to localStorage for local clients
+        if (selectedClientId && isLocalClientId(selectedClientId)) {
+            const localField = localFieldMapping[field] || field;
+            const processedValue = ['salary'].includes(localField) ? Number(value) || 0 : value;
+            updateLocalEmployee(activeEmployeeId, { [localField]: processedValue } as Partial<LocalEmployee>);
         }
     };
 
@@ -608,50 +780,64 @@ export default function NominaPage() {
         setDeleteModal({ isOpen: true, employeeId: id, employeeName: name });
     };
 
-    // Handle deleting employee (soft delete - can be restored from papelera)
+    // Handle deleting employee (soft delete for Supabase, hard delete for local)
     const handleDeleteEmployee = async () => {
         const { employeeId: id, employeeName } = deleteModal;
 
-        if (selectedClientId) {
-            try {
-                // Use soft delete via RPC for safe deletion with audit trail
-                const { error } = await supabase.rpc('soft_delete_record', {
-                    p_table_name: 'employees',
-                    p_record_id: id,
-                    p_reason: 'Usuario elimino empleado desde nomina'
-                });
-                if (error) throw error;
-                const newList = dbEmployees.filter(emp => emp.id !== id);
-                setDbEmployees(newList);
-                if (activeEmployeeId === id && newList.length > 0) setActiveEmployeeId(newList[0].id);
-
+        // Case 1: No client or local client - delete from local state/localStorage
+        if (!selectedClientId || isLocalClientId(selectedClientId)) {
+            if (localEmployees.length === 1) {
                 addToast({
-                    type: 'success',
-                    title: 'Empleado eliminado',
-                    description: `"${employeeName}" ha sido movido a la papelera`,
-                    action: {
-                        label: 'Ver papelera',
-                        onClick: () => window.location.href = '/dashboard/papelera'
-                    }
+                    type: 'warning',
+                    title: 'No se puede eliminar',
+                    description: 'Debe haber al menos un empleado'
                 });
-            } catch {
-                setError('Error eliminando empleado');
-                addToast({
-                    type: 'error',
-                    title: 'Error',
-                    description: 'No se pudo eliminar el empleado'
-                });
+                return;
             }
-        } else {
-            // Local employees (guest mode) - no soft delete needed
-            if (localEmployees.length === 1) return;
             const newEmployees = localEmployees.filter(emp => emp.id !== id);
             setLocalEmployees(newEmployees);
             if (activeEmployeeId === id) setActiveEmployeeId(newEmployees[0].id);
+
+            // Delete from localStorage if it's a local client
+            if (selectedClientId && isLocalClientId(selectedClientId)) {
+                deleteLocalEmployee(id);
+            }
+
             addToast({
                 type: 'info',
                 title: 'Empleado eliminado',
-                description: 'El empleado ha sido eliminado (modo invitado)'
+                description: 'El empleado ha sido eliminado'
+            });
+            return;
+        }
+
+        // Case 2: Supabase client - soft delete via RPC
+        try {
+            const { error } = await supabase.rpc('soft_delete_record', {
+                p_table_name: 'employees',
+                p_record_id: id,
+                p_reason: 'Usuario elimino empleado desde nomina'
+            });
+            if (error) throw error;
+            const newList = dbEmployees.filter(emp => emp.id !== id);
+            setDbEmployees(newList);
+            if (activeEmployeeId === id && newList.length > 0) setActiveEmployeeId(newList[0].id);
+
+            addToast({
+                type: 'success',
+                title: 'Empleado eliminado',
+                description: `"${employeeName}" ha sido movido a la papelera`,
+                action: {
+                    label: 'Ver papelera',
+                    onClick: () => window.location.href = '/dashboard/papelera'
+                }
+            });
+        } catch {
+            setError('Error eliminando empleado');
+            addToast({
+                type: 'error',
+                title: 'Error',
+                description: 'No se pudo eliminar el empleado'
             });
         }
     };
